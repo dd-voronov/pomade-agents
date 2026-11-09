@@ -1,0 +1,421 @@
+# pomade-agents — Design
+
+`pomade-agents` ("Agents" in the UI) is the Pomade app for Daniil's agents. It owns two kinds of
+data, for the whole Pomade family:
+
+- **The roster.** It shows which agents exist and what each one is for, holds their modes and
+  launch specs, manages their skills and model, and creates new agents.
+- **Session data.** It tracks every agent session per project: its name (which is also its tab's
+  name), the status Daniil sets, its live state, where it started, which agent and model ran it,
+  its context fill and estimated cost, the first and last messages, and one-click resume.
+
+Other pieces read both only through this app's API (PLATFORM rule 4). This doc states the current
+design. The reasoning and Daniil's scenarios are in the G4 grill outcome
+(`../Pomade/docs/auxiliary/grills/2026-11-09-g4-agents.md`); the platform frame is in
+`../Pomade/docs/PLATFORM.md`.
+
+## 1. Shape
+
+| Part | What |
+|---|---|
+| **UI** | one web app (iframe on `pomade-app://pomade-agents/`) rendering three surfaces, chosen by route: the **Live now** panel, the **Sessions** tab, the **Roster** tab (cards, agent detail page, create agent) |
+| **Backend** | **with-Pomade** (starts and stops with Pomade). It reads and watches the agents' session stores, keeps the parse cache, writes the session and roster files, edits agent folders and `settings.json`, and appends shell aliases to `~/.zshrc` |
+| **Commands** | `pomade-agents` (§7) |
+
+**Stack:** TypeScript + React + Vite for the UI, a TypeScript Node process for the backend, both
+on `pomade-kit`'s SDK. Pure logic (transcript parsing, attribution, cost math) is unit-tested with
+vitest. Behavior is covered by Playwright against the SDK's fake host, plus a dev-linked Pomade
+smoke spec.
+
+**Manifest** (`manifest.json`):
+- id `pomade-agents`, backend `with-pomade`
+- one strip icon: Agents → fills the panel with Live now
+- command `pomade-agents`
+- published events (§6)
+- paths outside the workspace: `~/.claude/` (built-in Claude Code store, skills, settings),
+  `~/.codex/` (sessions, config), `~/.zshrc` (aliases)
+
+**Surfaces:**
+- The **Agents icon** in Pomade's left strip opens the **Live now** panel (§2.8).
+- The panel's two buttons, **Sessions** and **Roster**, open or focus those wide tabs.
+- With the app installed, Pomade's clock icon opens the Sessions tab, and the "+" menu takes its
+  agents from the roster (§3.7).
+
+## 2. Sessions
+
+### 2.1 Identity
+
+- **One provider session id = one session.**
+  - `/compact` and resume (`claude --resume`, `codex resume`, Pomade's Resume) keep the id, so
+    they keep the session.
+  - `/clear` creates a new id, so it's a new session: unnamed and Active.
+  - `/fork` creates a new session named "<name> (fork)", with `forkedFrom` recorded.
+- **A tab's session changes over time.**
+  - In-session `/resume` switches the tab to an existing session. `/clear` and `/fork` move the
+    tab to a new one.
+  - The platform reports every binding change (`pomade:E-033`). The app records which project's
+    tab first ran each session (`launchedFrom`).
+- **Open / Resume:**
+  - If the session is bound to an open tab, that tab is focused.
+  - Otherwise the session is resumed in a new agent tab in its project (`pomade:E-033`).
+  - Resuming a session whose status isn't Active sets it to **Active**.
+
+### 2.2 Sources
+
+| Provider | Store | Session file |
+|---|---|---|
+| Claude Code, built-in `claude` | `~/.claude/projects/<encoded-cwd>/` | `<sessionId>.jsonl` (the basename is the id) |
+| Claude Code, folder agents | `<workspace>/Agents/<name>/projects/<encoded-cwd>/` | same |
+| Codex, built-in `codex` | `~/.codex/sessions/<YYYY>/<MM>/<DD>/` | `rollout-<launch time>-<sessionId>.jsonl`; line 0 `session_meta` carries id + cwd |
+
+- Only regular `.jsonl` files count. Excluded: `memory/`, per-session directories, and sub-agent
+  transcripts (`<sessionId>/subagents/`).
+- A session's **start folder** is its first recorded `cwd`.
+- Store semantics (when a file appears, what `/clear` and resume do to it) are in Pomade's
+  `docs/modules/agents/session-stores.md`.
+- The backend watches each store. A file that appears or grows is re-parsed incrementally from
+  its last offset.
+- The parse index lives in `<userData>/app-state/pomade-agents/` (machine-local, rebuildable).
+
+### 2.3 What a session shows
+
+| Field | Source |
+|---|---|
+| agent | the store it lives in: built-in store → `claude` / `codex`; `Agents/<name>/` → that folder agent |
+| provider | Claude Code or Codex |
+| model + effort | the latest turn. Claude: `message.model` + `effort`. Codex: `turn_context.model` + `effort`. A mid-session `/model` switch shows |
+| context % | the last turn's input-side tokens ÷ the model's context window. Claude: `input + cache_read + cache_creation` of the last assistant usage, window from the price table. Codex: `last_token_usage` ÷ `model_context_window` |
+| ~$ est. | Σ tokens per turn × the price table (input, output, cache read, cache write), always labeled "~$ est." |
+| started · last active | first and last `timestamp` |
+| folder · branch | `cwd`, `gitBranch` (Claude). Codex: `session_meta.cwd` |
+| first / last message from Daniil | the first and last real user text, skipping injected content (system reminders, skill bodies, tool results, command caveats, Pomade's file-context lines) |
+| last agent answer | the last assistant text block |
+
+**Price table:** a hand-maintained table in the app source. Per model id it holds dollar rates
+per million tokens and the context window. A model missing from the table shows "—" for cost and
+context; it never shows a guess.
+
+### 2.4 Status and live state
+
+Two separate columns:
+
+| | Values | Set by |
+|---|---|---|
+| **Status** | Active · On hold · Done · Done–skip/Failed | Daniil only, in the Agents UI (row, detail panel, bulk) |
+| **Live state** | Working · Needs you · Idle · Closed | detected: the platform's live state per agent tab (`pomade:E-033`); Runner runs from its events; anything not running is Closed |
+
+- **New sessions start Active.**
+- **On the app's first run, every session that already exists is set to Done**, silently.
+- **An optional one-line note** attaches to any status.
+- **Resuming** a non-Active session sets it to Active. Nothing else ever changes a status.
+- **Done–skip/Failed** is excluded from cost roll-ups (a toggle includes it), and readers like
+  the Session Analyzer treat it separately.
+
+### 2.5 Names
+
+- **A session's name is its tab's name, in both directions.**
+  - Renaming in the app changes the tab title.
+  - Double-click-renaming an agent tab renames the session.
+  - Restored tabs show their session's name.
+- **There are no automatic names.** Claude's `aiTitle` is ignored.
+- **An unnamed session:**
+  - its row shows the first message in grey
+  - its tab shows the default title in italics with an "unnamed" dot (e.g. after `/clear`)
+
+### 2.6 Project attribution
+
+In order:
+1. **Move to project** override, if set.
+2. **The project of the Pomade tab that first ran it** (`launchedFrom`), when known.
+3. **The deepest project whose root contains the start folder.**
+   - If several projects share that root, the session shows in each, with a "shared folder"
+     marker.
+4. **No project contains the folder** → the **Workspace** bucket.
+
+Also:
+- The detail panel shows the start folder relative to the project root ("started in `docs/`").
+- Every agent counts, whether or not it's connected to the project.
+- A session created after the first run and never bound to a Pomade tab is marked **"outside
+  Pomade"**. Its live state is always Closed.
+
+### 2.7 Sessions tab
+
+- **Scope** follows Pomade's sidebar selection: a project → that project's sessions; Workspace
+  → all sessions, with a Project column and filter.
+- **Groups**, top to bottom: Active · On hold · Done · Done–skip/Failed. None is ever hidden.
+  Within each group, rows are sorted by last activity.
+- **Row:** live state · name · agent · provider · model + effort · context % · ~$ est. · last
+  active. The note sits under the row.
+- **Filters:** agent, folder, and search over names and messages. Multi-select + **bulk Set
+  status**.
+- **Detail panel on the right:**
+  - start folder, start time
+  - first message, last message, last agent answer ("show more" expands in place)
+  - **Open / Resume · Set status (+ note) · Rename · Move to project**
+- The layout above is the agreed starting point. It's groomed with prototypes before it's built
+  (`T-001`).
+- Deep reading = Resume. There is no transcript viewer in v1.
+
+### 2.8 Live now panel
+
+- **Every running session**, grouped by project, with the active project first.
+  - Row: name, live state, since when.
+  - Unattended runs show ⏱ and the job name.
+- **Click a row:**
+  - an agent tab → Pomade switches to its project and focuses the tab
+  - a Runner run → its attached terminal tab opens
+- **The Agents icon's badge** counts the sessions in **Needs you**.
+- The red unread dots on tabs and the per-project counters are the platform's and stay as they
+  are.
+
+## 3. Roster
+
+### 3.1 Agents
+
+- **Built-ins:**
+  - `claude`: Claude Code, config `~/.claude`
+  - `codex`: Codex, config `~/.codex`
+- **Folder agents:** one per `<workspace>/Agents/<name>/` that holds a `CLAUDE.md`. Folders named
+  `_shared` or containing `template` are skipped. All folder agents are Claude Code instances run
+  with `CLAUDE_CONFIG_DIR=<folder>`.
+- **Each agent's launch command is its shell alias**, e.g. `claude-libra`. Pomade types it into
+  an interactive shell.
+
+### 3.2 `agent.yaml`
+
+One file per agent: `<workspace>/Apps/pomade-agents/agents/<id>/agent.yaml`. The folder leaves
+room for future per-agent files (custom modes, own harness).
+
+```yaml
+id: claude-libra
+provider: claude-code          # claude-code | codex
+kind: folder                   # builtin | folder
+configDir: Agents/claude-libra # workspace-relative; builtins: ~/.claude, ~/.codex
+command: claude-libra          # what Pomade types to launch it
+role: A meticulous librarian for Daniil's Knowledge vault.
+tags: [knowledge, vault]
+hidden: false
+modes:
+  normal: { enabled: true }
+  full-autonomy: { enabled: true }
+```
+
+- **Model and effort aren't stored here.** The provider's own config is their single truth:
+  `settings.json` `model` / `effortLevel` for Claude Code, `config.toml` for Codex.
+- **First run** creates one file per agent:
+  - from Pomade's folder scan
+  - plus `.pomade/agents.json` (command overrides, hidden agents)
+  - plus a role line pre-filled from the first sentence under `## Role` in the agent's
+    `CLAUDE.md`
+- **Orphans:** an `agent.yaml` whose `configDir` no longer exists (the folder was renamed
+  outside the app) is shown on a card, with **Re-link** to an unclaimed agent folder or
+  **Remove**.
+- **Known limit:** command edits made in the app don't reach Pomade's `.pomade/agents.json`. The
+  platform's fallback (§3.7) uses the last commands it knew itself.
+
+### 3.3 Cards (Roster tab)
+
+Each card shows:
+- name, provider, default model + effort
+- role line, tags
+- **Connected to:** the project setting. Pomade stores it; the app reads and writes it through
+  `pomade:E-030`, and it's the same data as the project's settings list.
+- **Used in:** projects with ≥1 session by the agent
+- last active
+- this week: session count and ~$ (Done–skip excluded)
+- **Start session ▾** (pick a project) · **Sessions** · **Edit**
+
+### 3.4 Agent detail page
+
+| Section | Content |
+|---|---|
+| Overview | the card; `CLAUDE.md` opens in Pomade's editor |
+| Skills | the agent's `skills/` entries grouped by source: `Agents/_shared/skills`, `Knowledge/_skills/**`, own. On/off = create / remove the symlink; **Add skill** from the catalog (both shared sources); "also in" other agents |
+| Model | default model + effort, edited in the provider config (only those keys change) |
+| Modes | §3.5, with a per-agent switch for Full autonomy |
+| Permissions, MCP, plugins | read-only; **Open `settings.json`** |
+| Memory | the projects the agent has `memory/` for; open a memory file |
+| Sessions | this agent's sessions across all projects (the Sessions list, filtered) |
+
+### 3.5 Modes and launch specs
+
+| Mode | Claude Code | Codex |
+|---|---|---|
+| Normal | the agent's own settings, no flags | default approvals |
+| Full autonomy | `--dangerously-skip-permissions` | `--yolo` |
+
+- **The modes come from the provider and are listed in `agent.yaml`.**
+- A disabled mode is offered nowhere: not in the "+" menu, not by Runner.
+- **A launch spec** = the command line for an (agent, mode, resume id?, prompt?) combination.
+  Pomade's "+" menu and Runner both build their launches from it.
+- Custom modes are later ([[P-004]]).
+
+### 3.6 Creating an agent
+
+**Claude Code agents only in v1.**
+
+1. **Form:**
+   - **name**: `[a-z0-9-]`. Refused if the folder exists, or if `zsh -ilc 'type <name>'`
+     resolves (an existing alias or command).
+   - **provider**
+   - **role line**
+   - **tags**
+   - **start from**: the blank template `Agents/Claude Agent Template`, or **clone** an existing
+     agent
+   - **connect to projects**
+2. **Create:**
+   - Copy the template, or the source agent's identity and config: `CLAUDE.md`,
+     `settings.json`, `skills/` links, `plugins` link. A clone never copies `projects/`,
+     sessions, memory, history, caches or `.claude.json`.
+   - Link every `Agents/_shared/skills/*` that's missing.
+   - Write `agent.yaml`.
+   - Connect the projects.
+   - Append `alias <name>='CLAUDE_CONFIG_DIR="<abs folder>" claude'` to `~/.zshrc` (always, once),
+     then verify it resolves.
+3. **Open:**
+   - Pomade opens an agent tab with the new agent in the first connected project.
+   - The app shows a copyable prompt for after `/login`: *"Use the creating-claude-agent skill to
+     set up <name>: role …, tags …"*.
+   - The card shows **Needs login** until the agent's first session exists.
+
+### 3.7 The "+" menu and the clock icon
+
+- **With the app installed,** Pomade reads the roster from it through the broker
+  (`pomade:E-033`): the agent list, commands, enabled modes, hidden agents.
+- **When the app is absent or not responding,** Pomade uses its own folder scan +
+  `.pomade/agents.json` (PLATFORM rule 7). A broken app never empties the "+" menu.
+- **With the app installed,** the clock icon opens the Sessions tab. Otherwise it opens Pomade's
+  built-in history dialog.
+
+## 4. Data and files
+
+| What | Where | Synced |
+|---|---|---|
+| agent profiles | `<workspace>/Apps/pomade-agents/agents/<id>/agent.yaml` | yes |
+| session records | `<workspace>/Apps/pomade-agents/sessions/<session-id>.yaml` | yes |
+| app settings | `<workspace>/Apps/pomade-agents/settings.yaml` (`adoptedAt`: the first run) | yes |
+| parse index, stats cache | `<userData>/app-state/pomade-agents/` | no |
+
+**Session record.** One per session, written the first time the app sees the session and on
+every change:
+
+```yaml
+id: 7b5c3451-0370-4bf9-b6fd-617d56545a78
+provider: claude-code            # claude-code | codex
+agent: claude                    # roster id
+name: G4 agents grill            # absent = unnamed
+status: active                   # active | on-hold | done | done-skip
+note: waiting for the v0.2.6 test round   # optional
+project: <stable project id>     # effective project (§2.6); absent = Workspace
+projectRoot: Projects/Pomade     # workspace-relative, refreshed on project rename
+projectOverride: true            # set when Daniil used Move to project
+launchedFrom: <project id>       # project of the Pomade tab that first ran it
+forkedFrom: <session id>
+startedByRunner: { job: Morning summary }   # absent = started by Daniil
+outsidePomade: true              # never bound to a Pomade tab (created after adoptedAt)
+transcript: /Users/…/7b5c3451-….jsonl
+cwd: /Users/…/Projects/Pomade
+updated: 2026-11-09T14:32:00Z
+```
+
+- **Anyone may read these files.** The format skill (§7) describes them.
+- **Only the app writes them**, through its UI, its API or its command. That way the tab title
+  follows a rename, and event C fires on a status change.
+- Derived numbers (tokens, cost, context, messages) aren't stored here. They come from the
+  transcript, through the API.
+
+## 5. Published API
+
+Registered with Pomade's broker (`pomade:E-028`). Callers reach it through the Host API.
+
+| Call | Returns | Callers |
+|---|---|---|
+| `sessions.get(id)` | the session summary: record fields + §2.3 fields + live state | Runner, git |
+| `sessions.lastMessage(id)` | `{ text, at }`: the last agent answer | Runner (result cards) |
+| `sessions.find({ cwd, startedFrom, startedTo, agent? })` | sessions started in that folder in that time window | Runner (runs without a pre-set id, e.g. Codex) |
+| `sessions.forRepo({ folder, branch? })` | sessions whose start folder is inside `folder` (a repo or worktree), optionally on `branch` | git (branch ↔ session link) |
+| `sessions.liveIn({ folder })` | `{ live, sessions }`: agent tabs and Runner runs running inside `folder`, including an agent tab not yet prompted | git (merge block), `pomade-git` (skip scheduled commit) |
+| `roster.list()` | agents: id, name, provider, kind, command, role, tags, hidden, enabled modes | Pomade "+" menu, Runner |
+| `roster.launchSpec({ agent, mode, resume?, prompt? })` | the command line to type | Pomade "+" menu, Runner |
+| `roster.projectsFor(agent)` · `roster.agentsFor(project)` | project ids · agent ids (the connection setting) | Runner (job form) |
+
+**Rule 4:** this app calls no other app. Runner's runs reach it as events (§6).
+
+## 6. Events
+
+**Published** (declared in the manifest, delivered by `pomade:E-031`):
+
+| Event | When | v1 |
+|---|---|---|
+| **A** `pomade-agents.turn-finished` | an agent answered and waits | declared; not emitted ([[P-013]]). When it is, only while someone subscribes |
+| **B** `pomade-agents.session-closed` | the session's process ended: `/exit`, tab closed, crash, a Runner run finished | yes |
+| **C** `pomade-agents.status-changed` | Daniil changed a status (bulk = one event per session) | yes |
+
+**Payload, every event:**
+- `sessionId`, `provider`, `agent`, `project` (id + root)
+- `cwd`, `name`, `status`
+- `startedByRunner` (+ `job`), `at`
+
+C adds `from` and `to`. B adds `reason`: exit · tab-closed · crash · run-finished.
+
+**How B is built:**
+- from the platform's **agent tab exited** event, plus the tab's bound session
+- for unattended runs, from Runner's **run finished**
+
+Runner's loop guard (it never fires its "agent session finished" hook for its own runs) reads
+`startedByRunner`. C always fires: it's a user action. Example use: Done → Runner runs the
+Session Analyzer script on that transcript.
+
+**Subscribed:**
+- the platform's agent tab exited and binding changes (`pomade:E-031`, `pomade:E-033`)
+- Runner's run started / run finished (session id, job name), for ⏱ rows and B
+
+## 7. Command `pomade-agents`
+
+Linked into `~/.pomade/bin` (`pomade:E-028`):
+
+```
+pomade-agents set-name [--session <id>] "<name>"
+pomade-agents set-note [--session <id>] "<note>"
+pomade-agents show     [--session <id>] [--json]
+```
+
+- **Without `--session`,** the command acts on the session bound to the terminal tab it runs in.
+  The tab is identified by an environment variable Pomade gives every terminal.
+- **There is no status command.** Status is Daniil's, in the UI.
+- **The format skill** ships from this repo. It teaches agents and scripts to read the session
+  records (§4) and to use this command.
+
+## 8. Platform and kit usage
+
+| Need | From |
+|---|---|
+| app tab + panel, manifest, install, dev link, own tabs at a route | `pomade:E-027` |
+| with-Pomade backend, broker, the `pomade-agents` command | `pomade:E-028` |
+| Agents icon, Live now panel, badge | `pomade:E-029`, `pomade:E-032` |
+| projects, groups, sidebar selection (incl. Workspace), stable project ids, project ↔ agent connection, symlinks, open a file | `pomade:E-030` |
+| agent tab exited, app-published events, subscriptions | `pomade:E-031` |
+| tab ↔ session bindings, titles both ways, live state, focus / launch / resume, "+" menu + clock icon | `pomade:E-033` |
+| opening a Runner run's attached terminal | `pomade:E-034` |
+| Host API client, fake host | `pomade-kit:E-001` |
+
+## 9. Placement
+
+| Capability | Where |
+|---|---|
+| Sessions tab, Live now panel, Roster tab, detail page, create agent | this app |
+| Session data: stores, attribution, names, statuses, notes, overrides, stats, last message, lookups, "live here" | this app (single owner) |
+| Roster data: profiles, modes, launch specs | this app; the platform's folder scan is the fallback |
+| `~/.zshrc` aliases, agent folders, provider config edits | this app's backend |
+| Launching agents, agent tabs, live pty state, session-id capture (`session-watcher`) | platform |
+| Project ↔ agent connection (stored as a project setting) | platform; this app edits it and answers others |
+| Unattended runs | `pomade-runner` |
+| Branch ↔ session link in the Git panel | platform git, using §5 |
+
+## 10. Not in v1
+
+Codex-based agents ([[P-003]]) · custom modes ([[P-004]]) · team-first "+" menu ([[P-005]]) ·
+planned sessions ([[P-006]]) · Stats tab ([[P-007]]) · Claude subscription meter ([[P-008]]) ·
+transcript tab ([[P-009]]) · Board cards → agents ([[P-010]]) · dashboard widgets ([[P-011]]) ·
+own harness / own agents ([[P-012]]) · emitting event A ([[P-013]]) · Runner runs in the Active
+group ([[P-014]], parked). Stats roll-ups: v1 scope still to be groomed ([[P-002]]).
