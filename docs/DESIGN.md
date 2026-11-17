@@ -69,7 +69,8 @@ smoke spec.
 | Codex, built-in `codex` | `~/.codex/sessions/<YYYY>/<MM>/<DD>/` | `rollout-<launch time>-<sessionId>.jsonl`; line 0 `session_meta` carries id + cwd |
 
 - Only regular `.jsonl` files count. Excluded: `memory/`, per-session directories, and sub-agent
-  transcripts (`<sessionId>/subagents/`).
+  transcripts (Claude `<sessionId>/subagents/`; Codex rollouts whose `session_meta.source` names a
+  sub-agent).
 - A session's **start folder** is its first recorded `cwd`.
 - Store semantics (when a file appears, what `/clear` and resume do to it) are in Pomade's
   `docs/modules/agents/session-stores.md`.
@@ -84,11 +85,11 @@ smoke spec.
 | agent | the store it lives in: built-in store → `claude` / `codex`; `Agents/<name>/` → that folder agent |
 | provider | Claude Code or Codex |
 | model + effort | the latest turn. Claude: `message.model` + `effort`. Codex: `turn_context.model` + `effort`. A mid-session `/model` switch shows |
-| context % | the last turn's input-side tokens ÷ the model's context window. Claude: `input + cache_read + cache_creation` of the last assistant usage, window from the price table. Codex: `last_token_usage` ÷ `model_context_window` |
-| ~$ est. | Σ tokens per turn × the price table (input, output, cache read, cache write), always labeled "~$ est." |
+| context % | the last turn's input-side tokens ÷ the model's context window. Claude: `input + cache_read + cache_creation` of the last assistant usage, window from the price table. Codex: `last_token_usage` ÷ the rollout's `model_context_window` (shown even for a model missing from the price table) |
+| ~$ est. | Σ tokens per turn × the price table (input, output, cache read, cache write split into 5-minute and 1-hour), always labeled "~$ est.". Claude: usage counted once per `message.id` (one API message spans several records); `<synthetic>` records aren't turns. Codex: per-turn tokens are differences of the cumulative `total_token_usage` (identical `token_count` events repeat) |
 | started · last active | first and last `timestamp` |
-| folder · branch | `cwd`, `gitBranch` (Claude). Codex: `session_meta.cwd` |
-| first / last message from Daniil | the first and last real user text, skipping injected content (system reminders, skill bodies, tool results, command caveats, Pomade's file-context lines) |
+| folder · branch | `cwd`, the first non-empty `gitBranch` (Claude). Codex: `session_meta.cwd`, `session_meta.git.branch` when recorded |
+| first / last message from Daniil | the first and last real user text, skipping injected content (system reminders, skill bodies, tool results, command caveats, built-in slash commands, Pomade's file-context lines). A skill or custom command shows as typed. Codex Desktop's wrapped prompts keep only the request |
 | last agent answer | the last assistant text block |
 
 **Price table:** a hand-maintained table in the app source. Per model id it holds dollar rates

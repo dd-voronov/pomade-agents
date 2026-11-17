@@ -28,6 +28,11 @@ function absolute(env: Env, name: string): string | null {
   return value;
 }
 
+/** The user's home folder (`HOME`), where the built-in agents' stores are; `null` when unset. */
+export function resolveHome(env: Env): string | null {
+  return absolute(env, "HOME");
+}
+
 /** Throws with a readable message when the environment is not a backend's. */
 export function resolveLocations(env: Env, appId: string): Locations {
   const socket = absolute(env, POMADE_ENV.socket);

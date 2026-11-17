@@ -38,14 +38,15 @@ The gate: `npm run lint && npm run typecheck && npm run build && npm run test:un
 | `src/ui/core/` | the app shell: handshake, routes and surfaces, the tab's view switch, empty and unavailable states, tokens |
 | `src/ui/sessions/` · `src/ui/roster/` | the Live now panel and the Sessions view · the Roster view |
 | `src/backend/core/` | the backend process: locations, run record, connection to Pomade |
+| `src/backend/stores/` | the agents' session stores: transcript parsers, the price table, the parse index, watching |
 | `src/backend/interfaces/` | the API the backend serves through Pomade's broker |
-| `harness/` | development and test tooling: the sandbox, the fake Pomade and its shell page, fixtures |
+| `harness/` | development and test tooling: the sandbox, the fake Pomade and its shell page, fixtures (synthetic transcripts in `fixtures/transcripts/`) |
 | `e2e/` | Playwright specs against the fake Pomade; `e2e/pomade/` — the smoke spec in a real Pomade |
 | `scripts/` | `dev`, `dev:fake` and the `pomade` command runner |
 
 ## Test isolation
 
 Every test and `dev:fake` run in a sandbox (`harness/sandbox.ts`): a temp folder with a HOME
-holding copies of the fixture stores (`~/.claude`, `~/.codex`, `~/.zshrc`), a copy of the fixture
-workspace, and Pomade user data. The backend gets only the environment Pomade gives a backend,
+holding copies of the fixture stores (`~/.claude`, `~/.codex`, `~/.zshrc`, with synthetic
+transcripts), a copy of the fixture workspace, and Pomade user data. The backend gets only the environment Pomade gives a backend,
 pointed at that folder. Nothing reads or writes the real stores or the real `Apps/`.

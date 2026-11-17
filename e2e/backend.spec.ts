@@ -1,4 +1,5 @@
 import { readRunRecord } from "../src/backend/core/run-record.ts";
+import { INDEX_FILE } from "../src/backend/stores/index-file.ts";
 import { APP_INFO_METHOD } from "../src/shared/api.ts";
 import { BUILT_BACKEND } from "../harness/app.ts";
 import { spawnBackend } from "../harness/backend-process.ts";
@@ -55,21 +56,23 @@ test("the built backend serves app.info to Pomade with every location inside the
   expect(await readRunRecord(stateDir)).toMatchObject({ pid: backend.pid, version: manifest.version });
 });
 
-test("the backend stops cleanly on SIGTERM and writes only inside its state folder", async ({ backend, pomade, sandbox, manifest }) => {
+test("the backend stops cleanly on SIGTERM and writes only inside its state folder: the run record and the parse index", async ({ backend, pomade, sandbox, manifest }) => {
   const stateDir = `${sandbox.userData}/app-state/${manifest.id}`;
   await expect.poll(() => readRunRecord(stateDir)).not.toBeNull();
+  await expect.poll(() => sandbox.snapshot(stateDir).then((files) => Object.keys(files).sort())).toEqual(["backend.json", INDEX_FILE]);
   expect(await sandbox.snapshot(sandbox.root)).toEqual({
     ...Object.fromEntries(Object.entries((await fixtureSnapshots()).home).map(([path, hash]) => [`home/${path}`, hash])),
     ...Object.fromEntries(Object.entries((await fixtureSnapshots()).workspace).map(([path, hash]) => [`workspace/${path}`, hash])),
     [`ud/app-keys/${manifest.id}`]: expect.any(String),
     [`ud/app-state/${manifest.id}/backend.json`]: expect.any(String),
+    [`ud/app-state/${manifest.id}/${INDEX_FILE}`]: expect.any(String),
   });
 
   expect(await backend.stop()).toEqual({ code: 0, signal: null, killed: false });
   expect(alive(backend.pid)).toBe(false);
   await expect.poll(() => pomade.backendCount()).toBe(0);
   expect(backend.output()).toContain("stopped");
-  expect(await sandbox.snapshot(`${sandbox.userData}/app-state`)).toEqual({});
+  expect(Object.keys(await sandbox.snapshot(`${sandbox.userData}/app-state`))).toEqual([`${manifest.id}/${INDEX_FILE}`]);
   const fixtures = await fixtureSnapshots();
   expect(await sandbox.snapshot(sandbox.home)).toEqual(fixtures.home);
   expect(await sandbox.snapshot(sandbox.workspace)).toEqual(fixtures.workspace);

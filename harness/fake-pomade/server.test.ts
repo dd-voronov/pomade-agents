@@ -5,6 +5,7 @@ import { connectSocket } from "pomade-kit/node";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { readRunRecord } from "../../src/backend/core/run-record.ts";
+import { INDEX_FILE } from "../../src/backend/stores/index-file.ts";
 import { APP_INFO_METHOD } from "../../src/shared/api.ts";
 import { FIXTURE_PROJECTS, SOURCE_BACKEND, readManifest } from "../app.ts";
 import { spawnBackend, type BackendProcess } from "../backend-process.ts";
@@ -60,13 +61,13 @@ describe("the backend against the fake Pomade", { timeout: 20_000 }, () => {
     expect(await readRunRecord(stateDir)).toMatchObject({ pid: backend.pid, version: manifest.version });
   });
 
-  it("stops on SIGTERM with status 0, removes its run record and leaves home and workspace untouched", async () => {
+  it("stops on SIGTERM with status 0, removes its run record, keeps its parse index and leaves home and workspace untouched", async () => {
     backend = spawnBackend(sandbox, { entry: SOURCE_BACKEND });
     await until(() => pomade.backendCount() === 1, "the backend to connect");
 
     expect(await backend.stop()).toEqual({ code: 0, signal: null, killed: false });
     await until(() => pomade.backendCount() === 0, "the connection to close");
-    expect(await sandbox.snapshot(`${sandbox.userData}/app-state`)).toEqual({});
+    expect(Object.keys(await sandbox.snapshot(`${sandbox.userData}/app-state`))).toEqual([`${manifest.id}/${INDEX_FILE}`]);
     const fixtures = await fixtureSnapshots();
     expect(await sandbox.snapshot(sandbox.home)).toEqual(fixtures.home);
     expect(await sandbox.snapshot(sandbox.workspace)).toEqual(fixtures.workspace);

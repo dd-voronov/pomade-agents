@@ -17,7 +17,7 @@ function Hosted({ host }: { host: HostClient }): ReactElement {
   if (view === "live-now") return <LiveNowPanel host={host} />;
   return (
     <TabView host={host} view={view}>
-      {view === "roster" ? <RosterTab /> : <SessionsTab />}
+      {view === "roster" ? <RosterTab /> : <SessionsTab host={host} />}
     </TabView>
   );
 }

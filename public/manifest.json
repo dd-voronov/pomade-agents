@@ -12,12 +12,21 @@
       "action": "panel"
     }
   ],
+  "events": {
+    "publish": [
+      "sessions.changed"
+    ],
+    "subscribe": [
+      "pomade-agents:sessions.changed"
+    ]
+  },
   "backend": {
     "entry": "backend/main.mjs",
     "mode": "with-pomade"
   },
   "api": [
-    "app.info"
+    "app.info",
+    "sessions.summaries"
   ],
   "outsideWorkspace": [
     "~/.claude/",
