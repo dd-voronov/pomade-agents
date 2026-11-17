@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { contextPercent, isSessionsAnswer, isSessionsChanged, isSessionSummary, type SessionSummary } from "./sessions.ts";
+import {
+  contextPercent,
+  isSession,
+  isSessionRecord,
+  isSessionsAnswer,
+  isSessionsChanged,
+  isSessionSummary,
+  type SessionRecord,
+  type SessionSummary,
+} from "./sessions.ts";
+import { testSession } from "./test-sessions.ts";
 
 const SUMMARY: SessionSummary = {
   id: "s",
@@ -26,7 +36,9 @@ describe("sessions shapes", () => {
   it("accepts a well-formed summary and answer", () => {
     expect(isSessionSummary(SUMMARY)).toBe(true);
     expect(isSessionSummary({ ...SUMMARY, context: null, costUsd: null })).toBe(true);
-    expect(isSessionsAnswer({ epoch: "e", revision: 2, full: false, summaries: [SUMMARY], removed: ["/x"], indexing: false })).toBe(true);
+    const session = testSession({ summary: SUMMARY, id: SUMMARY.id });
+    expect(isSessionsAnswer({ epoch: "e", revision: 2, full: false, sessions: [session], removed: ["x"], indexing: false, recordsOff: null })).toBe(true);
+    expect(isSessionsAnswer({ epoch: "e", revision: 2, full: true, sessions: [], removed: [], indexing: true, recordsOff: "No workspace" })).toBe(true);
     expect(isSessionsChanged({ epoch: "e", revision: 0 })).toBe(true);
   });
 
@@ -35,10 +47,45 @@ describe("sessions shapes", () => {
     expect(isSessionSummary({ ...SUMMARY, context: { used: 1, window: 0 } })).toBe(false);
     expect(isSessionSummary({ ...SUMMARY, tokens: { input: -1, output: 0, cacheRead: 0, cacheWrite: 0 } })).toBe(false);
     expect(isSessionSummary({ ...SUMMARY, firstMessage: "Fix it" })).toBe(false);
-    expect(isSessionsAnswer({ epoch: "e", revision: 2, full: false, summaries: [{ ...SUMMARY, id: 1 }], removed: [], indexing: false })).toBe(false);
-    expect(isSessionsAnswer({ epoch: "e", revision: 2, full: false, summaries: [], removed: [], indexing: "no" })).toBe(false);
+    const answer = { epoch: "e", revision: 2, full: false, sessions: [], removed: [], indexing: false, recordsOff: null };
+    expect(isSessionsAnswer({ ...answer, sessions: [testSession({ summary: { ...SUMMARY, id: 1 } as unknown as SessionSummary })] })).toBe(false);
+    expect(isSessionsAnswer({ ...answer, indexing: "no" })).toBe(false);
+    expect(isSessionsAnswer({ ...answer, recordsOff: undefined })).toBe(false);
+    expect(isSession(testSession({ attribution: { projects: [""], by: "folder", sharedFolder: false } }))).toBe(false);
+    expect(isSession(testSession({ attribution: { projects: [], by: "guess" as "folder", sharedFolder: false } }))).toBe(false);
     expect(isSessionsChanged({ epoch: "e" })).toBe(false);
     expect(isSessionsChanged(null)).toBe(false);
+  });
+
+  it("takes a session record with its own keys only, names and notes one line", () => {
+    const record: SessionRecord = {
+      id: "7b5c",
+      provider: "claude-code",
+      agent: "claude",
+      name: "G4 agents grill",
+      status: "on-hold",
+      note: "waiting for the test round",
+      project: "p1",
+      projectRoot: "Projects/Pomade",
+      projectOverride: true,
+      launchedFrom: "p1",
+      forkedFrom: "6a4b",
+      startedByRunner: { job: "Morning summary" },
+      outsidePomade: true,
+      transcript: "/h/.claude/projects/-w/7b5c.jsonl",
+      cwd: "/w",
+      updated: "2026-11-09T14:32:00Z",
+    };
+    expect(isSessionRecord(record)).toBe(true);
+    expect(isSessionRecord({ id: "7b5c", provider: "codex", agent: "codex", status: "done" })).toBe(true);
+    expect(isSessionRecord({ ...record, status: "paused" })).toBe(false);
+    expect(isSessionRecord({ ...record, name: "two\nlines" })).toBe(false);
+    expect(isSessionRecord({ ...record, name: " " })).toBe(false);
+    expect(isSessionRecord({ ...record, projectOverride: false })).toBe(false);
+    expect(isSessionRecord({ ...record, startedByRunner: { job: "x", extra: 1 } })).toBe(false);
+    expect(isSessionRecord({ ...record, color: "red" })).toBe(false);
+    const { agent: _agent, ...noAgent } = record;
+    expect(isSessionRecord(noAgent)).toBe(false);
   });
 
   it("puts context in percent with one decimal", () => {

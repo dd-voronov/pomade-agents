@@ -1,0 +1,4 @@
+/* One status and its count never break across lines ("Done–skip/Failed 0"). */
+.status {
+  white-space: nowrap;
+}

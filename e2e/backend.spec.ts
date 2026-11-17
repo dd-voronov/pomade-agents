@@ -4,8 +4,14 @@ import { APP_INFO_METHOD } from "../src/shared/api.ts";
 import { BUILT_BACKEND } from "../harness/app.ts";
 import { spawnBackend } from "../harness/backend-process.ts";
 import { startFakePomade } from "../harness/fake-pomade/server.ts";
-import { fixtureSnapshots } from "../harness/sandbox.ts";
+import { SEEDED_TRANSCRIPTS, fixtureSnapshots } from "../harness/sandbox.ts";
 import { expect, test } from "./fixtures.ts";
+
+/** A seeded transcript's session id: Claude's file name, Codex's trailing uuid. */
+function sessionIdOf(path: string): string {
+  const name = path.slice(path.lastIndexOf("/") + 1, -".jsonl".length);
+  return /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.exec(name)?.[0] ?? name;
+}
 
 function alive(pid: number): boolean {
   try {
@@ -56,13 +62,22 @@ test("the built backend serves app.info to Pomade with every location inside the
   expect(await readRunRecord(stateDir)).toMatchObject({ pid: backend.pid, version: manifest.version });
 });
 
-test("the backend stops cleanly on SIGTERM and writes only inside its state folder: the run record and the parse index", async ({ backend, pomade, sandbox, manifest }) => {
+test("the backend stops cleanly on SIGTERM and writes only its state folder (run record, parse index) and its data folder (settings, session records)", async ({ backend, pomade, sandbox, manifest }) => {
   const stateDir = `${sandbox.userData}/app-state/${manifest.id}`;
+  const dataFiles = Object.keys(SEEDED_TRANSCRIPTS).map((path) => `workspace/Apps/${manifest.id}/sessions/${sessionIdOf(path)}.yaml`);
   await expect.poll(() => readRunRecord(stateDir)).not.toBeNull();
   await expect.poll(() => sandbox.snapshot(stateDir).then((files) => Object.keys(files).sort())).toEqual(["backend.json", INDEX_FILE]);
+  await expect
+    .poll(() => sandbox.snapshot(`${sandbox.workspace}/Apps/${manifest.id}`).then((files) => Object.keys(files).sort()))
+    .toEqual(["settings.yaml", ...dataFiles.map((path) => path.slice(path.indexOf("/sessions/") + 1))].sort());
+  const fixtures = await fixtureSnapshots();
+  const inSandbox = (folder: string, files: Record<string, string>): Record<string, string> =>
+    Object.fromEntries(Object.entries(files).map(([path, hash]) => [`${folder}/${path}`, hash]));
+  const appData = Object.fromEntries([`workspace/Apps/${manifest.id}/settings.yaml`, ...dataFiles].map((path) => [path, expect.any(String)]));
   expect(await sandbox.snapshot(sandbox.root)).toEqual({
-    ...Object.fromEntries(Object.entries((await fixtureSnapshots()).home).map(([path, hash]) => [`home/${path}`, hash])),
-    ...Object.fromEntries(Object.entries((await fixtureSnapshots()).workspace).map(([path, hash]) => [`workspace/${path}`, hash])),
+    ...inSandbox("home", fixtures.home),
+    ...inSandbox("workspace", fixtures.workspace),
+    ...appData,
     [`ud/app-keys/${manifest.id}`]: expect.any(String),
     [`ud/app-state/${manifest.id}/backend.json`]: expect.any(String),
     [`ud/app-state/${manifest.id}/${INDEX_FILE}`]: expect.any(String),
@@ -73,9 +88,8 @@ test("the backend stops cleanly on SIGTERM and writes only inside its state fold
   await expect.poll(() => pomade.backendCount()).toBe(0);
   expect(backend.output()).toContain("stopped");
   expect(Object.keys(await sandbox.snapshot(`${sandbox.userData}/app-state`))).toEqual([`${manifest.id}/${INDEX_FILE}`]);
-  const fixtures = await fixtureSnapshots();
   expect(await sandbox.snapshot(sandbox.home)).toEqual(fixtures.home);
-  expect(await sandbox.snapshot(sandbox.workspace)).toEqual(fixtures.workspace);
+  expect(inSandbox("workspace", await sandbox.snapshot(sandbox.workspace))).toEqual({ ...inSandbox("workspace", fixtures.workspace), ...appData });
 });
 
 test("a backend survives Pomade going away and reconnects when it is back", async ({ backend, pomade, sandbox, manifest }) => {

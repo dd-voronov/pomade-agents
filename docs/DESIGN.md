@@ -131,7 +131,9 @@ In order:
 3. **The deepest project whose root contains the start folder.**
    - If several projects share that root, the session shows in each, with a "shared folder"
      marker.
-4. **No project contains the folder** → the **Workspace** bucket.
+4. **The record's last project**, if it still exists (a project folder moved, so no root holds
+   the start folder any more).
+5. **None of the above** → the **Workspace** bucket.
 
 Also:
 - The detail panel shows the start folder relative to the project root ("started in `docs/`").
@@ -307,7 +309,7 @@ agent: claude                    # roster id
 name: G4 agents grill            # absent = unnamed
 status: active                   # active | on-hold | done | done-skip
 note: waiting for the v0.2.6 test round   # optional
-project: <stable project id>     # effective project (§2.6); absent = Workspace
+project: <stable project id>     # effective project (§2.6), the first in sidebar order on a shared root; absent = Workspace
 projectRoot: Projects/Pomade     # workspace-relative, refreshed on project rename
 projectOverride: true            # set when Daniil used Move to project
 launchedFrom: <project id>       # project of the Pomade tab that first ran it

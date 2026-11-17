@@ -4,7 +4,9 @@
 // Watching: one recursive `fs.watch` per store root. On macOS that is one FSEvents stream per root
 // — no descriptor per file or folder, so hundreds of transcripts carry no EMFILE risk, and events
 // arrive within milliseconds. An event names a path; the path is stat'ed and read from its parsed
-// offset, so a coalesced, repeated or missed-detail event only costs a stat. A root that does not
+// offset, so a coalesced, repeated or missed-detail event only costs a stat. FSEvents may swallow a
+// second change to a path that changed moments before, so a transcript that changed is read once
+// more `RECHECK_MS` later, until a read finds nothing new. A root that does not
 // exist yet (an agent that never ran, no Codex) cannot be watched: a 2 s tick checks for it, and
 // for roots that went away or roster changes (a folder agent added or removed). The Codex date tree
 // is walked once when its root is first watched, then followed by its events.
@@ -18,7 +20,7 @@ import { watch, type FSWatcher } from "node:fs";
 import { stat } from "node:fs/promises";
 import { join, sep } from "node:path";
 
-import type { SessionSummary, SessionsAnswer, SessionsChanged, SessionsSince } from "../../shared/sessions.ts";
+import type { SessionSummary, SessionsChanged, SessionsSince } from "../../shared/sessions.ts";
 import { readIndex, writeIndex, type FileMark, type IndexedFile } from "./index-file.ts";
 import {
   builtinRoots,
@@ -39,6 +41,8 @@ const SETTLE_MS = 40;
 const NOTIFY_MS = 150;
 const SAVE_MS = 5000;
 const TICK_MS = 2000;
+/** How long after a transcript changed it is read once more (FSEvents may swallow the next change). */
+const RECHECK_MS = 500;
 
 export interface SessionStoreOptions {
   /** The user's home: the built-in stores are under it. `null`: no built-in stores. */
@@ -50,9 +54,23 @@ export interface SessionStoreOptions {
   log: (line: string) => void;
 }
 
+/** The summaries, whole or as the changes since a revision. */
+export interface SummariesAnswer {
+  /** Names one store run; revisions count within it. */
+  epoch: string;
+  revision: number;
+  /** True: `summaries` is every session's — replace the copy. False: only the changes since `since`. */
+  full: boolean;
+  summaries: SessionSummary[];
+  /** Transcripts whose summary is gone since `since` (always empty when `full`). */
+  removed: string[];
+  /** True while the first walk of the stores is still running. */
+  indexing: boolean;
+}
+
 export interface SessionStore {
   /** Summaries since `since`, or all of them. */
-  answer(since?: SessionsSince): SessionsAnswer;
+  answer(since?: SessionsSince): SummariesAnswer;
   /** Called (coalesced) after summaries changed; returns an unsubscribe function. */
   onChange(listener: (changed: SessionsChanged) => void): () => void;
   /** Resolves once the first walk of every store is parsed. */
@@ -108,6 +126,7 @@ export async function startSessionStore(options: SessionStoreOptions): Promise<S
   const pendingFolders = new Map<string, { root: StoreRoot; folder: string }>();
   const inFlight = new Set<string>();
   let settleTimer: NodeJS.Timeout | null = null;
+  const rechecks = new Map<string, NodeJS.Timeout>();
 
   const listeners = new Set<(changed: SessionsChanged) => void>();
   let notifyTimer: NodeJS.Timeout | null = null;
@@ -154,6 +173,18 @@ export async function startSessionStore(options: SessionStoreOptions): Promise<S
 
   // ── Reading ──────────────────────────────────────────────────────────────
 
+  const recheckLater = (file: SessionFile): void => {
+    clearTimeout(rechecks.get(file.path));
+    rechecks.set(
+      file.path,
+      setTimeout(() => {
+        rechecks.delete(file.path);
+        pendingFiles.set(file.path, file);
+        settle();
+      }, RECHECK_MS),
+    );
+  };
+
   const read = async (file: SessionFile): Promise<void> => {
     const known = entries.get(file.path);
     const previous = known ?? carried.get(file.path) ?? null;
@@ -166,6 +197,7 @@ export async function startSessionStore(options: SessionStoreOptions): Promise<S
     }
     if (result.kind === "unchanged" && known) return;
     const { mark, state } = result.kind === "parsed" ? result : (previous as IndexedFile);
+    if (result.kind === "parsed") recheckLater(file);
     changed();
     removed.delete(file.path);
     entries.set(file.path, {
@@ -332,7 +364,7 @@ export async function startSessionStore(options: SessionStoreOptions): Promise<S
       if (stopped) return;
       stopped = true;
       clearInterval(tick);
-      for (const timer of [settleTimer, notifyTimer]) if (timer) clearTimeout(timer);
+      for (const timer of [settleTimer, notifyTimer, ...rechecks.values()]) if (timer) clearTimeout(timer);
       for (const watched of roots.values()) unwatch(watched);
       await save();
     },

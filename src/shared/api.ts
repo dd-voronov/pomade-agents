@@ -1,13 +1,19 @@
 // The app's own API as the UI and the backend both know it: the methods the backend serves through
 // Pomade's broker (the manifest's `api`) and the shapes they answer. docs/CONTRACTS.md describes it.
 
-import { SESSIONS_SUMMARIES_METHOD } from "./sessions.ts";
+import { SESSIONS_LIST_METHOD, SESSIONS_MOVE_METHOD, SESSIONS_RENAME_METHOD, SESSIONS_SET_STATUS_METHOD } from "./sessions.ts";
 
 /** Answers `AppInfo`: which backend is running and where it keeps the app's data. */
 export const APP_INFO_METHOD = "app.info";
 
 /** Every method the backend serves, in the manifest's `api` order. */
-export const API_METHODS = [APP_INFO_METHOD, SESSIONS_SUMMARIES_METHOD] as const;
+export const API_METHODS = [
+  APP_INFO_METHOD,
+  SESSIONS_LIST_METHOD,
+  SESSIONS_SET_STATUS_METHOD,
+  SESSIONS_RENAME_METHOD,
+  SESSIONS_MOVE_METHOD,
+] as const;
 
 export interface AppInfo {
   /** The app's version (the manifest's). */

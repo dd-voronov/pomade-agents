@@ -30,6 +30,7 @@ for (const scheme of ["light", "dark"] as const) {
       const tab = tabFrame("alpha");
       await expect(tab.getByRole("heading", { name: "Sessions" })).toBeVisible();
       await expect(tab.getByTestId("sessions-count")).toHaveText("3 sessions indexed.");
+      await expect(tab.getByTestId("sessions-by-status")).toHaveText("Active 0 · On hold 0 · Done 3 · Done–skip/Failed 0.");
       expect(await tab.locator("body").evaluate(background)).toBe(scheme === "light" ? "rgb(255, 255, 255)" : "rgb(31, 35, 39)");
       await page.screenshot({ path: `${ARTIFACTS}/sessions-${scheme}.png` });
 

@@ -44,7 +44,8 @@ export interface Sandbox {
   cleanup(): Promise<void>;
 }
 
-/** Every file under `folder`: path relative to it (POSIX separators) → SHA-256 of its content. */
+/** Every file under `folder`: path relative to it (POSIX separators) → SHA-256 of its content. A
+ *  file that goes away during the walk is left out. */
 export async function snapshotFolder(folder: string): Promise<Record<string, string>> {
   const out: Record<string, string> = {};
   let entries;
@@ -57,7 +58,15 @@ export async function snapshotFolder(folder: string): Promise<Record<string, str
   for (const entry of entries) {
     if (!entry.isFile()) continue;
     const path = join(entry.parentPath, entry.name);
-    out[relative(folder, path).split(sep).join("/")] = createHash("sha256").update(await readFile(path)).digest("hex");
+    let content: Buffer;
+    try {
+      content = await readFile(path);
+    } catch (err) {
+      // A file a running backend replaced or removed during the walk (a temporary write) is not there.
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") continue;
+      throw err;
+    }
+    out[relative(folder, path).split(sep).join("/")] = createHash("sha256").update(content).digest("hex");
   }
   return Object.fromEntries(Object.entries(out).sort(([a], [b]) => a.localeCompare(b)));
 }

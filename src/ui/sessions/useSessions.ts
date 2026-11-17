@@ -1,5 +1,5 @@
-// The session summaries, kept current in the UI: the first answer is asked through Pomade's broker
-// (`apps.call` to the app's own `sessions.summaries`), then the backend's `sessions.changed` notice
+// The sessions, kept current in the UI: the first answer is asked through Pomade's broker
+// (`apps.call` to the app's own `sessions.list`), then the backend's `sessions.changed` notice
 // says when to ask for the changes since the last answer. While the backend does not answer, the
 // UI asks again every second; a restarted backend (another epoch) answers whole.
 
@@ -8,22 +8,22 @@ import type { HostClient } from "pomade-kit/sdk";
 
 import {
   SESSIONS_CHANGED_EVENT,
-  SESSIONS_SUMMARIES_METHOD,
+  SESSIONS_LIST_METHOD,
   isSessionsAnswer,
   isSessionsChanged,
-  type SessionsSummariesParams,
+  type SessionsListParams,
 } from "../../shared/sessions.ts";
-import { applyAnswer, isBehind, type SummariesCopy } from "./summaries.ts";
+import { applyAnswer, isBehind, type SessionsCopy } from "./sessions-copy.ts";
 
 const ANSWER_TIMEOUT_MS = 5000;
 const RETRY_MS = 1000;
 
-export function useSessionSummaries(host: HostClient): SummariesCopy | null {
-  const [copy, setCopy] = useState<SummariesCopy | null>(null);
+export function useSessions(host: HostClient): SessionsCopy | null {
+  const [copy, setCopy] = useState<SessionsCopy | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    let current: SummariesCopy | null = null;
+    let current: SessionsCopy | null = null;
     let asking = false;
     let again = false;
     let retry: ReturnType<typeof setTimeout> | undefined;
@@ -36,8 +36,8 @@ export function useSessionSummaries(host: HostClient): SummariesCopy | null {
       asking = true;
       clearTimeout(retry);
       try {
-        const params: SessionsSummariesParams = current === null ? {} : { since: current.since };
-        const answer = await host.apps.call(host.welcome.appId, SESSIONS_SUMMARIES_METHOD, params, { timeoutMs: ANSWER_TIMEOUT_MS });
+        const params: SessionsListParams = current === null ? {} : { since: current.since };
+        const answer = await host.apps.call(host.welcome.appId, SESSIONS_LIST_METHOD, params, { timeoutMs: ANSWER_TIMEOUT_MS });
         if (cancelled) return;
         if (!isSessionsAnswer(answer)) throw new Error("malformed answer");
         current = applyAnswer(current, answer);

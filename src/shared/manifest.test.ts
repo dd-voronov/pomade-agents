@@ -24,8 +24,13 @@ describe("manifest.json", () => {
       backend: { entry: "backend/main.mjs", mode: "with-pomade" },
     });
     expect(parsed.unsupportedKeys).toEqual(["outsideWorkspace"]);
-    // The UI hears the backend's change notices through the app's own published event.
-    expect(parsed.manifest.events).toEqual({ publish: ["sessions.changed"], subscribe: ["pomade-agents:sessions.changed"] });
+    // The UI hears the backend's change notices through the app's own published event; the backend
+    // follows Pomade's projects and agent tabs for project attribution.
+    expect(parsed.manifest.capabilities).toEqual(["project.read", "agentTabs.read"]);
+    expect(parsed.manifest.events).toEqual({
+      publish: ["sessions.changed"],
+      subscribe: ["pomade-agents:sessions.changed", "pomade.ready", "project.created", "project.renamed", "agentTab.changed"],
+    });
   });
 
   it("carries the package's version", () => {
@@ -36,7 +41,13 @@ describe("manifest.json", () => {
     const api = (raw as { api: string[] }).api;
     expect(api).toEqual([...API_METHODS]);
     const info = { version: "0", startedAt: "", workspace: null, dataDir: null, stateDir: "/s" };
-    const sessions = { answer: () => ({ epoch: "e", revision: 0, full: true, summaries: [], removed: [], indexing: false }) };
+    const none = (): Promise<never> => Promise.reject(new Error("not called"));
+    const sessions = {
+      answer: () => ({ epoch: "e", revision: 0, full: true, sessions: [], removed: [], indexing: false, recordsOff: null }),
+      changeStatus: none,
+      rename: none,
+      moveToProject: none,
+    };
     expect(Object.keys(createApi({ info, sessions }))).toEqual(api);
   });
 });

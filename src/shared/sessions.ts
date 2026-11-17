@@ -1,17 +1,32 @@
-// Session summaries as the UI and the backend both know them: what the backend learns from the
-// providers' transcript stores (DESIGN §2.2–2.3), the method that answers them and the event that
-// says they changed. docs/CONTRACTS.md describes both.
+// Sessions as the UI and the backend both know them (docs/CONTRACTS.md "Sessions"): what the
+// backend learns from the providers' transcript stores (the summary, DESIGN §2.2–2.3), the session
+// record the app keeps for each one (DESIGN §4), the project(s) it shows in (DESIGN §2.6), the
+// methods that answer and change them and the event that says they changed.
 //
 // The shapes are type aliases, so they are JSON values to the broker as they are.
-//
-// A summary holds only what the transcript says. The session record (name, status, project —
-// DESIGN §4) is a separate shape, joined to it by `id`.
 
-/** Answers `SessionsAnswer`: the summaries, whole or as the changes since a revision. */
-export const SESSIONS_SUMMARIES_METHOD = "sessions.summaries";
+import { AGENT_TAB_TITLE_MAX, SESSION_STATUSES, type SessionStatus } from "pomade-kit/protocol";
 
-/** Published by the backend, unqualified, whenever summaries change; payload `SessionsChanged`. */
+/** Answers `SessionsAnswer`: every session, or the changes since a revision. */
+export const SESSIONS_LIST_METHOD = "sessions.list";
+
+/** Sets the status (and the note) of one or more sessions; answers `SessionsUpdated`. */
+export const SESSIONS_SET_STATUS_METHOD = "sessions.setStatus";
+
+/** Names a session, or makes it unnamed; answers `SessionsUpdated`. */
+export const SESSIONS_RENAME_METHOD = "sessions.rename";
+
+/** Moves a session to a project, to the Workspace, or back to its automatic project; answers `SessionsUpdated`. */
+export const SESSIONS_MOVE_METHOD = "sessions.moveToProject";
+
+/** Published by the backend, unqualified, whenever sessions change; payload `SessionsChanged`. */
 export const SESSIONS_CHANGED_EVENT = "sessions.changed";
+
+/** A session name's longest length: it is also the tab's title. */
+export const SESSION_NAME_MAX = AGENT_TAB_TITLE_MAX;
+
+/** A note's longest length. */
+export const SESSION_NOTE_MAX = 500;
 
 export type SessionProvider = "claude-code" | "codex";
 
@@ -29,6 +44,7 @@ export type TokenTotals = {
   cacheWrite: number;
 };
 
+/** What the transcript says about a session. */
 export type SessionSummary = {
   /** The provider's session id. */
   id: string;
@@ -61,14 +77,73 @@ export type SessionSummary = {
   malformedLines: number;
 };
 
+/** The session record, `<workspace>/Apps/pomade-agents/sessions/<id>.yaml` (DESIGN §4): the keys
+ *  the file holds, an absent key absent here too. */
+export type SessionRecord = {
+  id: string;
+  provider: SessionProvider;
+  /** Roster id. */
+  agent: string;
+  /** Absent: unnamed. */
+  name?: string;
+  status: SessionStatus;
+  /** One line. */
+  note?: string;
+  /** The effective project's stable id — the first, when several share the start folder; absent: the Workspace. */
+  project?: string;
+  /** The effective project's folder, workspace-relative, as Pomade names it now. */
+  projectRoot?: string;
+  /** Daniil chose the project (Move to project): `project` is his choice. */
+  projectOverride?: true;
+  /** The project of the Pomade tab the session was first seen bound to. */
+  launchedFrom?: string;
+  forkedFrom?: string;
+  /** Absent: started by Daniil. */
+  startedByRunner?: { job: string };
+  /** Created after the app's first run and never bound to a Pomade tab. */
+  outsidePomade?: true;
+  /** The transcript file, absolute. */
+  transcript?: string;
+  /** The start folder, absolute. */
+  cwd?: string;
+  /** When the app last wrote the record, ISO 8601. */
+  updated?: string;
+};
+
+/** Which rule placed a session (DESIGN §2.6): Move to project; the project of the tab that first ran
+ *  it; the deepest project root holding its start folder; the project it was placed in before, when
+ *  no project root holds the folder any more (the project was renamed or moved); the Workspace. */
+export type AttributionRule = "override" | "launched" | "folder" | "remembered" | "workspace";
+
+/** Where a session shows. */
+export type Attribution = {
+  /** Stable project ids, in sidebar order; `[]`: the Workspace bucket. */
+  projects: string[];
+  by: AttributionRule;
+  /** Several projects share the start folder's root: the session shows in each, with a "shared folder" marker. */
+  sharedFolder: boolean;
+};
+
+/** One session: what its transcript says, its record, and where it shows. */
+export type Session = {
+  id: string;
+  /** The session's latest transcript. */
+  summary: SessionSummary;
+  /** `null` while there is none: no workspace is open, the first run is still indexing, or the record file cannot be read. */
+  record: SessionRecord | null;
+  /** Why the record file cannot be read; the app leaves it alone until it reads again. */
+  recordProblem: string | null;
+  attribution: Attribution;
+};
+
 /** Where a caller's copy stands: the `epoch` and `revision` of the last answer it applied. */
 export type SessionsSince = {
   epoch: string;
   revision: number;
 };
 
-export type SessionsSummariesParams = {
-  /** Omitted, or from another epoch: the answer is every summary (`full`). */
+export type SessionsListParams = {
+  /** Omitted, or from another epoch: the answer is every session (`full`). */
   since?: SessionsSince;
 };
 
@@ -76,16 +151,42 @@ export type SessionsAnswer = {
   /** Names one backend run; revisions count within it. */
   epoch: string;
   revision: number;
-  /** True: `summaries` is every session — replace the copy. False: only the changes since `since`. */
+  /** True: `sessions` is every session — replace the copy. False: only the changes since `since`. */
   full: boolean;
-  summaries: SessionSummary[];
-  /** Transcripts whose session is gone since `since` (always empty when `full`). */
+  sessions: Session[];
+  /** Ids of the sessions gone since `since` (always empty when `full`). */
   removed: string[];
   /** True while the first walk of the stores is still running. */
   indexing: boolean;
+  /** Why session records are not kept now (no workspace open, `settings.yaml` unreadable); `null` while they are. */
+  recordsOff: string | null;
 };
 
-/** `sessions.changed` payload: a caller behind this revision asks `sessions.summaries` again. */
+export type SetStatusParams = {
+  ids: string[];
+  status: SessionStatus;
+  /** A one-line note to set; `null` or empty removes it; omitted keeps it. */
+  note?: string | null;
+};
+
+export type RenameParams = {
+  id: string;
+  /** The new name; `null` or empty: unnamed. */
+  name: string | null;
+};
+
+export type MoveToProjectParams = {
+  id: string;
+  /** A project's stable id, or `"__workspace__"` for the Workspace bucket; `null`: back to the automatic project. */
+  project: string | null;
+};
+
+/** What a change method answers: the changed sessions as they are now. */
+export type SessionsUpdated = {
+  sessions: Session[];
+};
+
+/** `sessions.changed` payload: a caller behind this revision asks `sessions.list` again. */
 export type SessionsChanged = {
   epoch: string;
   revision: number;
@@ -96,13 +197,23 @@ export function contextPercent(context: { used: number; window: number }): numbe
   return Math.round((context.used / context.window) * 1000) / 10;
 }
 
-// ── Checks for answers that crossed the broker ─────────────────────────────
+// ── Checks for values that crossed the broker or came from disk ────────────
 
 type Shape = Record<string, unknown>;
 
 const isObject = (v: unknown): v is Shape => typeof v === "object" && v !== null && !Array.isArray(v);
 const isStringOrNull = (v: unknown): v is string | null => v === null || typeof v === "string";
 const isCount = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0;
+const isText = (v: unknown): v is string => typeof v === "string" && v.trim() !== "";
+const isOptionalText = (v: unknown): boolean => v === undefined || isText(v);
+
+export function isSessionStatus(v: unknown): v is SessionStatus {
+  return (SESSION_STATUSES as readonly unknown[]).includes(v);
+}
+
+export function isSessionProvider(v: unknown): v is SessionProvider {
+  return v === "claude-code" || v === "codex";
+}
 
 function isTimedTextOrNull(v: unknown): boolean {
   return v === null || (isObject(v) && typeof v.text === "string" && isStringOrNull(v.at));
@@ -117,7 +228,7 @@ export function isSessionSummary(value: unknown): value is SessionSummary {
   const v = value;
   return (
     typeof v.id === "string" &&
-    (v.provider === "claude-code" || v.provider === "codex") &&
+    isSessionProvider(v.provider) &&
     typeof v.agent === "string" &&
     typeof v.transcript === "string" &&
     isStringOrNull(v.cwd) &&
@@ -136,7 +247,78 @@ export function isSessionSummary(value: unknown): value is SessionSummary {
   );
 }
 
-/** True for a well-formed `sessions.summaries` answer. */
+/** The record keys, in the order a new record file lists them (DESIGN §4). */
+export const SESSION_RECORD_KEYS = [
+  "id",
+  "provider",
+  "agent",
+  "name",
+  "status",
+  "note",
+  "project",
+  "projectRoot",
+  "projectOverride",
+  "launchedFrom",
+  "forkedFrom",
+  "startedByRunner",
+  "outsidePomade",
+  "transcript",
+  "cwd",
+  "updated",
+] as const satisfies readonly (keyof SessionRecord)[];
+
+/** True for a record with only `SessionRecord`'s keys, each well-formed: names and notes one line. */
+export function isSessionRecord(value: unknown): value is SessionRecord {
+  if (!isObject(value)) return false;
+  const v = value;
+  const oneLine = (x: unknown): boolean => x === undefined || (isText(x) && !/[\r\n]/.test(x));
+  const runner = v.startedByRunner;
+  return (
+    Object.keys(v).every((key) => (SESSION_RECORD_KEYS as readonly string[]).includes(key)) &&
+    isText(v.id) &&
+    isSessionProvider(v.provider) &&
+    isText(v.agent) &&
+    oneLine(v.name) &&
+    isSessionStatus(v.status) &&
+    oneLine(v.note) &&
+    isOptionalText(v.project) &&
+    (v.projectRoot === undefined || typeof v.projectRoot === "string") &&
+    (v.projectOverride === undefined || v.projectOverride === true) &&
+    isOptionalText(v.launchedFrom) &&
+    isOptionalText(v.forkedFrom) &&
+    (runner === undefined || (isObject(runner) && Object.keys(runner).length === 1 && isText(runner.job))) &&
+    (v.outsidePomade === undefined || v.outsidePomade === true) &&
+    isOptionalText(v.transcript) &&
+    isOptionalText(v.cwd) &&
+    isOptionalText(v.updated)
+  );
+}
+
+const ATTRIBUTION_RULES: readonly unknown[] = ["override", "launched", "folder", "remembered", "workspace"] satisfies AttributionRule[];
+
+function isAttribution(v: unknown): v is Attribution {
+  return (
+    isObject(v) &&
+    Array.isArray(v.projects) &&
+    v.projects.every(isText) &&
+    ATTRIBUTION_RULES.includes(v.by) &&
+    typeof v.sharedFolder === "boolean"
+  );
+}
+
+export function isSession(value: unknown): value is Session {
+  if (!isObject(value)) return false;
+  const v = value;
+  return (
+    typeof v.id === "string" &&
+    isSessionSummary(v.summary) &&
+    (v.record === null || isSessionRecord(v.record)) &&
+    isStringOrNull(v.recordProblem) &&
+    isAttribution(v.attribution)
+  );
+}
+
+/** True for a well-formed `sessions.list` answer. */
 export function isSessionsAnswer(value: unknown): value is SessionsAnswer {
   if (!isObject(value)) return false;
   const v = value;
@@ -145,8 +327,9 @@ export function isSessionsAnswer(value: unknown): value is SessionsAnswer {
     isCount(v.revision) &&
     typeof v.full === "boolean" &&
     typeof v.indexing === "boolean" &&
-    Array.isArray(v.summaries) &&
-    v.summaries.every(isSessionSummary) &&
+    isStringOrNull(v.recordsOff) &&
+    Array.isArray(v.sessions) &&
+    v.sessions.every(isSession) &&
     Array.isArray(v.removed) &&
     v.removed.every((r) => typeof r === "string")
   );

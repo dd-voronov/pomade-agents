@@ -4,7 +4,10 @@
   "version": "0.1.0",
   "hostApi": 0,
   "icon": "agents.svg",
-  "capabilities": [],
+  "capabilities": [
+    "project.read",
+    "agentTabs.read"
+  ],
   "strip": [
     {
       "id": "agents",
@@ -17,7 +20,11 @@
       "sessions.changed"
     ],
     "subscribe": [
-      "pomade-agents:sessions.changed"
+      "pomade-agents:sessions.changed",
+      "pomade.ready",
+      "project.created",
+      "project.renamed",
+      "agentTab.changed"
     ]
   },
   "backend": {
@@ -26,7 +33,10 @@
   },
   "api": [
     "app.info",
-    "sessions.summaries"
+    "sessions.list",
+    "sessions.setStatus",
+    "sessions.rename",
+    "sessions.moveToProject"
   ],
   "outsideWorkspace": [
     "~/.claude/",

@@ -14,9 +14,9 @@ and the backend's handlers in step with it.
 |---|---|
 | `id` · `name` | `pomade-agents` · Agents |
 | `hostApi` | `0` |
-| `capabilities` | none |
+| `capabilities` | `project.read` (projects, their stable ids and folders) · `agentTabs.read` (which session each agent tab is bound to) — the backend's project attribution |
 | `strip` | one icon, `agents` — action `panel` |
-| `events` | publishes `sessions.changed`; subscribes to `pomade-agents:sessions.changed` (its own, for its UI frames) |
+| `events` | publishes `sessions.changed`; subscribes to `pomade-agents:sessions.changed` (its own, for its UI frames) and, for the backend, `pomade.ready`, `project.created`, `project.renamed`, `agentTab.changed` |
 | `backend` | `backend/main.mjs`, mode `with-pomade` |
 | `api` | the methods of "Published API" below |
 | `outsideWorkspace` | `~/.claude/`, `~/.codex/`, `~/.zshrc` — the paths outside the workspace the backend uses. The Host API defines no key for them; Pomade lists this one as not supported yet |
@@ -44,7 +44,10 @@ it the same way. Method names and shapes are in `src/shared/api.ts`.
 | Method | Params | Answer |
 |---|---|---|
 | `app.info` | — | `AppInfo` |
-| `sessions.summaries` | `{ since?: { epoch, revision } }` | `SessionsAnswer` |
+| `sessions.list` | `{ since?: { epoch, revision } }` | `SessionsAnswer` |
+| `sessions.setStatus` | `{ ids: string[], status, note?: string \| null }` | `SessionsUpdated` |
+| `sessions.rename` | `{ id, name: string \| null }` | `SessionsUpdated` |
+| `sessions.moveToProject` | `{ id, project: string \| null }` | `SessionsUpdated` |
 
 ```ts
 interface AppInfo {
@@ -56,11 +59,10 @@ interface AppInfo {
 }
 ```
 
-### Session summaries
+### Sessions
 
-What the backend learns from the agents' transcript stores (DESIGN §2.2–2.3). The shapes are in
-`src/shared/sessions.ts`. A summary holds only what the transcript says; the session record
-(DESIGN §4) is a separate shape, joined to it by `id`.
+A session joins three things (DESIGN §2.4, §2.6, §4), all shapes in `src/shared/sessions.ts`: what
+its transcript says (the summary), the record the app keeps for it, and where it shows.
 
 ```ts
 type SessionSummary = {
@@ -83,17 +85,42 @@ type SessionSummary = {
   malformedLines: number;             // lines that were not JSON, skipped
 };
 
+type SessionRecord = {                // the record file's keys (below); an absent key is absent here
+  id; provider; agent; name?; status /* the kit's SessionStatus */; note?;
+  project?; projectRoot?; projectOverride?: true; launchedFrom?; forkedFrom?;
+  startedByRunner?: { job }; outsidePomade?: true; transcript?; cwd?; updated?;
+};
+
+type Attribution = {
+  projects: string[];                 // stable project ids, sidebar order; [] = the Workspace bucket
+  by: "override" | "launched" | "folder" | "remembered" | "workspace";
+  sharedFolder: boolean;              // several projects share the start folder's root: shown in each
+};
+
+type Session = {
+  id: string;
+  summary: SessionSummary;            // the latest of the session's transcripts
+  record: SessionRecord | null;       // null: no workspace, first run still indexing, or the file cannot be used
+  recordProblem: string | null;       // why the record file cannot be used
+  attribution: Attribution;
+};
+
 type SessionsAnswer = {
   epoch: string;                      // one backend run; revisions count within it
   revision: number;
-  full: boolean;                      // true: every summary — replace; false: changes since `since`
-  summaries: SessionSummary[];
-  removed: string[];                  // transcripts gone since `since` (empty when full)
+  full: boolean;                      // true: every session — replace; false: changes since `since`
+  sessions: Session[];
+  removed: string[];                  // ids of sessions gone since `since` (empty when full)
   indexing: boolean;                  // the first walk of the stores is still running
+  recordsOff: string | null;          // why records are not kept now (no workspace, settings.yaml unusable)
 };
+
+type SessionsUpdated = { sessions: Session[] };   // the changed sessions as they are now
 ```
 
 - `since` omitted, from another epoch, or ahead of the backend → a full answer.
+- A session is listed while a transcript of it exists. Its record stays on disk when the
+  transcripts are gone, and joins again if one comes back.
 - Message texts are trimmed and capped at 4000 characters (a longer one ends in "…").
 - Context: Claude — the latest turn's `input + cache read + cache write` ÷ the price table's
   window for its model (none for a model missing from the table); Codex — the latest request's
@@ -101,9 +128,28 @@ type SessionsAnswer = {
 - Codex sub-agent rollouts (`session_meta.source.subagent`) are not sessions, like Claude's
   `subagents/` transcripts.
 
+**Attribution** (`src/backend/sessions/attribution.ts`), in order: Move to project (`override`;
+no project = the Workspace) → the project of the first Pomade tab seen bound to the session
+(`launched`) → the deepest project folder holding the start folder, every project on it when
+several share it (`folder`, `sharedFolder`) → the project the record names, when no project folder
+holds the start folder any more — the project was renamed or moved (`remembered`) → the Workspace.
+A project that no longer exists never holds a session; a Move to it is dropped. Project folders
+are compared absolute with symlinks resolved; a tab in the Workspace scope binds the session but
+names no project.
+
+**Changes.** `sessions.setStatus` sets one status on every id (all are checked first: an unknown id
+is `not-found`); `note` — a string sets it (trimmed, one line, at most 500 characters), `null` or
+empty removes it, omitted keeps it. `sessions.rename` — a name (trimmed, one line, at most 200
+characters, the tab title's limit), `null` or empty for unnamed; it changes the record only (tab
+titles are E-002). `sessions.moveToProject` — a project id, `"__workspace__"` for the Workspace
+bucket, or `null` for the automatic project again; an unknown project is `not-found`. Errors:
+`invalid-params` for malformed params, `not-ready` without a workspace or before the session has a
+record, `io-error` when its record file cannot be used. Every status change goes through
+`SessionData.changeStatus`.
+
 **Change notice — `sessions.changed`.** The backend publishes `{ epoch, revision }` at most every
-150 ms after summaries changed. The app's frames subscribe to it (the manifest declares the app's
-own event in `events.subscribe`) and, when behind it, ask `sessions.summaries` with their `since`.
+150 ms after sessions changed. The app's frames subscribe to it (the manifest declares the app's
+own event in `events.subscribe`) and, when behind it, ask `sessions.list` with their `since`.
 Events are not replayed, so a frame asks once its subscription stands, and again every second
 while the backend does not answer; a restarted backend is another epoch and answers whole.
 
@@ -115,6 +161,32 @@ Adding a method: its name in the manifest's `api` and in `API_METHODS`, its shap
 - **Environment** — what Pomade gives a backend (HOST-API §2 "Backends"). The workspace is
   `POMADE_WORKSPACE`; Pomade's user-data folder is the parent of the folder holding `POMADE_SOCKET`
   (`<userData>/run/pomade.sock`). The agents' stores are under `HOME`.
+- **App data** (`src/backend/records/`) — `<workspace>/Apps/pomade-agents/`:
+  - `sessions/<session-id>.yaml` — one record per session (DESIGN §4), written when the app first
+    sees the session and on every change. YAML 1.2 core schema (times stay strings); a key with no
+    value, and `false` for `projectOverride` / `outsidePomade`, read as absent. A rewrite changes
+    only the keys whose values change — comments, extra keys, order and quoting stay. New records
+    are linked into place (never over a file that is there), changes are written to a temporary
+    file and renamed, one at a time per file, each applied to the file as it is on disk then. A
+    file that is not valid YAML, not a mapping, or not a record of its session is never written
+    over; its session answers `record: null` with `recordProblem`. A record deleted by hand is
+    written again with its session's first-sight values.
+  - `settings.yaml` — `adoptedAt`: when the first run adopted the sessions that existed. The first
+    run waits for the first walk of the stores, writes a Done record for every session found (no
+    notice, no prompt), then sets `adoptedAt`, keeping anything else in the file. Afterwards a
+    session without a record gets one: Done when it started before `adoptedAt`, else Active and
+    `outsidePomade` until a tab is seen bound to it. An unusable `settings.yaml` stops new records
+    (`recordsOff` says why) and is never written over.
+  - The backend writes these files itself, not through the Host API's file methods (PLATFORM
+    rule 3 allows either): records must be written whether or not the socket is up — the first
+    run adopts the moment indexing ends — and one writer keeps one set of guarantees. One
+    recursive `fs.watch` on the folder re-reads what changes on disk; a file that changed is read
+    once more 500 ms later (FSEvents may swallow a second change to a path that just changed).
+  - No workspace open: no records, `recordsOff` says so, the change methods are `not-ready`.
+- **Pomade** (`src/backend/interfaces/platform.ts`) — on each connection the backend lists the
+  projects (again on `project.created`, `project.renamed`, `pomade.ready`) and the agent tabs (again
+  on `pomade.ready`), and takes every `agentTab.changed`: the first project each session is seen
+  bound in is its `launchedFrom`. A rename refreshes `projectRoot` in the records of that project.
 - **Locations** (`src/backend/core/locations.ts`) — app data in `<workspace>/Apps/pomade-agents/`,
   machine-local state in `<userData>/app-state/pomade-agents/`, the built-in agents' stores under
   `HOME`.
@@ -123,7 +195,8 @@ Adding a method: its name in the manifest's `api` and in `API_METHODS`, its shap
   a `CLAUDE.md`, not `_shared`, no "template" in its name), `~/.codex/sessions/**/rollout-*.jsonl`.
   One recursive `fs.watch` per store root (FSEvents on macOS: no descriptor per file); a root that
   does not exist yet, and roster changes, are checked every 2 s. Each transcript is read from the
-  offset its last parse reached, opened and closed per read.
+  offset its last parse reached, opened and closed per read, and read once more 500 ms after it
+  changed.
 - **Parse index** — `<stateDir>/session-index.json`: `{ parser, prices, files: { <path>: { mark:
   { ino, offset }, state } } }`. Valid only for the same `PARSER_VERSION` and price-table
   fingerprint; anything else, or a corrupt file, is a cold start. Saved at most every 5 s while
