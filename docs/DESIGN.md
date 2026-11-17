@@ -333,11 +333,36 @@ Registered with Pomade's broker (`pomade:E-028`). Callers reach it through the H
 | `sessions.get(id)` | the session summary: record fields + §2.3 fields + live state | Runner, git |
 | `sessions.lastMessage(id)` | `{ text, at }`: the last agent answer | Runner (result cards) |
 | `sessions.find({ cwd, startedFrom, startedTo, agent? })` | sessions started in that folder in that time window | Runner (runs without a pre-set id, e.g. Codex) |
-| `sessions.forRepo({ folder, branch? })` | sessions whose start folder is inside `folder` (a repo or worktree), optionally on `branch` | git (branch ↔ session link) |
-| `sessions.liveIn({ folder })` | `{ live, sessions }`: agent tabs and Runner runs running inside `folder`, including an agent tab not yet prompted | git (merge block), `pomade-git` (skip scheduled commit) |
-| `roster.list()` | agents: id, name, provider, kind, command, role, tags, hidden, enabled modes | Pomade "+" menu, Runner |
+| `sessions.forRepo({ folder, branch? })` | `{ sessions: RepoSession[] }`: sessions whose start folder is `folder` or inside it (a repo or worktree) and, with `branch`, whose recorded branch is that one; newest activity first | git (branch ↔ session link) |
+| `sessions.liveIn({ folder })` | `{ live, sessions: LiveSession[] }`: agent tabs and Runner runs running at or below `folder` now, including an agent tab not yet prompted; `live` is true exactly when `sessions` is non-empty | git (merge block, In progress rows), `pomade-git` (skip scheduled commit) |
+| `roster.list()` | `{ agents: RosterAgent[] }` (the shape in Pomade's `docs/HOST-API.md` §4 "`apps` — the broker", "Platform reads of app APIs"): id, name, command, provider, config dir, enabled modes with their arguments. Hidden agents are left out | Pomade "+" menu and agent launches, Runner |
 | `roster.launchSpec({ agent, mode, resume?, prompt? })` | the command line to type | Pomade "+" menu, Runner |
 | `roster.projectsFor(agent)` · `roster.agentsFor(project)` | project ids · agent ids (the connection setting) | Runner (job form) |
+
+**The sessions contract.** `sessions.forRepo` and `sessions.liveIn` are a contract shared with
+Pomade, fixed in `pomade-kit/protocol` (`agent-sessions.ts`). The app imports its types and
+constants (`SESSIONS_APP_ID`, `SESSIONS_FOR_REPO_METHOD`, `SESSIONS_LIVE_IN_METHOD`,
+`RepoSession`, `LiveSession`, `SessionStatus`, `SessionLiveState`) and never redefines them.
+
+- **`RepoSession`** = `{ id, agent, name | null, status, live, cwd, branch | null,
+  project | null, startedAt, lastActiveAt }`.
+  - `status`: `active` · `on-hold` · `done` · `done-skip` (§2.4)
+  - `live`: `working` · `needs-you` · `idle` · `closed` (§2.4)
+  - `name: null` = unnamed; `branch: null` = the provider records none (Codex); `project: null` =
+    the Workspace bucket
+- **`LiveSession`** = `{ sessionId | null, agent, cwd, source, job | null }`.
+  - `sessionId: null` = an agent tab not prompted yet
+  - `source`: `tab` (a Pomade agent tab) or `run` (an unattended Runner run); `job` is the Runner
+    job's name for a run and `null` for a tab
+- **Folders** (`folder`, `cwd`) are absolute with symlinks resolved.
+- **How Pomade reads them** (PLATFORM rule 7):
+  - Both methods are declared in the manifest's `api`. Pomade calls them as the caller `pomade`,
+    with a 1.5 s limit; after a timeout it doesn't ask again for 10 s.
+  - A malformed `forRepo` session is dropped; a malformed `liveIn` answer is ignored whole.
+  - The Git panel's In progress row links one session: the live one, else the latest. A worktree
+    is matched by its folder, a branch by the repo folder plus the branch name.
+  - "Agent live here?" joins this app's answer with Pomade's own terminals. The app's answer only
+    adds to it.
 
 **Rule 4:** this app calls no other app. Runner's runs reach it as events (§6).
 
@@ -353,7 +378,7 @@ Registered with Pomade's broker (`pomade:E-028`). Callers reach it through the H
 
 **Payload, every event:**
 - `sessionId`, `provider`, `agent`, `project` (id + root)
-- `cwd`, `name`, `status`
+- `cwd`, `name`, `status` (the kit's `SessionStatus` values, §5)
 - `startedByRunner` (+ `job`), `at`
 
 C adds `from` and `to`. B adds `reason`: exit · tab-closed · crash · run-finished.
