@@ -1,0 +1,34 @@
+// The app shell: one bundle for every surface. What the handshake answered decides what renders —
+// the "no Pomade host" state, a refusal, or the view the frame was opened for.
+
+import type { ReactElement } from "react";
+import type { ConnectResult, HostClient } from "pomade-kit/sdk";
+
+import { RosterTab } from "../roster/RosterTab.tsx";
+import { LiveNowPanel } from "../sessions/LiveNowPanel.tsx";
+import { SessionsTab } from "../sessions/SessionsTab.tsx";
+import { viewFor } from "./routes.ts";
+import { TabView } from "./TabView.tsx";
+import { NoHost, Rejected } from "./Unavailable.tsx";
+import { useRoute } from "./useRoute.ts";
+
+function Hosted({ host }: { host: HostClient }): ReactElement {
+  const view = viewFor(host.welcome.surface, useRoute(host));
+  if (view === "live-now") return <LiveNowPanel host={host} />;
+  return (
+    <TabView host={host} view={view}>
+      {view === "roster" ? <RosterTab /> : <SessionsTab />}
+    </TabView>
+  );
+}
+
+export function App({ connection }: { connection: ConnectResult }): ReactElement {
+  switch (connection.status) {
+    case "no-host":
+      return <NoHost />;
+    case "rejected":
+      return <Rejected reason={connection.reason} />;
+    case "connected":
+      return <Hosted host={connection.host} />;
+  }
+}

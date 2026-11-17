@@ -1,0 +1,64 @@
+.tab {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.bar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  height: 44px;
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.switch {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-md);
+  background: var(--active-bg);
+}
+
+.item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px 0 var(--space-2);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.item:hover {
+  color: var(--text);
+}
+
+.item[aria-current="page"] {
+  background: var(--panel-raised);
+  box-shadow: var(--shadow-1);
+  color: var(--text);
+  cursor: default;
+}
+
+.item svg {
+  flex: none;
+}
+
+.view {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
+}

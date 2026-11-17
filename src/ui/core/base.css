@@ -1,0 +1,49 @@
+/* The base layer every surface shares. A panel frame sits on Pomade's side-panel background, a
+   tab frame on its pane background; `data-surface` on <html> says which. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+}
+
+body {
+  font-family: var(--font-ui);
+  font-size: var(--fs-base);
+  line-height: var(--lh);
+  color: var(--text);
+  background: var(--panel-raised);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+html[data-surface="panel"] body {
+  background: var(--bg);
+}
+
+::selection {
+  background: var(--selection);
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}

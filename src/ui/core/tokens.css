@@ -1,0 +1,76 @@
+/* Pomade's visual language, as far as this app uses it: the same names and light values as
+   Pomade's own tokens, plus a dark set for a dark system appearance. */
+
+:root {
+  color-scheme: light dark;
+
+  --accent: #4fb8d8;
+  --focus-ring: rgba(79, 184, 216, 0.55);
+  --selection: rgba(79, 184, 216, 0.18);
+
+  --bg: #fafbfc;
+  --panel: #f1f4f6;
+  --panel-raised: #ffffff;
+  --border: #e2e8ec;
+  --border-strong: #cdd6dc;
+  --text: #1f2933;
+  --text-muted: #5a6b7a;
+  --text-faint: #8a99a6;
+
+  --hover-bg: rgba(31, 41, 51, 0.04);
+  --active-bg: rgba(31, 41, 51, 0.07);
+
+  --warning: #d98a1f;
+  --warning-soft: rgba(217, 138, 31, 0.14);
+  --ok: #2f9e6f;
+
+  --font-ui: -apple-system, "SF Pro Text", "SF Pro", system-ui, sans-serif;
+  --fs-base: 13px;
+  --fs-sm: 12px;
+  --fs-xs: 11px;
+  --fs-lg: 15px;
+  --lh: 1.45;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+
+  --shadow-1: 0 1px 2px rgba(31, 41, 51, 0.06);
+
+  --dur-fast: 90ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --focus-ring: rgba(79, 184, 216, 0.65);
+    --selection: rgba(79, 184, 216, 0.28);
+
+    --bg: #1b1e22;
+    --panel: #22262b;
+    --panel-raised: #1f2327;
+    --border: #2e353c;
+    --border-strong: #414a53;
+    --text: #e4e8ec;
+    --text-muted: #a3afba;
+    --text-faint: #7b8793;
+
+    --hover-bg: rgba(255, 255, 255, 0.06);
+    --active-bg: rgba(255, 255, 255, 0.1);
+
+    --warning: #e3a13f;
+    --warning-soft: rgba(227, 161, 63, 0.18);
+    --ok: #4cba8a;
+
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  }
+}

@@ -1,0 +1,62 @@
+.page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding: var(--space-6) var(--space-5);
+  text-align: center;
+}
+
+.glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--active-bg);
+  color: var(--text-muted);
+}
+
+.glyph[data-tone="warning"] {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  line-height: 1.3;
+  color: var(--text);
+}
+
+.text {
+  max-width: 380px;
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+  text-wrap: balance;
+}
+
+.page[data-size="compact"] {
+  padding: var(--space-5) var(--space-4);
+}
+
+.page[data-size="compact"] .glyph {
+  width: 32px;
+  height: 32px;
+  margin-bottom: var(--space-2);
+  border-radius: var(--radius-md);
+}
+
+.page[data-size="compact"] .title {
+  font-size: var(--fs-base);
+}
+
+.page[data-size="compact"] .text {
+  font-size: var(--fs-sm);
+  color: var(--text-faint);
+}

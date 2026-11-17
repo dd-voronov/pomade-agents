@@ -1,0 +1,27 @@
+{
+  "id": "pomade-agents",
+  "name": "Agents",
+  "version": "0.1.0",
+  "hostApi": 0,
+  "icon": "agents.svg",
+  "capabilities": [],
+  "strip": [
+    {
+      "id": "agents",
+      "title": "Agents",
+      "action": "panel"
+    }
+  ],
+  "backend": {
+    "entry": "backend/main.mjs",
+    "mode": "with-pomade"
+  },
+  "api": [
+    "app.info"
+  ],
+  "outsideWorkspace": [
+    "~/.claude/",
+    "~/.codex/",
+    "~/.zshrc"
+  ]
+}
