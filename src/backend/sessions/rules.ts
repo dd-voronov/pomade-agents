@@ -5,7 +5,6 @@
 // before the adoption is Done too (its record went missing, or it ran on another Mac), and any other
 // is Active and "outside Pomade" until a Pomade tab is seen bound to it.
 
-import { WORKSPACE_PROJECT_ID } from "pomade-kit/protocol";
 
 import type { SessionRecord, SessionSummary } from "../../shared/sessions.ts";
 import { attribute, type ProjectPlace } from "./attribution.ts";
@@ -54,7 +53,7 @@ export function refreshRecord(record: SessionRecord, { summary, boundIn, project
   if (summary.cwd !== null) next.cwd = summary.cwd;
   if (boundIn !== null) {
     delete next.outsidePomade;
-    if (next.launchedFrom === undefined && boundIn !== WORKSPACE_PROJECT_ID) next.launchedFrom = boundIn;
+    if (next.launchedFrom === undefined) next.launchedFrom = boundIn;
   }
   if (projects === null) return next;
   // A Move to a project that no longer exists is void: the session goes back to its automatic project.

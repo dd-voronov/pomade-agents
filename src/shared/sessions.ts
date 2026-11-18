@@ -95,7 +95,7 @@ export type SessionRecord = {
   projectRoot?: string;
   /** Daniil chose the project (Move to project): `project` is his choice. */
   projectOverride?: true;
-  /** The project of the Pomade tab the session was first seen bound to. */
+  /** The project of the Pomade tab the session was first seen bound to; `"__workspace__"`: a tab in the Workspace scope (the session belongs to no project). */
   launchedFrom?: string;
   forkedFrom?: string;
   /** Absent: started by Daniil. */

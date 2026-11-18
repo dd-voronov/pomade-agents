@@ -20,6 +20,7 @@ describe("project attribution", () => {
     ["the Workspace for a folder outside the workspace", { cwd: "/elsewhere" }, [], "workspace"],
     ["the Workspace for an unknown start folder", { cwd: null }, [], "workspace"],
     ["the launching tab's project over the folder", { record: { launchedFrom: "docs" } }, ["docs"], "launched"],
+    ["the Workspace bucket when launched from a tab in the Workspace scope", { record: { launchedFrom: "__workspace__" } }, [], "launched"],
     ["the override over the launching tab", { record: { projectOverride: true, project: "a", launchedFrom: "docs" } }, ["a"], "override"],
     ["the Workspace when moved there", { record: { projectOverride: true } }, [], "override"],
     ["the folder when the override's project is gone", { record: { projectOverride: true, project: "gone" } }, ["pomade"], "folder"],

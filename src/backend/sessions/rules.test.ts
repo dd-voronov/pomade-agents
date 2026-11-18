@@ -36,7 +36,7 @@ describe("a session's first record", () => {
   it.each<[string, string | null, RecordContext["boundIn"], Partial<SessionRecord>]>([
     ["Active and outside Pomade when started after the first run and not bound", "2026-11-17T12:00:00.000Z", null, { status: "active", outsidePomade: true }],
     ["Active, launched from its tab's project, when bound", "2026-11-17T13:00:00.000Z", "alpha", { status: "active", launchedFrom: "alpha", project: "alpha", projectRoot: "Projects/alpha" }],
-    ["Active, not outside Pomade, when bound in the Workspace scope", "2026-11-17T13:00:00.000Z", "__workspace__", { status: "active" }],
+    ["Active, launched from the Workspace (no project), when bound in the Workspace scope", "2026-11-17T13:00:00.000Z", "__workspace__", { status: "active", launchedFrom: "__workspace__" }],
     ["Active when its start time is unknown", null, null, { status: "active", outsidePomade: true }],
     ["Done when it started before the first run (its record went missing, or another Mac)", "2026-11-17T11:59:59.999Z", null, { status: "done" }],
     ["Done, launched from its tab's project, when started before the first run and bound", "2026-11-01T00:00:00.000Z", "beta", { status: "done", launchedFrom: "beta" }],

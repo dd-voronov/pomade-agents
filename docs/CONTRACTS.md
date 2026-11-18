@@ -134,8 +134,8 @@ no project = the Workspace) → the project of the first Pomade tab seen bound t
 several share it (`folder`, `sharedFolder`) → the project the record names, when no project folder
 holds the start folder any more — the project was renamed or moved (`remembered`) → the Workspace.
 A project that no longer exists never holds a session; a Move to it is dropped. Project folders
-are compared absolute with symlinks resolved; a tab in the Workspace scope binds the session but
-names no project.
+are compared absolute with symlinks resolved. A tab in the Workspace scope records
+`launchedFrom: "__workspace__"`: the session belongs to the Workspace, in no project.
 
 **Changes.** `sessions.setStatus` sets one status on every id (all are checked first: an unknown id
 is `not-found`); `note` — a string sets it (trimmed, one line, at most 500 characters), `null` or

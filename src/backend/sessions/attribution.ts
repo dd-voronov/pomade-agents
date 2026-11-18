@@ -1,10 +1,12 @@
 // Which project(s) a session shows in (DESIGN §2.6), in order: Move to project; the project of the
-// Pomade tab that first ran it (`launchedFrom`); the deepest project root holding its start folder
+// Pomade tab that first ran it (`launchedFrom`; a tab in the Workspace scope places it in the
+// Workspace bucket, in no project); the deepest project root holding its start folder
 // — every project on that root when several share it; the project it was placed in before, when no
 // project root holds the folder any more (its project was renamed or moved: ids are stable,
 // pomade:E-030); else the Workspace bucket. A project that no longer exists never holds a session.
 
 import { sep } from "node:path";
+import { WORKSPACE_PROJECT_ID } from "pomade-kit/protocol";
 
 import type { Attribution, SessionRecord } from "../../shared/sessions.ts";
 
@@ -44,6 +46,7 @@ export function attribute({ cwd, record, projects }: AttributionInput): Attribut
     if (record.project === undefined) return { projects: [], by: "override", sharedFolder: false };
     if (exists(record.project)) return only(record.project, "override");
   }
+  if (record?.launchedFrom === WORKSPACE_PROJECT_ID) return { projects: [], by: "launched", sharedFolder: false };
   if (record?.launchedFrom !== undefined && exists(record.launchedFrom)) return only(record.launchedFrom, "launched");
   if (projects !== null && cwd !== null) {
     const holding = projectsHolding(cwd, projects);

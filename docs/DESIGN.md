@@ -127,7 +127,9 @@ Two separate columns:
 
 In order:
 1. **Move to project** override, if set.
-2. **The project of the Pomade tab that first ran it** (`launchedFrom`), when known.
+2. **The project of the Pomade tab that first ran it** (`launchedFrom`), when known. A tab in the
+   Workspace scope means the session belongs to the **Workspace**, in no project: ad-hoc
+   questions, work on the workspace itself.
 3. **The deepest project whose root contains the start folder.**
    - If several projects share that root, the session shows in each, with a "shared folder"
      marker.
