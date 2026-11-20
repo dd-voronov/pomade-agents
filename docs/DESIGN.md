@@ -1,16 +1,23 @@
+---
+doc: docs/DESIGN.md
+audience: engineers, product
+holds: the app's living design — sessions, roster, data and files, published API, events, command, placement, what's not in v1
+kind: reference
+---
+
 # pomade-agents — Design
 
-`pomade-agents` ("Agents" in the UI) is the Pomade app for Daniil's agents. It owns two kinds of
+`pomade-agents` ("Agents" in the UI) is the Pomade app for the user's agents. It owns two kinds of
 data, for the whole Pomade family:
 
 - **The roster.** It shows which agents exist and what each one is for, holds their modes and
   launch specs, manages their skills and model, and creates new agents.
 - **Session data.** It tracks every agent session per project: its name (which is also its tab's
-  name), the status Daniil sets, its live state, where it started, which agent and model ran it,
+  name), the status the user sets, its live state, where it started, which agent and model ran it,
   its context fill and estimated cost, the first and last messages, and one-click resume.
 
 Other pieces read both only through this app's API (PLATFORM rule 4). This doc states the current
-design. The reasoning and Daniil's scenarios are in the G4 grill outcome
+design. The reasoning and the Owner's scenarios are in the G4 grill outcome
 (`../Pomade/docs/auxiliary/grills/2026-11-09-g4-agents.md`); the platform frame is in
 `../Pomade/docs/PLATFORM.md`.
 
@@ -89,7 +96,7 @@ smoke spec.
 | ~$ est. | Σ tokens per turn × the price table (input, output, cache read, cache write split into 5-minute and 1-hour), always labeled "~$ est.". Claude: usage counted once per `message.id` (one API message spans several records); `<synthetic>` records aren't turns. Codex: per-turn tokens are differences of the cumulative `total_token_usage` (identical `token_count` events repeat) |
 | started · last active | first and last `timestamp` |
 | folder · branch | `cwd`, the first non-empty `gitBranch` (Claude). Codex: `session_meta.cwd`, `session_meta.git.branch` when recorded |
-| first / last message from Daniil | the first and last real user text, skipping injected content (system reminders, skill bodies, tool results, command caveats, built-in slash commands, Pomade's file-context lines). A skill or custom command shows as typed. Codex Desktop's wrapped prompts keep only the request |
+| first / last message from the user | the first and last real user text, skipping injected content (system reminders, skill bodies, tool results, command caveats, built-in slash commands, Pomade's file-context lines). A skill or custom command shows as typed. Codex Desktop's wrapped prompts keep only the request |
 | last agent answer | the last assistant text block |
 
 **Price table:** a hand-maintained table in the app source. Per model id it holds dollar rates
@@ -102,7 +109,7 @@ Two separate columns:
 
 | | Values | Set by |
 |---|---|---|
-| **Status** | Active · On hold · Done · Done–skip/Failed | Daniil only, in the Agents UI (row, detail panel, bulk) |
+| **Status** | Active · On hold · Done · Done–skip/Failed | the user only, in the Agents UI (row, detail panel, bulk) |
 | **Live state** | Working · Needs you · Idle · Closed | detected: the platform's live state per agent tab (`pomade:E-033`); Runner runs from its events; anything not running is Closed |
 
 - **New sessions start Active.**
@@ -197,7 +204,7 @@ provider: claude-code          # claude-code | codex
 kind: folder                   # builtin | folder
 configDir: Agents/claude-libra # workspace-relative; builtins: ~/.claude, ~/.codex
 command: claude-libra          # what Pomade types to launch it
-role: A meticulous librarian for Daniil's Knowledge vault.
+role: A meticulous librarian for the Knowledge vault.
 tags: [knowledge, vault]
 hidden: false
 modes:
@@ -313,10 +320,10 @@ status: active                   # active | on-hold | done | done-skip
 note: waiting for the v0.2.6 test round   # optional
 project: <stable project id>     # effective project (§2.6), the first in sidebar order on a shared root; absent = Workspace
 projectRoot: Projects/Pomade     # workspace-relative, refreshed on project rename
-projectOverride: true            # set when Daniil used Move to project
+projectOverride: true            # set when the user used Move to project
 launchedFrom: <project id>       # project of the Pomade tab that first ran it
 forkedFrom: <session id>
-startedByRunner: { job: Morning summary }   # absent = started by Daniil
+startedByRunner: { job: Morning summary }   # absent = started by the user
 outsidePomade: true              # never bound to a Pomade tab (created after adoptedAt)
 transcript: /Users/…/7b5c3451-….jsonl
 cwd: /Users/…/Projects/Pomade
@@ -379,7 +386,7 @@ constants (`SESSIONS_APP_ID`, `SESSIONS_FOR_REPO_METHOD`, `SESSIONS_LIVE_IN_METH
 |---|---|---|
 | **A** `pomade-agents.turn-finished` | an agent answered and waits | declared; not emitted ([[P-013]]). When it is, only while someone subscribes |
 | **B** `pomade-agents.session-closed` | the session's process ended: `/exit`, tab closed, crash, a Runner run finished | yes |
-| **C** `pomade-agents.status-changed` | Daniil changed a status (bulk = one event per session) | yes |
+| **C** `pomade-agents.status-changed` | the user changed a status (bulk = one event per session) | yes |
 
 **Payload, every event:**
 - `sessionId`, `provider`, `agent`, `project` (id + root)
@@ -412,7 +419,7 @@ pomade-agents show     [--session <id>] [--json]
 
 - **Without `--session`,** the command acts on the session bound to the terminal tab it runs in.
   The tab is identified by an environment variable Pomade gives every terminal.
-- **There is no status command.** Status is Daniil's, in the UI.
+- **There is no status command.** Status is the user's, in the UI.
 - **The format skill** ships from this repo. It teaches agents and scripts to read the session
   records (§4) and to use this command.
 

@@ -10,7 +10,7 @@
 //   includes the cached and cache-write tokens, `output_tokens` the reasoning tokens), the latest
 //   request's `last_token_usage`, and `model_context_window`. A turn's tokens are the difference
 //   between consecutive totals, billed at the model of the turn context in force;
-// - `event_msg` `user_message`: Daniil's message (`prompts.ts`). Some rollouts carry no such
+// - `event_msg` `user_message`: the user's message (`prompts.ts`). Some rollouts carry no such
 //   events (seen from codex-tui 0.147 to 0.153); their messages are the user `response_item`s
 //   that are not Codex's own context. Once a rollout shows a `user_message` event, the events are
 //   the only source, and what the items gave before is dropped;

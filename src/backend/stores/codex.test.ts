@@ -21,7 +21,7 @@ describe("a Codex rollout", () => {
     expect(summary.effort).toBe("high");
   });
 
-  it("keeps Daniil's messages, unwrapping the desktop app's context headers; Codex's own context is skipped", () => {
+  it("keeps the user's messages, unwrapping the desktop app's context headers; Codex's own context is skipped", () => {
     expect(summary.firstMessage).toEqual({ text: "Fix the flaky test", at: "2026-11-12T10:00:05.007Z" });
     expect(summary.lastMessage).toEqual({ text: "Also update the docs", at: "2026-11-12T10:05:00.001Z" });
     expect(summary.lastAnswer).toEqual({ text: "Docs updated.", at: "2026-11-12T10:05:31.000Z" });

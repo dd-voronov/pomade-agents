@@ -68,7 +68,7 @@ export type SessionSummary = {
   context: { used: number; window: number } | null;
   /** Estimated cost in USD; `null` when any turn ran on a model the price table lacks. */
   costUsd: number | null;
-  /** Daniil's first and last real messages, injected content skipped. */
+  /** The user's first and last real messages, injected content skipped. */
   firstMessage: TimedText | null;
   lastMessage: TimedText | null;
   /** The agent's last text answer. */
@@ -93,12 +93,12 @@ export type SessionRecord = {
   project?: string;
   /** The effective project's folder, workspace-relative, as Pomade names it now. */
   projectRoot?: string;
-  /** Daniil chose the project (Move to project): `project` is his choice. */
+  /** The user chose the project (Move to project): `project` is their choice. */
   projectOverride?: true;
   /** The project of the Pomade tab the session was first seen bound to; `"__workspace__"`: a tab in the Workspace scope (the session belongs to no project). */
   launchedFrom?: string;
   forkedFrom?: string;
-  /** Absent: started by Daniil. */
+  /** Absent: started by the user. */
   startedByRunner?: { job: string };
   /** Created after the app's first run and never bound to a Pomade tab. */
   outsidePomade?: true;

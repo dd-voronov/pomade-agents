@@ -7,7 +7,7 @@
 //   API message is written as several consecutive records (one per content block) that repeat the
 //   same `message.id` and usage, so usage counts once per id. `<synthetic>` records (API errors
 //   Claude Code writes itself) are no turn;
-// - `user`: Daniil's messages (`prompts.ts`).
+// - `user`: the user's messages (`prompts.ts`).
 //
 // Every other record type (snapshots, titles, modes, queue operations, cost state, …) only counts
 // for time.

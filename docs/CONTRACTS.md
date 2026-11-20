@@ -1,3 +1,10 @@
+---
+doc: docs/CONTRACTS.md
+audience: engineers
+holds: the interfaces this app offers and the ones its parts share — manifest, surfaces and routes, published API, backend, test harness
+kind: reference
+---
+
 # pomade-agents — Contracts
 
 The interfaces this app offers and the ones its own parts share. Pomade's conventions apply
@@ -79,7 +86,7 @@ type SessionSummary = {
   tokens: { input; output; cacheRead; cacheWrite };   // summed; input = uncached input
   context: { used: number; window: number } | null;   // latest turn's input-side tokens ÷ window
   costUsd: number | null;             // ~$ est.; null when any turn's model is not in the price table
-  firstMessage: { text; at } | null;  // Daniil's first and last real messages
+  firstMessage: { text; at } | null;  // the user's first and last real messages
   lastMessage: { text; at } | null;
   lastAnswer: { text; at } | null;    // the agent's last text answer
   malformedLines: number;             // lines that were not JSON, skipped

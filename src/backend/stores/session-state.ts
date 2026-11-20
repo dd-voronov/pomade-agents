@@ -120,7 +120,7 @@ export function timedText(text: string, at: unknown): TimedText {
   return { text: capped, at: typeof at === "string" ? at : null };
 }
 
-/** Record one of Daniil's messages: the first one stays first, every one becomes the last. */
+/** Record one of the user's messages: the first one stays first, every one becomes the last. */
 export function noteMessage(state: SessionState, text: string, at: unknown): void {
   const message = timedText(text, at);
   state.firstMessage ??= message;

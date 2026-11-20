@@ -1,4 +1,4 @@
-// Which user records are Daniil's own messages, and their text. Transcripts carry a lot under the
+// Which `user` records are the user's own messages, and their text. Transcripts carry a lot under the
 // user role that nobody typed: tool results, skill bodies, system reminders, command caveats and
 // outputs, background-task notifications, interrupt markers, compaction summaries, IDE context,
 // and the file-context prompt Pomade submits when it starts an agent on a document.
@@ -35,7 +35,7 @@ function contentText(content: unknown): string | null {
   return parts.join("\n");
 }
 
-/** A slash command Daniil typed, as he typed it: `/name args`. */
+/** A slash command the user typed, as they typed it: `/name args`. */
 function commandAsTyped(text: string): string | null {
   const name = COMMAND_NAME_RE.exec(text)?.[1];
   if (name === undefined) return null;
@@ -45,7 +45,7 @@ function commandAsTyped(text: string): string | null {
 }
 
 /**
- * Daniil's message in a Claude Code `user` record, or `null` when the record is not one.
+ * The user's message in a Claude Code `user` record, or `null` when the record is not one.
  *
  * Current Claude Code marks every prompt's origin: `origin.kind` is `human` for what he submitted
  * (typed, pasted, a queued prompt, an accepted suggestion, a skill command) and something else for
@@ -76,7 +76,7 @@ export function claudePrompt(record: Shape): string | null {
 const CODEX_REQUEST_MARKER_RE = /^## My request for Codex:[ \t]*\n/m;
 
 /**
- * Daniil's message in a Codex `user_message` event, or `null` when it holds none. The event carries
+ * The user's message in a Codex `user_message` event, or `null` when it holds none. The event carries
  * what he submitted; Codex's own context (`AGENTS.md`, environment) goes into other records. The
  * desktop app prefixes its context headers (`# In app browser:`, `# Files mentioned by the user:`)
  * and marks where the request starts.
@@ -93,7 +93,7 @@ export function codexPrompt(message: unknown): string | null {
 const CODEX_CONTEXT_RE = /^(<[a-zA-Z][\w-]*>|# AGENTS\.md instructions)/;
 
 /**
- * Daniil's message in the text of a Codex user `response_item` (the model's input), or `null`.
+ * The user's message in the text of a Codex user `response_item` (the model's input), or `null`.
  * Rollouts written without `user_message` events hold his messages only there, beside the
  * context Codex adds.
  */

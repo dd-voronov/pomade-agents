@@ -74,7 +74,7 @@ describe("keeping a record current", () => {
     projectRoot: "Projects/beta",
   };
 
-  it("follows the transcript and keeps everything that is Daniil's", () => {
+  it("follows the transcript and keeps everything that is the user's", () => {
     expect(refreshRecord(record, context({}, { transcript: "/t/new.jsonl" }))).toEqual({ ...record, transcript: "/t/new.jsonl" });
   });
 

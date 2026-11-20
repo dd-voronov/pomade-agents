@@ -23,7 +23,7 @@ describe("a Claude Code transcript", () => {
     expect(summary.effort).toBe("medium");
   });
 
-  it("keeps only Daniil's messages: system reminders, task notifications, command caveats and output, interrupts are skipped", () => {
+  it("keeps only the user's messages: system reminders, task notifications, command caveats and output, interrupts are skipped", () => {
     expect(summary.firstMessage).toEqual({ text: "Plan the sessions table", at: "2026-11-10T09:00:01.000Z" });
     expect(summary.lastMessage).toEqual({ text: "Now write it", at: "2026-11-10T09:03:00.000Z" });
     expect(summary.lastAnswer).toEqual({ text: "Done.", at: "2026-11-10T09:03:05.000Z" });
@@ -98,7 +98,7 @@ describe("a Claude Code transcript", () => {
     expect(summaryOf("claude-code", onlyClear)).toMatchObject({ firstMessage: null, lastMessage: null, lastAnswer: null });
   });
 
-  it("shows a skill command typed as the first input as Daniil typed it; its injected body, a compaction summary and Pomade's file-context prompt are skipped", () => {
+  it("shows a skill command typed as the first input as the user typed it; its injected body, a compaction summary and Pomade's file-context prompt are skipped", () => {
     const skill = summaryOf("claude-code", fixture("claude-skill-first.jsonl"));
     expect(skill.firstMessage).toEqual({ text: "/grill-me the store design", at: "2026-11-11T08:00:00.000Z" });
     expect(skill.lastMessage).toEqual({ text: "[Image #1] what about this layout?", at: "2026-11-11T08:07:00.000Z" });

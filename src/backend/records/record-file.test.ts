@@ -60,7 +60,7 @@ describe("a session record file", () => {
 
   it("is rewritten key by key: comments, extra keys, order and quoting of the rest stay", () => {
     const edited = [
-      "# Daniil's notes on this one",
+      "# My notes on this one",
       `id: ${ID}`,
       "status: done   # finished on Friday",
       "provider: claude-code",
@@ -77,7 +77,7 @@ describe("a session record file", () => {
     const next: SessionRecord = { ...rest, status: "on-hold", launchedFrom: "p1" };
     expect(rewriteRecord(edited, next)).toBe(
       [
-        "# Daniil's notes on this one",
+        "# My notes on this one",
         `id: ${ID}`,
         "status: on-hold # finished on Friday",
         "provider: claude-code",
