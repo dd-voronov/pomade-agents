@@ -19,6 +19,8 @@ export interface Turn {
   output?: number;
   at: string;
   cwd: string;
+  /** The answer's text; default "Done.". */
+  text?: string;
 }
 
 let turns = 0;
@@ -35,7 +37,7 @@ export const answer = (turn: Turn): string =>
       id: `msg_e2e_${++turns}`,
       type: "message",
       role: "assistant",
-      content: [{ type: "text", text: "Done." }],
+      content: [{ type: "text", text: turn.text ?? "Done." }],
       stop_reason: "end_turn",
       usage: { input_tokens: 10, cache_read_input_tokens: turn.input - 10, cache_creation_input_tokens: 0, output_tokens: turn.output ?? 100 },
     },

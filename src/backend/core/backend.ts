@@ -1,18 +1,21 @@
 // The backend process's life: record the run, index the agents' session stores, keep the session
 // records, stay connected to Pomade over its socket — following its projects and agent tabs, which
-// are what runs now — and serve the app's API on every connection (HOST-API §2 "Backends"). Pomade starts it with the app
-// and stops it with SIGTERM.
+// are what runs now — serve the app's API on every connection and publish its session events
+// (HOST-API §2 "Backends"). Pomade starts it with the app and stops it with SIGTERM; a requested
+// stop publishes the status changes still inside their window first.
 
 import type { HostClient } from "pomade-kit/sdk";
 import { stayConnected } from "pomade-kit/node";
 
 import type { AppInfo } from "../../shared/api.ts";
+import { STATUS_WINDOW_MS } from "../../shared/session-events.ts";
 import { SESSIONS_CHANGED_EVENT } from "../../shared/sessions.ts";
 import { createApi } from "../interfaces/api.ts";
 import { followPomade } from "../interfaces/platform.ts";
 import { openRecordStore, type RecordStore } from "../records/record-store.ts";
 import { createLiveState, followTabs } from "../sessions/live-state.ts";
 import { startSessionData } from "../sessions/session-data.ts";
+import { startSessionEvents } from "../sessions/session-events.ts";
 import { startSessionStore } from "../stores/session-store.ts";
 import { resolveHome, resolveLocations, type Env } from "./locations.ts";
 import { createRealPaths } from "./real-paths.ts";
@@ -71,6 +74,18 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
   sessions.onChange((changed) => {
     host?.events.publish(SESSIONS_CHANGED_EVENT, changed).catch((err: unknown) => log(`could not publish ${SESSIONS_CHANGED_EVENT}: ${message(err)}`));
   });
+  // Events B and C go to other apps through the connection that is up when they are due.
+  const events = startSessionEvents({
+    sessions,
+    publish: async (name, payload) => {
+      if (host === null) throw new Error("Pomade is not connected");
+      await host.events.publish(name, payload);
+    },
+    realPath,
+    windowMs: STATUS_WINDOW_MS,
+    now: options.now,
+    log,
+  });
 
   const connection = stayConnected(
     { env, role: "backend" },
@@ -89,6 +104,7 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
             bind: (sessionId, projectId) => sessions.bind(sessionId, projectId),
             listTabs: (list) => tabs.list(list),
             tabChanged: (tab, closed) => tabs.changed(tab, closed),
+            tabExited: (exited) => events.tabExited(exited),
           },
           { workspace: locations.workspace, log },
         );
@@ -107,6 +123,7 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
 
   return {
     async stop() {
+      await events.stop();
       connection.stop();
       sessions.stop();
       await records?.stop();

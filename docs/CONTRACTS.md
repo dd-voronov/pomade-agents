@@ -1,7 +1,7 @@
 ---
 doc: docs/CONTRACTS.md
 audience: engineers
-holds: the interfaces this app offers and the ones its parts share — manifest, surfaces and routes, published API, backend, test harness
+holds: the interfaces this app offers and the ones its parts share — manifest, surfaces and routes, published API, published events, backend, test harness
 kind: reference
 ---
 
@@ -23,7 +23,7 @@ and the backend's handlers in step with it.
 | `hostApi` | `0` |
 | `capabilities` | `project.read` (projects, their stable ids, names and folders) · `agentTabs.read` (each agent tab's session, folder and live state) — the backend's project attribution and live state; the Sessions tab's project names |
 | `strip` | one icon, `agents` — action `panel` |
-| `events` | publishes `sessions.changed`; subscribes to `pomade-agents:sessions.changed` (its own, for its UI frames), `project.created` and `project.renamed` (the backend, and the UI frames for project names) and, for the backend, `pomade.ready`, `agentTab.changed` |
+| `events` | publishes `sessions.changed` (for its own UI frames) and `session.turnFinished` (declared, never published), `session.closed`, `session.statusChanged` ("Published events" below); subscribes to `pomade-agents:sessions.changed` (its own, for its UI frames), `project.created` and `project.renamed` (the backend, and the UI frames for project names) and, for the backend, `pomade.ready`, `agentTab.changed`, `agentTab.exited` |
 | `backend` | `backend/main.mjs`, mode `with-pomade` |
 | `api` | the methods of "Published API" below — `sessions.forRepo` and `sessions.liveIn` among them, which Pomade reads (HOST-API §4, "Platform reads of app APIs") |
 | `outsideWorkspace` | `~/.claude/`, `~/.codex/`, `~/.zshrc` — the paths outside the workspace the backend uses. The Host API defines no key for them; Pomade lists this one as not supported yet |
@@ -62,6 +62,9 @@ it the same way. Method names and shapes are in `src/shared/api.ts`; the session
 | `sessions.moveToProject` | `{ id, project: string \| null }` | `SessionsUpdated` |
 | `sessions.forRepo` | `SessionsForRepoParams` `{ folder, branch? }` | `SessionsForRepoResult` `{ sessions: RepoSession[] }` |
 | `sessions.liveIn` | `SessionsLiveInParams` `{ folder }` | `SessionsLiveInResult` `{ live, sessions: LiveSession[] }` |
+| `sessions.get` | `SessionsGetParams` `{ id }` | `SessionsGetResult` `{ session: Session }` |
+| `sessions.lastMessage` | `SessionsLastMessageParams` `{ id }` | `SessionsLastMessageResult` `{ message: { text, at } \| null }` |
+| `sessions.find` | `SessionsFindParams` `{ cwd, startedFrom, startedTo, agent? }` | `SessionsFindResult` `{ sessions: FoundSession[] }` |
 
 ```ts
 interface AppInfo {
@@ -204,8 +207,117 @@ kit's `checkRepoSessions` / `checkLiveIn` unchanged. Pomade asks them as the cal
   job: null }`; a tab whose folder is not known yet is left out. `live` is true exactly when
   `sessions` is not empty.
 
+### Reads for Runner
+
+`sessions.get`, `sessions.lastMessage` and `sessions.find` (DESIGN §5), shapes in
+`src/shared/sessions.ts`; `src/backend/sessions/for-runner.ts` answers `find`.
+
+```ts
+type SessionsGetResult = { session: Session };          // "Sessions" above
+
+type SessionsLastMessageResult = {
+  message: { text: string; at: string | null } | null;  // the agent's last text answer; null while it has not answered
+};
+
+type SessionsFindParams = {
+  cwd: string;          // absolute
+  startedFrom: string;  // ISO 8601 date and time with a zone (Z or ±hh:mm)
+  startedTo: string;
+  agent?: string;       // roster id
+};
+
+type FoundSession = {
+  id: string;
+  provider: "claude-code" | "codex";
+  agent: string;
+  cwd: string;          // the start folder, absolute, symlinks resolved
+  startedAt: string;    // ISO 8601, as the transcript records it
+  lastActiveAt: string;
+};
+type SessionsFindResult = { sessions: FoundSession[] };  // earliest start first
+```
+
+- **`get` and `lastMessage`** — an `id` (a non-empty string) no transcript of which is known is
+  `not-found`. `lastMessage` is the summary's `lastAnswer`: the text as the agent wrote it
+  (Markdown, line breaks kept), trimmed, capped at 4000 characters (a longer one ends in "…"), from
+  the session's latest transcript; `at` is the answer's record time (`null` only when the record
+  has none).
+- **`find`** — the sessions whose start folder, resolved, is exactly `cwd`, resolved (a folder
+  inside it does not match), whose `startedAt` lies between `startedFrom` and `startedTo` compared
+  as instants, both ends included, and, with `agent`, whose agent is that one. A session without a
+  start folder or both activity times is left out. Ties in `startedAt` go by id. Errors:
+  `invalid-params` for a `cwd` that is not absolute, a time that is not ISO 8601 with a zone,
+  `startedFrom` after `startedTo`, or an empty `agent`.
+
 Adding a method: its name in the manifest's `api` and in `API_METHODS`, its shapes in
 `src/shared/`, its handler in `src/backend/interfaces/api.ts`.
+
+## Published events
+
+Events B and C (DESIGN §6) go out on Pomade's bus (HOST-API §4 `events`); a subscriber declares
+`pomade-agents:session.closed` and `pomade-agents:session.statusChanged` in its manifest's
+`events.subscribe`. Names and payloads are in `src/shared/session-events.ts`, which also has
+the guards `isSessionClosedEvent` and `isStatusChangedEvent`. `session.turnFinished` (A) is
+declared and never published. Events are not replayed: a subscriber that is not connected when
+one goes out misses it, and so does every subscriber when the backend is not connected to
+Pomade then (the backend logs it).
+
+```ts
+type SessionEventBase = {
+  sessionId: string;
+  provider: "claude-code" | "codex";
+  agent: string;                                // roster id
+  project: { id: string; root: string } | null; // the project it shows in — the first, on a shared
+                                                // folder; root workspace-relative; null: the Workspace bucket
+  cwd: string | null;                           // start folder, absolute, symlinks resolved
+  transcript: string;                           // the latest transcript file, absolute
+  name: string | null;                          // null: unnamed
+  status: "active" | "on-hold" | "done" | "done-skip";
+  startedByRunner: boolean;                     // the record has startedByRunner
+  job: string | null;                           // its job name when startedByRunner, else null
+  at: string;                                   // ISO 8601: when it happened
+};
+
+type SessionClosedEvent = SessionEventBase & { reason: "exit" | "tab-closed" | "crash" };
+type StatusChangedEvent = SessionEventBase & { from: SessionStatus; to: SessionStatus }; // status = to
+```
+
+A session is told of only with a usable record (it has the status); one without is logged and
+left out.
+
+**B `session.closed`** — from Pomade's `agentTab.exited` (HOST-API §4 `events`), which fires once
+per end of an agent process in a tab and names the session bound to the tab then; `at` is when
+the backend heard it. `reason` is the platform's:
+
+| `reason` | Pomade's `agentTab.exited` reason means |
+|---|---|
+| `exit` | the agent quit with status 0 — `/exit`, or interrupted with Ctrl+C (status 130); the two are not told apart |
+| `tab-closed` | the tab was closed with the agent running — by the user or a bulk action; also an agent a bulk "exit all agents" had to kill |
+| `crash` | it ended with any other status, or the tab's shell died under it; the cause is not told |
+
+- Pomade's `quit` (it quit or closed the workspace, and resumes the session at its next launch)
+  is a pause, not an end: no event.
+- An exit with no session bound (an agent never prompted, or a binding Pomade was unsure of) has
+  no session to tell of: no event.
+- A session the app does not know yet (its transcript is still being read) is waited for up to
+  5 s (`CLOSED_WAIT_MS`), then left out.
+- `agentTab.changed` alone does not tell these apart: `closed` is both a closed tab and an agent
+  handing the shell back, and `state: "exited"` carries no cause.
+- Subscribers treat a `reason` they do not know as an end too: the list grows when Runner's runs
+  finish B.
+
+**C `session.statusChanged`** — every status change `SessionData.changeStatus` makes (the UI's,
+another app's `sessions.setStatus`), per session, published **5 s after the session's last
+change** (`STATUS_WINDOW_MS`, `src/backend/sessions/status-window.ts`):
+
+- A setting that leaves the status as it was is no change.
+- Changes inside the window are one event: `from` is the status before the first, `to` the
+  status after the last; each change restarts the window. A status back at `from` when the
+  window ends publishes nothing — that is how the Sessions tab's Undo takes a change back.
+- A bulk change is one window per session: three sessions set Done are three events.
+- `at` is when the last change was written.
+- A requested stop (SIGTERM, SIGINT) publishes every pending change at once, before the backend
+  lets go of Pomade; a backend killed or crashed loses them.
 
 ## Backend
 
@@ -237,7 +349,8 @@ Adding a method: its name in the manifest's `api` and in `API_METHODS`, its shap
 - **Pomade** (`src/backend/interfaces/platform.ts`) — on each connection the backend lists the
   projects (again on `project.created`, `project.renamed`, `pomade.ready`) and the agent tabs (again
   on `pomade.ready`), and takes every `agentTab.changed`: the first project each session is seen
-  bound in is its `launchedFrom`; every tab's state and folder feed the live state. A rename refreshes `projectRoot` in the records of that project.
+  bound in is its `launchedFrom`; every tab's state and folder feed the live state. Every
+  `agentTab.exited` feeds event B. A rename refreshes `projectRoot` in the records of that project.
 - **Locations** (`src/backend/core/locations.ts`) — app data in `<workspace>/Apps/pomade-agents/`,
   machine-local state in `<userData>/app-state/pomade-agents/`, the built-in agents' stores under
   `HOME`.
@@ -255,8 +368,8 @@ Adding a method: its name in the manifest's `api` and in `API_METHODS`, its shap
 - **Run record** — `<stateDir>/backend.json`: `{ pid, version, startedAt }`, written atomically at
   start and removed on a requested stop. A record left behind names a backend that crashed or was
   killed.
-- **Stop** — on SIGTERM or SIGINT the backend closes its connection, removes its run record and
-  exits with status 0.
+- **Stop** — on SIGTERM or SIGINT the backend publishes the status changes still inside their
+  window, closes its connection, removes its run record and exits with status 0.
 
 ## Test harness
 
@@ -273,6 +386,6 @@ Adding a method: its name in the manifest's `api` and in `API_METHODS`, its shap
   the option `seed` — `test.use({ seed: { into(sandbox) } })` writes into the sandbox before the
   backend starts (`null` by default).
 - Transcript helpers (`e2e/transcripts.ts`): `prompt` and `answer` (Claude Code lines; a prompt
-  may record a git branch, an answer carries its model, effort and usage), `claudeSession(sandbox, id, lines)`, `projectFolder(sandbox,
+  may record a git branch, an answer carries its model, effort, usage and text), `claudeSession(sandbox, id, lines)`, `projectFolder(sandbox,
   projectId)`, and `seedIntoProject(sandbox, projectId)`, which moves the seeded transcripts' start
   folders into a fixture project.

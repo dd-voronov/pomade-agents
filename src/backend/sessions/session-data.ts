@@ -10,7 +10,8 @@
 //   first binding, project and its root) are written when they change; a record that cannot be
 //   read is left alone and its session shows without one.
 // - **Changes in.** Status, note, name and Move to project go to the record file and nowhere else;
-//   every status change goes through `changeStatus`.
+//   every status change goes through `changeStatus`, which tells its listeners each session whose
+//   status it changed.
 // - **Changes out.** Each session carries a revision; the API answers the changes since a
 //   caller's revision, and a change notice goes out at most every `NOTIFY_MS`.
 //
@@ -57,11 +58,24 @@ export interface SessionDataOptions {
   log: (line: string) => void;
 }
 
+/** A status `changeStatus` changed. */
+export interface StatusChange {
+  id: string;
+  from: SessionStatus;
+  to: SessionStatus;
+  /** When it was written, ISO 8601. */
+  at: string;
+}
+
 export interface SessionData {
   /** Sessions since `since`, or all of them. */
   answer(since?: SessionsSince): SessionsAnswer;
   /** Every session as it is now. */
   list(): Session[];
+  /** One session as it is now; `undefined` when no transcript of it is known. */
+  get(id: string): Session | undefined;
+  /** Pomade's projects, in sidebar order; `null` while not known. */
+  projects(): readonly ProjectPlace[] | null;
   /** Called (coalesced) after sessions changed; returns an unsubscribe function. */
   onChange(listener: (changed: SessionsChanged) => void): () => void;
   /** Pomade's projects, in sidebar order. */
@@ -70,6 +84,8 @@ export interface SessionData {
   bind(sessionId: string, projectId: string): void;
   /** Set the status of sessions — the one way a status changes. `note`: a string sets it, `null` removes it, omitted keeps it. */
   changeStatus(ids: readonly string[], status: SessionStatus, note?: string | null): Promise<Session[]>;
+  /** Called after `changeStatus` changed a session's status; returns an unsubscribe function. */
+  onStatusChange(listener: (change: StatusChange) => void): () => void;
   /** Name a session; `null`: unnamed. */
   rename(id: string, name: string | null): Promise<Session>;
   /** Move a session to a project, to the Workspace (`"__workspace__"`), or back to its automatic project (`null`). */
@@ -106,6 +122,7 @@ export function startSessionData(options: SessionDataOptions): SessionData {
   const dirty = new Set<string>();
   let flushTimer: NodeJS.Timeout | null = null;
   const listeners = new Set<(changed: SessionsChanged) => void>();
+  const statusListeners = new Set<(change: StatusChange) => void>();
   let notifyTimer: NodeJS.Timeout | null = null;
 
   // ── Changes out ──────────────────────────────────────────────────────────
@@ -351,6 +368,13 @@ export function startSessionData(options: SessionDataOptions): SessionData {
       return [...entries.values()].map((entry) => entry.session);
     },
 
+    get(id) {
+      flush();
+      return entries.get(id)?.session;
+    },
+
+    projects: () => projects,
+
     onChange(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);
@@ -370,8 +394,25 @@ export function startSessionData(options: SessionDataOptions): SessionData {
     async changeStatus(ids, status, note) {
       for (const id of ids) requireRecord(id);
       const out: Session[] = [];
-      for (const id of ids) out.push(await change(id, (record) => withText({ ...record, status }, "note", note)));
+      for (const id of ids) {
+        let from: SessionStatus = status;
+        out.push(
+          await change(id, (record) => {
+            from = record.status;
+            return withText({ ...record, status }, "note", note);
+          }),
+        );
+        if (from !== status) {
+          const at = now().toISOString();
+          for (const listener of statusListeners) listener({ id, from, to: status, at });
+        }
+      }
       return out;
+    },
+
+    onStatusChange(listener) {
+      statusListeners.add(listener);
+      return () => statusListeners.delete(listener);
     },
 
     async rename(id, name) {

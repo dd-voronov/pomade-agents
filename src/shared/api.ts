@@ -3,7 +3,15 @@
 
 import { SESSIONS_FOR_REPO_METHOD, SESSIONS_LIVE_IN_METHOD } from "pomade-kit/protocol";
 
-import { SESSIONS_LIST_METHOD, SESSIONS_MOVE_METHOD, SESSIONS_RENAME_METHOD, SESSIONS_SET_STATUS_METHOD } from "./sessions.ts";
+import {
+  SESSIONS_FIND_METHOD,
+  SESSIONS_GET_METHOD,
+  SESSIONS_LAST_MESSAGE_METHOD,
+  SESSIONS_LIST_METHOD,
+  SESSIONS_MOVE_METHOD,
+  SESSIONS_RENAME_METHOD,
+  SESSIONS_SET_STATUS_METHOD,
+} from "./sessions.ts";
 
 /** Answers `AppInfo`: which backend is running and where it keeps the app's data. */
 export const APP_INFO_METHOD = "app.info";
@@ -17,6 +25,9 @@ export const API_METHODS = [
   SESSIONS_MOVE_METHOD,
   SESSIONS_FOR_REPO_METHOD,
   SESSIONS_LIVE_IN_METHOD,
+  SESSIONS_GET_METHOD,
+  SESSIONS_LAST_MESSAGE_METHOD,
+  SESSIONS_FIND_METHOD,
 ] as const;
 
 export interface AppInfo {

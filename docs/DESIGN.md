@@ -403,9 +403,9 @@ Registered with Pomade's broker (`pomade:E-028`). Callers reach it through the H
 
 | Call | Returns | Callers |
 |---|---|---|
-| `sessions.get(id)` | the session summary: record fields + §2.3 fields + live state | Runner, git |
-| `sessions.lastMessage(id)` | `{ text, at }`: the last agent answer | Runner (result cards) |
-| `sessions.find({ cwd, startedFrom, startedTo, agent? })` | sessions started in that folder in that time window | Runner (runs without a pre-set id, e.g. Codex) |
+| `sessions.get({ id })` | `{ session }`: record fields + §2.3 fields + live state | Runner, git |
+| `sessions.lastMessage({ id })` | `{ message: { text, at } \| null }`: the last agent answer as the agent wrote it (Markdown), capped at 4000 characters; `null` while it has not answered | Runner (result cards) |
+| `sessions.find({ cwd, startedFrom, startedTo, agent? })` | `{ sessions: { id, provider, agent, cwd, startedAt, lastActiveAt }[] }`: sessions started exactly in that folder (symlinks resolved) within that time window, both ends included; earliest start first | Runner (runs without a pre-set id, e.g. Codex) |
 | `sessions.forRepo({ folder, branch? })` | `{ sessions: RepoSession[] }`: sessions whose start folder is `folder` or inside it (a repo or worktree) and, with `branch`, whose recorded branch is that one; newest activity first | git (branch ↔ session link) |
 | `sessions.liveIn({ folder })` | `{ live, sessions: LiveSession[] }`: agent tabs and Runner agent runs (`kind: agent`; never script, git or service runs) running at or below `folder` now, including an agent tab not yet prompted; `live` is true exactly when `sessions` is non-empty | git (merge block, In progress rows), `pomade-git` (skip scheduled commit) |
 | `roster.list()` | `{ agents: RosterAgent[] }` (the shape in Pomade's `docs/HOST-API.md` §4 "`apps` — the broker", "Platform reads of app APIs"): id, name, command, provider, config dir, enabled modes with their arguments. Hidden agents are left out | Pomade "+" menu and agent launches, Runner |
@@ -441,24 +441,33 @@ constants (`SESSIONS_APP_ID`, `SESSIONS_FOR_REPO_METHOD`, `SESSIONS_LIVE_IN_METH
 
 ## 6. Events
 
-**Published** (declared in the manifest, delivered by `pomade:E-031`):
+**Published** (declared in the manifest, delivered by `pomade:E-031`; subscribers name them
+`pomade-agents:<event>`):
 
 | Event | When | v1 |
 |---|---|---|
-| **A** `pomade-agents.turn-finished` | an agent answered and waits | declared; not emitted ([[P-013]]). When it is, only while someone subscribes |
-| **B** `pomade-agents.session-closed` | the session's process ended: `/exit`, tab closed, crash, a Runner run finished | yes |
-| **C** `pomade-agents.status-changed` | the user changed a status (bulk = one event per session) | yes |
+| **A** `session.turnFinished` | an agent answered and waits | declared; not emitted ([[P-013]]). When it is, only while someone subscribes |
+| **B** `session.closed` | the session's process ended: `/exit`, tab closed, crash, a Runner run finished | yes |
+| **C** `session.statusChanged` | the user changed a status (bulk = one event per session), 5 s after the change | yes |
 
 **Payload, every event:**
-- `sessionId`, `provider`, `agent`, `project` (id + root)
-- `cwd`, `name`, `status` (the kit's `SessionStatus` values, §5)
-- `startedByRunner` (+ `job`), `at`
+- `sessionId`, `provider`, `agent` (roster id), `project` (`{ id, root }`, root
+  workspace-relative; `null` for the Workspace bucket)
+- `cwd`, `transcript` (the session's transcript file, absolute — Runner's hooks hand it to
+  scripts), `name`, `status` (the kit's `SessionStatus` values, §5)
+- `startedByRunner` (`true` with the `job` name; else `false`, `job: null`), `at`
 
 C adds `from` and `to`. B adds `reason`: exit · tab-closed · crash · run-finished.
 
 **How B is built:**
-- from the platform's **agent tab exited** event, plus the tab's bound session
+- from the platform's **agent tab exited** event (`agentTab.exited`), plus the session bound to
+  the tab then; its reasons are the platform's. Pomade quitting (`quit`) pauses a session, so it
+  publishes nothing
 - for unattended runs, from Runner's **run finished**
+
+**How C is timed:** it goes out 5 s after the session's last status change. A change taken back
+inside the window (the Sessions tab's Undo) publishes nothing; several changes inside it publish
+one event, from the first `from` to the last `to`. A requested stop publishes the pending ones.
 
 Runner's loop guard (it never fires its "agent session finished" hook for its own runs) reads
 `startedByRunner`. C always fires: it's a user action. Example use: Done → Runner runs the

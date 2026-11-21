@@ -190,6 +190,32 @@ describe("the session data", () => {
     expect(status("a")).toBe("done");
   });
 
+  it("tells its listeners every status changeStatus changes, from what to what, and nothing for one that stays", async () => {
+    await mkdir(dataDir, { recursive: true });
+    await writeFile(join(dataDir, SETTINGS_FILE), `adoptedAt: ${FIRST_RUN}\n`);
+    const source = fakeSource();
+    source.put(summary("a"), summary("b"));
+    const d = await start(source);
+    await expect.poll(() => ["a", "b"].map(status), SOON).toEqual(["done", "done"]);
+    const heard: unknown[] = [];
+    const unsubscribe = d.onStatusChange((change) => heard.push(change));
+
+    await d.changeStatus(["a", "b"], "on-hold");
+    await d.changeStatus(["a"], "on-hold", "a note only");
+    clock = new Date("2026-11-17T12:05:00.000Z");
+    await d.changeStatus(["a"], "active");
+    expect(heard).toEqual([
+      { id: "a", from: "done", to: "on-hold", at: FIRST_RUN },
+      { id: "b", from: "done", to: "on-hold", at: FIRST_RUN },
+      { id: "a", from: "on-hold", to: "active", at: "2026-11-17T12:05:00.000Z" },
+    ]);
+    unsubscribe();
+    await d.changeStatus(["b"], "done");
+    expect(heard).toHaveLength(3);
+    expect(d.get("b")?.record?.status).toBe("done");
+    expect(d.get("ghost")).toBeUndefined();
+  });
+
   it("refreshes the project root after a rename and keeps the session in its project", async () => {
     await mkdir(dataDir, { recursive: true });
     await writeFile(join(dataDir, SETTINGS_FILE), `adoptedAt: ${FIRST_RUN}\n`);

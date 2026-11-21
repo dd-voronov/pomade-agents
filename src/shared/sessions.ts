@@ -19,6 +19,15 @@ export const SESSIONS_RENAME_METHOD = "sessions.rename";
 /** Moves a session to a project, to the Workspace, or back to its automatic project; answers `SessionsUpdated`. */
 export const SESSIONS_MOVE_METHOD = "sessions.moveToProject";
 
+/** One session by id; answers `SessionsGetResult`. */
+export const SESSIONS_GET_METHOD = "sessions.get";
+
+/** A session's last agent answer; answers `SessionsLastMessageResult`. */
+export const SESSIONS_LAST_MESSAGE_METHOD = "sessions.lastMessage";
+
+/** The sessions started in a folder within a time window; answers `SessionsFindResult`. */
+export const SESSIONS_FIND_METHOD = "sessions.find";
+
 /** Published by the backend, unqualified, whenever sessions change; payload `SessionsChanged`. */
 export const SESSIONS_CHANGED_EVENT = "sessions.changed";
 
@@ -194,6 +203,49 @@ export type SessionsUpdated = {
 export type SessionsChanged = {
   epoch: string;
   revision: number;
+};
+
+export type SessionsGetParams = {
+  id: string;
+};
+
+export type SessionsGetResult = {
+  session: Session;
+};
+
+export type SessionsLastMessageParams = {
+  id: string;
+};
+
+export type SessionsLastMessageResult = {
+  /** The agent's last text answer as it wrote it (Markdown), trimmed and capped at 4000 characters; `null` while it has not answered. */
+  message: TimedText | null;
+};
+
+export type SessionsFindParams = {
+  /** The start folder: absolute; compared with symlinks resolved, exactly. */
+  cwd: string;
+  /** ISO 8601; both ends included. */
+  startedFrom: string;
+  startedTo: string;
+  /** Only this agent's sessions (roster id). */
+  agent?: string;
+};
+
+/** A session `sessions.find` matched. */
+export type FoundSession = {
+  id: string;
+  provider: SessionProvider;
+  agent: string;
+  /** The start folder, absolute, symlinks resolved. */
+  cwd: string;
+  startedAt: string;
+  lastActiveAt: string;
+};
+
+export type SessionsFindResult = {
+  /** Earliest start first. */
+  sessions: FoundSession[];
 };
 
 /** Context fill in percent, one decimal. */

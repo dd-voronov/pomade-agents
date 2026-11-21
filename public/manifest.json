@@ -17,14 +17,18 @@
   ],
   "events": {
     "publish": [
-      "sessions.changed"
+      "sessions.changed",
+      "session.turnFinished",
+      "session.closed",
+      "session.statusChanged"
     ],
     "subscribe": [
       "pomade-agents:sessions.changed",
       "pomade.ready",
       "project.created",
       "project.renamed",
-      "agentTab.changed"
+      "agentTab.changed",
+      "agentTab.exited"
     ]
   },
   "backend": {
@@ -38,7 +42,10 @@
     "sessions.rename",
     "sessions.moveToProject",
     "sessions.forRepo",
-    "sessions.liveIn"
+    "sessions.liveIn",
+    "sessions.get",
+    "sessions.lastMessage",
+    "sessions.find"
   ],
   "outsideWorkspace": [
     "~/.claude/",

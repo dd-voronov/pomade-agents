@@ -1,13 +1,14 @@
 // What the backend learns from Pomade on each connection (HOST-API §4): the projects — their stable
 // ids and folders (`project.list`, again on `project.created`, `project.renamed` and `pomade.ready`)
 // — and the agent tabs: which session each one is bound to, where it runs and what its agent is
-// doing (`agentTabs.list`, again on `pomade.ready`, then every `agentTab.changed`; pomade:E-033).
+// doing (`agentTabs.list`, again on `pomade.ready`, then every `agentTab.changed`; pomade:E-033) —
+// and every end of an agent process in a tab, with the session bound to it then (`agentTab.exited`).
 // Subscriptions end with the connection; the next one sets them up again.
 
 import { realpath } from "node:fs/promises";
 import { join } from "node:path";
 
-import type { AgentTabInfo, ProjectInfo } from "pomade-kit/protocol";
+import type { AgentTabExitedPayload, AgentTabInfo, ProjectInfo } from "pomade-kit/protocol";
 import type { HostClient } from "pomade-kit/sdk";
 
 import type { ProjectPlace } from "../sessions/attribution.ts";
@@ -20,6 +21,8 @@ export interface PlatformFacts {
   listTabs(tabs: readonly AgentTabInfo[]): void;
   /** One agent tab as it is now; `closed`: it left the list. */
   tabChanged(tab: AgentTabInfo, closed: boolean): void;
+  /** An agent process in a tab ended. */
+  tabExited(exited: AgentTabExitedPayload): void;
 }
 
 export interface FollowOptions {
@@ -74,6 +77,7 @@ export function followPomade(host: HostClient, facts: PlatformFacts, { workspace
         bindTab(tab);
         facts.tabChanged(tab, changes.includes("closed"));
       }),
+      host.events.subscribe("agentTab.exited", (exited) => facts.tabExited(exited)),
       host.events.subscribe("pomade.ready", () => {
         run("list the projects", loadProjects);
         run("list the agent tabs", loadTabs);

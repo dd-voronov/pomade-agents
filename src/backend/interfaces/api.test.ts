@@ -3,6 +3,12 @@ import { describe, expect, it } from "vitest";
 import { testSession, testSummary } from "../../shared/test-sessions.ts";
 import { createApi, type ApiSources } from "./api.ts";
 
+const ANSWER = { text: "Done.\n\n- one\n- two", at: "2026-11-17T10:04:00.000Z" };
+const LISTED = [
+  testSession({ id: "a", summary: testSummary({ id: "a", cwd: "/w/repo", branch: "main", lastAnswer: ANSWER }) }),
+  testSession({ id: "b", summary: testSummary({ id: "b", cwd: "/w/repo", startedAt: "2026-11-17T09:00:00.000Z" }) }),
+];
+
 function api() {
   const calls: unknown[][] = [];
   const sessions: ApiSources["sessions"] = {
@@ -22,7 +28,8 @@ function api() {
       calls.push(["moveToProject", id, project]);
       return Promise.resolve(testSession({ id }));
     },
-    list: () => [testSession({ id: "a", summary: testSummary({ id: "a", cwd: "/w/repo", branch: "main" }) })],
+    list: () => LISTED,
+    get: (id) => LISTED.find((s) => s.id === id),
   };
   const live = { entries: () => [] };
   const info = { version: "0", startedAt: "", workspace: null, dataDir: null, stateDir: "/s" };
@@ -77,7 +84,7 @@ describe("the API's params", () => {
   it("answers git's questions for a well-formed folder and branch", async () => {
     const ctx = { from: "pomade" };
     const { handlers } = api();
-    expect(await handlers["sessions.forRepo"]?.({ folder: "/w" }, ctx)).toMatchObject({ sessions: [{ id: "a", cwd: "/w/repo" }] });
+    expect(await handlers["sessions.forRepo"]?.({ folder: "/w" }, ctx)).toMatchObject({ sessions: [{ id: "a", cwd: "/w/repo" }, { id: "b" }] });
     expect(await handlers["sessions.forRepo"]?.({ folder: "/w", branch: "other" }, ctx)).toEqual({ sessions: [] });
     expect(await handlers["sessions.liveIn"]?.({ folder: "/w" }, ctx)).toEqual({ live: false, sessions: [] });
   });
@@ -90,6 +97,43 @@ describe("the API's params", () => {
     ["sessions.forRepo", { folder: "/w", branch: 3 }],
     ["sessions.liveIn", { folder: 1 }],
     ["sessions.liveIn", { folder: "/w\nx" }],
+  ])("refuses %s with %j as invalid-params", async (method, params) => {
+    await expect(Promise.resolve().then(() => call(method, params))).rejects.toMatchObject({ code: "invalid-params" });
+  });
+
+  it("answers a session, its last answer, and the sessions started in a folder in a window", async () => {
+    const ctx = { from: "pomade-runner" };
+    const { handlers } = api();
+    expect(await handlers["sessions.get"]?.({ id: "a" }, ctx)).toEqual({ session: LISTED[0] });
+    expect(await handlers["sessions.lastMessage"]?.({ id: "a" }, ctx)).toEqual({ message: ANSWER });
+    expect(await handlers["sessions.lastMessage"]?.({ id: "b" }, ctx)).toEqual({ message: null });
+    const window = { cwd: "/w/repo", startedFrom: "2026-11-17T09:00:00.000Z", startedTo: "2026-11-17T10:00:00Z" };
+    expect(await handlers["sessions.find"]?.(window, ctx)).toEqual({
+      sessions: [
+        { id: "b", provider: "claude-code", agent: "claude", cwd: "/w/repo", startedAt: "2026-11-17T09:00:00.000Z", lastActiveAt: "2026-11-17T10:05:00.000Z" },
+        { id: "a", provider: "claude-code", agent: "claude", cwd: "/w/repo", startedAt: "2026-11-17T10:00:00.000Z", lastActiveAt: "2026-11-17T10:05:00.000Z" },
+      ],
+    });
+    expect(await handlers["sessions.find"]?.({ ...window, agent: "codex" }, ctx)).toEqual({ sessions: [] });
+  });
+
+  it.each(["sessions.get", "sessions.lastMessage"])("answers %s for an unknown session as not-found", async (method) => {
+    await expect(Promise.resolve().then(() => call(method, { id: "ghost" }))).rejects.toMatchObject({ code: "not-found" });
+  });
+
+  const FIND = { cwd: "/w", startedFrom: "2026-11-17T09:00:00Z", startedTo: "2026-11-17T10:00:00Z" };
+  it.each<[string, unknown]>([
+    ["sessions.get", {}],
+    ["sessions.get", { id: "" }],
+    ["sessions.lastMessage", null],
+    ["sessions.find", { ...FIND, cwd: "w" }],
+    ["sessions.find", { ...FIND, cwd: undefined }],
+    ["sessions.find", { ...FIND, startedFrom: "yesterday" }],
+    ["sessions.find", { ...FIND, startedFrom: "2026-11-17" }],
+    ["sessions.find", { ...FIND, startedTo: "2026-13-45T99:00:00Z" }],
+    ["sessions.find", { ...FIND, startedFrom: FIND.startedTo, startedTo: FIND.startedFrom }],
+    ["sessions.find", { ...FIND, agent: "" }],
+    ["sessions.find", { ...FIND, agent: 1 }],
   ])("refuses %s with %j as invalid-params", async (method, params) => {
     await expect(Promise.resolve().then(() => call(method, params))).rejects.toMatchObject({ code: "invalid-params" });
   });
