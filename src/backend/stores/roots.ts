@@ -32,9 +32,11 @@ export interface SessionFile {
 export const BUILTIN_CLAUDE = "claude";
 export const BUILTIN_CODEX = "codex";
 
-const AGENTS_FOLDER = "Agents";
+/** The workspace folder holding the folder agents. */
+export const AGENTS_FOLDER = "Agents";
 const SHARED_FOLDER = "_shared";
-const AGENT_MARKER = "CLAUDE.md";
+/** The file that makes a folder under `Agents/` an agent. */
+export const AGENT_MARKER = "CLAUDE.md";
 
 const CLAUDE_FILE_RE = /^(.+)\.jsonl$/;
 const CODEX_FILE_RE = /^rollout-.*?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/;
@@ -51,8 +53,10 @@ export function isSkippedAgentFolder(name: string): boolean {
   return name === SHARED_FOLDER || name.toLowerCase().includes("template");
 }
 
-/** One store per folder agent: every `<workspace>/Agents/<name>/` holding a `CLAUDE.md`. */
-export async function folderAgentRoots(workspace: string): Promise<StoreRoot[]> {
+/** The folder agents (DESIGN §3.1): the name of every `<workspace>/Agents/<name>/` holding a
+ *  `CLAUDE.md`, except `_shared` and templates, sorted. The roster and the session stores both
+ *  take their folder agents from here. */
+export async function folderAgentNames(workspace: string): Promise<string[]> {
   const agents = join(workspace, AGENTS_FOLDER);
   let entries;
   try {
@@ -60,7 +64,7 @@ export async function folderAgentRoots(workspace: string): Promise<StoreRoot[]> 
   } catch {
     return [];
   }
-  const roots: StoreRoot[] = [];
+  const names: string[] = [];
   for (const entry of entries) {
     if (!entry.isDirectory() || isSkippedAgentFolder(entry.name)) continue;
     try {
@@ -68,9 +72,14 @@ export async function folderAgentRoots(workspace: string): Promise<StoreRoot[]> 
     } catch {
       continue;
     }
-    roots.push({ path: join(agents, entry.name, "projects"), provider: "claude-code", agent: entry.name });
+    names.push(entry.name);
   }
-  return roots.sort((a, b) => a.agent.localeCompare(b.agent));
+  return names.sort((a, b) => a.localeCompare(b));
+}
+
+/** One store per folder agent. */
+export async function folderAgentRoots(workspace: string): Promise<StoreRoot[]> {
+  return (await folderAgentNames(workspace)).map((name) => ({ path: join(workspace, AGENTS_FOLDER, name, "projects"), provider: "claude-code", agent: name }));
 }
 
 /** The session a path names, when it is a session file's place in `root`; else `null`. */

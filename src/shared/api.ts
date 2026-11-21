@@ -12,6 +12,7 @@ import {
   SESSIONS_RENAME_METHOD,
   SESSIONS_SET_STATUS_METHOD,
 } from "./sessions.ts";
+import { ROSTER_AGENTS_FOR_METHOD, ROSTER_AGENTS_METHOD, ROSTER_LAUNCH_SPEC_METHOD, ROSTER_LIST_METHOD, ROSTER_PROJECTS_FOR_METHOD } from "./roster.ts";
 
 /** Answers `AppInfo`: which backend is running and where it keeps the app's data. */
 export const APP_INFO_METHOD = "app.info";
@@ -28,6 +29,11 @@ export const API_METHODS = [
   SESSIONS_GET_METHOD,
   SESSIONS_LAST_MESSAGE_METHOD,
   SESSIONS_FIND_METHOD,
+  ROSTER_LIST_METHOD,
+  ROSTER_LAUNCH_SPEC_METHOD,
+  ROSTER_PROJECTS_FOR_METHOD,
+  ROSTER_AGENTS_FOR_METHOD,
+  ROSTER_AGENTS_METHOD,
 ] as const;
 
 export interface AppInfo {

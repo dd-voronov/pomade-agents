@@ -21,11 +21,11 @@ and the backend's handlers in step with it.
 |---|---|
 | `id` · `name` | `pomade-agents` · Agents |
 | `hostApi` | `0` |
-| `capabilities` | `project.read` (projects, their stable ids, names and folders) · `agentTabs.read` (each agent tab's session, folder and live state) — the backend's project attribution and live state; the Sessions tab's project names |
+| `capabilities` | `project.read` (projects, their stable ids, names and folders, their visible agents) · `agentTabs.read` (each agent tab's session, folder and live state) — the backend's project attribution, live state and the project ↔ agent connection; the Sessions tab's project names |
 | `strip` | one icon, `agents` — action `panel` |
-| `events` | publishes `sessions.changed` (for its own UI frames) and `session.turnFinished` (declared, never published), `session.closed`, `session.statusChanged` ("Published events" below); subscribes to `pomade-agents:sessions.changed` (its own, for its UI frames), `project.created` and `project.renamed` (the backend, and the UI frames for project names) and, for the backend, `pomade.ready`, `agentTab.changed`, `agentTab.exited` |
+| `events` | publishes `sessions.changed` and `roster.changed` (for its own UI frames) and `session.turnFinished` (declared, never published), `session.closed`, `session.statusChanged` ("Published events" below); subscribes to `pomade-agents:sessions.changed` and `pomade-agents:roster.changed` (its own, for its UI frames), `project.created` and `project.renamed` (the backend, and the UI frames for project names) and, for the backend, `pomade.ready`, `agentTab.changed`, `agentTab.exited` |
 | `backend` | `backend/main.mjs`, mode `with-pomade` |
-| `api` | the methods of "Published API" below — `sessions.forRepo` and `sessions.liveIn` among them, which Pomade reads (HOST-API §4, "Platform reads of app APIs") |
+| `api` | the methods of "Published API" below — `sessions.forRepo`, `sessions.liveIn` and `roster.list` among them, which Pomade reads (HOST-API §4, "Platform reads of app APIs") |
 | `outsideWorkspace` | `~/.claude/`, `~/.codex/`, `~/.zshrc` — the paths outside the workspace the backend uses. The Host API defines no key for them; Pomade lists this one as not supported yet |
 
 ## Surfaces and routes
@@ -61,8 +61,8 @@ One UI bundle; `welcome.surface` and the frame's route pick the view (`src/ui/co
 ## Published API
 
 Served by the backend through Pomade's broker (`api.serve`); callers use `apps.call`. The UI calls
-it the same way. Method names and shapes are in `src/shared/api.ts`; the sessions contract's are
-`pomade-kit/protocol`'s.
+it the same way. Method names and shapes are in `src/shared/api.ts`, `src/shared/sessions.ts` and
+`src/shared/roster.ts`; the sessions contract's and `RosterAgent` are `pomade-kit/protocol`'s.
 
 | Method | Params | Answer |
 |---|---|---|
@@ -76,6 +76,11 @@ it the same way. Method names and shapes are in `src/shared/api.ts`; the session
 | `sessions.get` | `SessionsGetParams` `{ id }` | `SessionsGetResult` `{ session: Session }` |
 | `sessions.lastMessage` | `SessionsLastMessageParams` `{ id }` | `SessionsLastMessageResult` `{ message: { text, at } \| null }` |
 | `sessions.find` | `SessionsFindParams` `{ cwd, startedFrom, startedTo, agent? }` | `SessionsFindResult` `{ sessions: FoundSession[] }` |
+| `roster.list` | `{}` | `{ agents: RosterAgent[] }` (the kit's) |
+| `roster.launchSpec` | `LaunchSpecParams` `{ agent, mode, resume?, sessionId?, prompt? }` | `LaunchSpec` `{ command, args, line, sessionId, exit }` |
+| `roster.projectsFor` | `RosterProjectsForParams` `{ agent }` | `RosterProjectsForResult` `{ projects: string[] }` |
+| `roster.agentsFor` | `RosterAgentsForParams` `{ project }` | `RosterAgentsForResult` `{ agents: string[] }` |
+| `roster.agents` | — | `RosterAgentsAnswer` (the app's own frames) |
 
 ```ts
 interface AppInfo {
@@ -260,6 +265,150 @@ type SessionsFindResult = { sessions: FoundSession[] };  // earliest start first
   `invalid-params` for a `cwd` that is not absolute, a time that is not ISO 8601 with a zone,
   `startedFrom` after `startedTo`, or an empty `agent`.
 
+### Roster
+
+The agents and their profiles (DESIGN §3.1, §3.2, §3.5), all shapes in `src/shared/roster.ts`;
+`src/backend/roster/` keeps them.
+
+**Agents.** The built-ins `claude` and `codex`; one folder agent per `<workspace>/Agents/<name>/`
+holding a `CLAUDE.md` (not `_shared`, nothing with "template" in its name; a folder named `claude`
+or `codex` is the built-in) — the same definition the session stores use (`folderAgentNames`,
+`src/backend/stores/roots.ts`); and every profile in `agents/`, whose agent may be gone. A folder
+whose name cannot name a file (`[A-Za-z0-9][A-Za-z0-9._-]*`, at most 128 characters) is left out
+and logged. Order: `claude`, `codex`, then by id. **Name**: `Claude`, `Codex`, a folder agent's id.
+
+**The profile file** — `<workspace>/Apps/pomade-agents/agents/<id>/agent.yaml`:
+
+```ts
+type AgentProfile = {
+  id: string;                     // the folder's name; a file whose id differs cannot be used
+  provider: "claude" | "codex";   // Pomade's provider names
+  kind: "builtin" | "folder";
+  configDir: string;              // "~/…" under the home folder; relative: under the workspace; or absolute
+  command: string;                // one line: the alias the shell runs
+  role?: string;                  // one line
+  tags: string[];                 // absent in the file: []
+  hidden: boolean;                // absent in the file: false
+  modes: { normal?: { enabled: boolean }; "full-autonomy"?: { enabled: boolean } };
+};                                // a mode absent from `modes` is not enabled; other mode keys are ignored
+```
+
+- Read and written like the session records ("Backend" below): YAML 1.2 core, only changed keys
+  rewritten, comments and extra keys kept, a new file linked into place, an unusable one never
+  written over.
+- **First sight.** An agent with no file gets one, keys in the order above:
+  - built-ins: `configDir: ~/.claude` / `~/.codex`, `kind: builtin`
+  - folder agents: `configDir: Agents/<name>`, `kind: folder`, `provider: claude`, `role` = the
+    first sentence (up to `.`, `!` or `?` before a space or the end) of the first paragraph under
+    `## Role` in its `CLAUDE.md`, absent when there is none
+  - all: `command` = `.pomade/agents.json` `commands[id]`, else the id; `hidden` = whether its
+    `hidden` list names the id; `tags: []`; both modes `enabled: true`
+  - A folder some profile already names as its `configDir` is that profile's agent: it gets no
+    second profile.
+- **An unusable file** (not YAML, not a mapping, a key missing or malformed) is left as it is;
+  `roster.agents` reports it (`profile: null`, `problem`), and its agent — when the scan finds it
+  — answers `roster.list`, launches and connections from its first-sight values.
+- **Orphan**: a `kind: folder` profile whose `configDir` folder does not exist. Kept; left out of
+  `roster.list`; `launchSpec` answers `not-found`. A built-in is never an orphan.
+
+**`roster.list`** — Pomade's read (HOST-API §4 "Platform reads of app APIs"); every answer passes
+the kit's `checkRosterList` unchanged:
+
+```ts
+interface RosterAgent {           // pomade-kit/protocol
+  id: string;
+  name: string;
+  command: string;                // the profile's
+  provider: "claude" | "codex";
+  configDir?: string;             // the profile's, absolute; absent only when it cannot be resolved (no HOME)
+  modes?: { id: string; name: string; args: string[] }[];
+}
+```
+
+- Every agent that is neither hidden nor an orphan, in roster order.
+- `modes` — the enabled ones, in the order `normal`, `full-autonomy`, each with the kit's
+  `providerModes` name and arguments: Normal `[]`; Full autonomy `["--dangerously-skip-permissions"]`
+  (claude) or `["--dangerously-bypass-approvals-and-sandbox"]` (codex). No mode enabled → `[]`.
+- Answered from memory: Pomade's 1.5 s limit is never near. Pomade applies its own
+  `.pomade/agents.json` overrides on top.
+
+**`roster.launchSpec`** — the command line for one launch (DESIGN §3.5):
+
+```ts
+type LaunchSpecParams = {
+  agent: string;                  // roster id
+  mode: string;                   // "normal" | "full-autonomy"
+  resume?: string;                // a session id: [A-Za-z0-9][A-Za-z0-9._:-]*, at most 128
+  sessionId?: string;             // a UUID: the new session's id; not with resume
+  prompt?: string;                // not blank, at most 16384 characters, no NUL
+};
+type LaunchSpec = {
+  command: string;                // the profile's command, as typed
+  args: string[];                 // unquoted
+  line: string;                   // command + args quoted, one line
+  sessionId: string | null;       // the id the launched session will have
+  exit: string;                   // what to type to end the agent: "/exit"
+};
+```
+
+| Params | Claude Code `args` | Codex `args` | `sessionId` |
+|---|---|---|---|
+| — | `<mode args>` | `<mode args>` | `null` |
+| `sessionId` | `<mode args> --session-id <uuid>` | `<mode args>` (Codex cannot pre-assign one) | Claude: the uuid · Codex: `null` (find it with `sessions.find`) |
+| `resume` | `<mode args> --resume <id>` | `<mode args> resume <id>` | the resumed id |
+| `prompt` | then `<prompt>` as the last argument — `-- <prompt>` when it starts with `-` | same | as above |
+
+- `<mode args>`: the mode's arguments as `roster.list` gives them. The forms are the CLIs' own
+  (`claude --help`, `codex --help`, `codex resume --help`) and Pomade's (`buildAgentCommand`:
+  command, mode arguments, then the resume arguments).
+- `line`: `command` as is (the alias, never resolved or run here), then each argument: as is when
+  it is only `A-Za-z0-9_@%+=:,./-`; ANSI-C quoted `$'…'` when it holds a control character (line
+  break, tab, …), with `\`, `'`, `!` and every control character escaped (`\n`, `\t`, `\r`,
+  `\xHH`); else in single quotes (`'` written `'\''`). So `line` is one printable line: `/bin/sh -c`
+  and `zsh -c` read it back to exactly `args`, and typed into an interactive shell it meets no line
+  break, tab completion or history expansion.
+- Errors: `invalid-params` for malformed params, `resume` with `sessionId`, an unknown mode or one
+  the profile does not enable; `not-found` for an agent the roster does not hold, or an orphan. A
+  hidden agent gets its spec.
+
+**`roster.projectsFor` · `roster.agentsFor`** — the project ↔ agent connection (pomade:E-030),
+read from Pomade on every call (`project.list`, `project.getAgents`), never kept:
+
+- A project's visible agents, as Pomade stores them: roster ids; `["*"]` every agent (also a project
+  that never set a list); `[]` none. The Workspace (`"__workspace__"`) offers every agent.
+- An agent is connected to a project when the project offers it and it is in `roster.list`.
+- `agentsFor({ project })` → `{ agents }`: the connected agents, in roster order. An unknown project
+  is `not-found` (Pomade's).
+- `projectsFor({ agent })` → `{ projects }`: stable project ids in the Projects panel's order, the
+  Workspace not among them. An agent the roster does not hold is `not-found`; a hidden agent or an
+  orphan has `[]`.
+
+**`roster.agents`** — every agent for the app's own frames (the Roster tab):
+
+```ts
+type RosterEntry = {
+  id: string;
+  name: string;
+  profile: AgentProfile | null;   // null: the file cannot be used (problem), or none yet / no workspace
+  problem: string | null;
+  orphan: boolean;
+  configDir: string | null;       // the profile's, absolute
+  model: string | null;           // from the provider's config: settings.json `model` (Claude Code),
+  effort: string | null;          // `effortLevel`; config.toml top-level `model`, `model_reasoning_effort` (Codex)
+};
+type RosterAgentsAnswer = {
+  epoch: string;                  // one backend run
+  revision: number;
+  agents: RosterEntry[];          // every agent, hidden ones and orphans included, roster order
+  profilesOff: string | null;     // why no profiles are kept (no workspace open)
+};
+```
+
+**Change notice — `roster.changed`** `{ epoch, revision }`: published whenever `roster.agents`
+would answer differently. The roster is small: a frame behind it asks `roster.agents` again, whole.
+A profile changed on disk is seen at once (the data folder's watch); agent folders,
+`.pomade/agents.json` and the providers' configs are read again every 2 s.
+
 Adding a method: its name in the manifest's `api` and in `API_METHODS`, its shapes in
 `src/shared/`, its handler in `src/backend/interfaces/api.ts`.
 
@@ -335,7 +484,9 @@ change** (`STATUS_WINDOW_MS`, `src/backend/sessions/status-window.ts`):
 - **Environment** — what Pomade gives a backend (HOST-API §2 "Backends"). The workspace is
   `POMADE_WORKSPACE`; Pomade's user-data folder is the parent of the folder holding `POMADE_SOCKET`
   (`<userData>/run/pomade.sock`). The agents' stores are under `HOME`.
-- **App data** (`src/backend/records/`) — `<workspace>/Apps/pomade-agents/`:
+- **App data** (`src/backend/records/`) — `<workspace>/Apps/pomade-agents/`; session records and
+  agent profiles are two sets of files kept by one machinery (`FileSet`), with one set of
+  guarantees:
   - `sessions/<session-id>.yaml` — one record per session (DESIGN §4), written when the app first
     sees the session and on every change. YAML 1.2 core schema (times stay strings); a key with no
     value, and `false` for `projectOverride` / `outsidePomade`, read as absent. A rewrite changes
@@ -345,6 +496,10 @@ change** (`STATUS_WINDOW_MS`, `src/backend/sessions/status-window.ts`):
     file that is not valid YAML, not a mapping, or not a record of its session is never written
     over; its session answers `record: null` with `recordProblem`. A record deleted by hand is
     written again with its session's first-sight values.
+  - `agents/<id>/agent.yaml` — one profile per agent ("Roster" above), written at first sight and on
+    every change, under the same rules as a record: keys changed one by one, linked into place, never
+    over an unusable file. A profile deleted by hand is written again with its first-sight values
+    while its agent exists.
   - `settings.yaml` — `adoptedAt`: when the first run adopted the sessions that existed. The first
     run waits for the first walk of the stores, writes a Done record for every session found (no
     notice, no prompt), then sets `adoptedAt`, keeping anything else in the file. Afterwards a
@@ -354,14 +509,21 @@ change** (`STATUS_WINDOW_MS`, `src/backend/sessions/status-window.ts`):
   - The backend writes these files itself, not through the Host API's file methods (PLATFORM
     rule 3 allows either): records must be written whether or not the socket is up — the first
     run adopts the moment indexing ends — and one writer keeps one set of guarantees. One
-    recursive `fs.watch` on the folder re-reads what changes on disk; a file that changed is read
+    recursive `fs.watch` on the folder re-reads what changes on disk (a record, a profile, the
+    settings; an agent's folder appearing or going away re-reads every profile); a file that changed is read
     once more 500 ms later (FSEvents may swallow a second change to a path that just changed).
-  - No workspace open: no records, `recordsOff` says so, the change methods are `not-ready`.
+  - No workspace open: no records and no profiles; `recordsOff` and `profilesOff` say so, the change
+    methods are `not-ready`, and the roster answers the built-ins from their first-sight values.
 - **Pomade** (`src/backend/interfaces/platform.ts`) — on each connection the backend lists the
   projects (again on `project.created`, `project.renamed`, `pomade.ready`) and the agent tabs (again
   on `pomade.ready`), and takes every `agentTab.changed`: the first project each session is seen
   bound in is its `launchedFrom`; every tab's state and folder feed the live state. Every
   `agentTab.exited` feeds event B. A rename refreshes `projectRoot` in the records of that project.
+- **Roster** (`src/backend/roster/`) — the agents (`roster.ts`), their first-sight values
+  (`first-sight.ts`: the scan, `.pomade/agents.json`, the role line), default model and effort
+  (`provider-config.ts`), launch specs (`launch-spec.ts`) and the connection (`connections.ts`).
+  The backend reads the roster once before it connects, so Pomade's first `roster.list` is whole,
+  then again on every profile change and every 2 s; each change publishes `roster.changed`.
 - **Locations** (`src/backend/core/locations.ts`) — app data in `<workspace>/Apps/pomade-agents/`,
   machine-local state in `<userData>/app-state/pomade-agents/`, the built-in agents' stores under
   `HOME`.

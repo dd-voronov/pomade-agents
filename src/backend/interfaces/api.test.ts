@@ -1,5 +1,7 @@
+import { HostError } from "pomade-kit/sdk";
 import { describe, expect, it } from "vitest";
 
+import type { AgentProfile } from "../../shared/roster.ts";
 import { testSession, testSummary } from "../../shared/test-sessions.ts";
 import { createApi, type ApiSources } from "./api.ts";
 
@@ -8,6 +10,26 @@ const LISTED = [
   testSession({ id: "a", summary: testSummary({ id: "a", cwd: "/w/repo", branch: "main", lastAnswer: ANSWER }) }),
   testSession({ id: "b", summary: testSummary({ id: "b", cwd: "/w/repo", startedAt: "2026-11-17T09:00:00.000Z" }) }),
 ];
+
+const PROFILE: AgentProfile = {
+  id: "claude",
+  provider: "claude",
+  kind: "builtin",
+  configDir: "~/.claude",
+  command: "claude",
+  tags: [],
+  hidden: false,
+  modes: { normal: { enabled: true }, "full-autonomy": { enabled: true } },
+};
+const AGENTS: Record<string, { profile: AgentProfile; orphan: boolean }> = {
+  claude: { profile: PROFILE, orphan: false },
+  codex: { profile: { ...PROFILE, id: "codex", provider: "codex", configDir: "~/.codex", command: "codex" }, orphan: false },
+  locked: { profile: { ...PROFILE, id: "locked", kind: "folder", command: "locked", modes: { normal: { enabled: true }, "full-autonomy": { enabled: false } } }, orphan: false },
+  quiet: { profile: { ...PROFILE, id: "quiet", kind: "folder", command: "quiet", hidden: true }, orphan: false },
+  gone: { profile: { ...PROFILE, id: "gone", kind: "folder", command: "gone" }, orphan: true },
+};
+const LISTED_AGENTS = ["claude", "codex", "locked"];
+const VISIBLE: Record<string, string[]> = { alpha: ["*"], beta: ["codex", "quiet", "ghost"], gamma: [] };
 
 function api() {
   const calls: unknown[][] = [];
@@ -33,7 +55,19 @@ function api() {
   };
   const live = { entries: () => [] };
   const info = { version: "0", startedAt: "", workspace: null, dataDir: null, stateDir: "/s" };
-  return { handlers: createApi({ info, sessions, live, realPath: (p) => Promise.resolve(p) }), calls };
+  const roster: ApiSources["roster"] = {
+    answer: () => ({ epoch: "r", revision: 1, agents: [], profilesOff: null }),
+    list: () => LISTED_AGENTS.map((id) => ({ id, name: id, command: id, provider: AGENTS[id]?.profile.provider ?? "claude" })),
+    agent: (id) => AGENTS[id],
+  };
+  const projects: ApiSources["projects"] = {
+    projects: () => Promise.resolve(Object.keys(VISIBLE)),
+    visibleAgents: (id) => {
+      const visible = VISIBLE[id];
+      return visible === undefined ? Promise.reject(new HostError("not-found", `No project ${id}`)) : Promise.resolve(visible);
+    },
+  };
+  return { handlers: createApi({ info, sessions, live, realPath: (p) => Promise.resolve(p), roster, projects }), calls };
 }
 
 const call = (method: string, params: unknown): unknown => {
@@ -136,5 +170,70 @@ describe("the API's params", () => {
     ["sessions.find", { ...FIND, agent: 1 }],
   ])("refuses %s with %j as invalid-params", async (method, params) => {
     await expect(Promise.resolve().then(() => call(method, params))).rejects.toMatchObject({ code: "invalid-params" });
+  });
+});
+
+describe("the roster API", () => {
+  const ctx = { from: "pomade-runner" };
+  const spec = async (params: unknown): Promise<unknown> => api().handlers["roster.launchSpec"]?.(params as never, ctx);
+
+  it("answers a launch spec per mode, new, with a session id, resuming, with a prompt", async () => {
+    expect(await spec({ agent: "claude", mode: "normal" })).toEqual({ command: "claude", args: [], line: "claude", sessionId: null, exit: "/exit" });
+    expect(await spec({ agent: "claude", mode: "full-autonomy", resume: "abc-1" })).toEqual({
+      command: "claude",
+      args: ["--dangerously-skip-permissions", "--resume", "abc-1"],
+      line: "claude --dangerously-skip-permissions --resume abc-1",
+      sessionId: "abc-1",
+      exit: "/exit",
+    });
+    const id = "0b9c5d4e-1f2a-4b3c-8d4e-5f6a7b8c9d0e";
+    expect(await spec({ agent: "claude", mode: "normal", sessionId: id, prompt: "it's $HOME" })).toMatchObject({
+      args: ["--session-id", id, "it's $HOME"],
+      line: `claude --session-id ${id} 'it'\\''s $HOME'`,
+      sessionId: id,
+    });
+    expect(await spec({ agent: "codex", mode: "full-autonomy", resume: "019a", prompt: "-v please" })).toMatchObject({
+      args: ["--dangerously-bypass-approvals-and-sandbox", "resume", "019a", "--", "-v please"],
+      sessionId: "019a",
+    });
+    expect(await spec({ agent: "codex", mode: "normal", sessionId: id })).toMatchObject({ args: [], sessionId: null });
+    expect(await spec({ agent: "quiet", mode: "normal" })).toMatchObject({ command: "quiet" });
+  });
+
+  it.each<[string, unknown]>([
+    ["no params", null],
+    ["no agent", { mode: "normal" }],
+    ["no mode", { agent: "claude" }],
+    ["an unknown mode", { agent: "claude", mode: "turbo" }],
+    ["a disabled mode", { agent: "locked", mode: "full-autonomy" }],
+    ["resume and sessionId", { agent: "claude", mode: "normal", resume: "a", sessionId: "0b9c5d4e-1f2a-4b3c-8d4e-5f6a7b8c9d0e" }],
+    ["a sessionId that is not a UUID", { agent: "claude", mode: "normal", sessionId: "abc" }],
+    ["a resume id with a space", { agent: "claude", mode: "normal", resume: "a b" }],
+    ["an empty prompt", { agent: "claude", mode: "normal", prompt: "  " }],
+    ["a prompt with a NUL", { agent: "claude", mode: "normal", prompt: "a\0b" }],
+    ["a prompt too long", { agent: "claude", mode: "normal", prompt: "x".repeat(16385) }],
+  ])("refuses a launch spec with %s as invalid-params", async (_, params) => {
+    await expect(Promise.resolve().then(() => spec(params))).rejects.toMatchObject({ code: "invalid-params" });
+  });
+
+  it.each(["ghost", "gone"])("refuses a launch spec for %s, not in the roster, as not-found", async (agent) => {
+    await expect(Promise.resolve().then(() => spec({ agent, mode: "normal" }))).rejects.toMatchObject({ code: "not-found" });
+  });
+
+  it("answers the connection: a project's offered agents, an agent's projects", async () => {
+    const { handlers } = api();
+    const agentsFor = (project: string): unknown => handlers["roster.agentsFor"]?.({ project }, ctx);
+    const projectsFor = (agent: string): unknown => handlers["roster.projectsFor"]?.({ agent }, ctx);
+    expect(await agentsFor("alpha")).toEqual({ agents: LISTED_AGENTS });
+    expect(await agentsFor("beta")).toEqual({ agents: ["codex"] });
+    expect(await agentsFor("gamma")).toEqual({ agents: [] });
+    expect(await agentsFor("__workspace__")).toEqual({ agents: LISTED_AGENTS });
+    await expect(Promise.resolve().then(() => agentsFor("nowhere"))).rejects.toMatchObject({ code: "not-found" });
+    expect(await projectsFor("claude")).toEqual({ projects: ["alpha"] });
+    expect(await projectsFor("codex")).toEqual({ projects: ["alpha", "beta"] });
+    expect(await projectsFor("quiet")).toEqual({ projects: [] });
+    await expect(Promise.resolve().then(() => projectsFor("ghost"))).rejects.toMatchObject({ code: "not-found" });
+    await expect(Promise.resolve().then(() => handlers["roster.agentsFor"]?.({ project: "" }, ctx))).rejects.toMatchObject({ code: "invalid-params" });
+    await expect(Promise.resolve().then(() => handlers["roster.projectsFor"]?.({}, ctx))).rejects.toMatchObject({ code: "invalid-params" });
   });
 });

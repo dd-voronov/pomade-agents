@@ -3,6 +3,7 @@
 // Params are checked here; a malformed one is `invalid-params`.
 
 import {
+  AGENT_PROMPT_MAX,
   SESSIONS_FOR_REPO_METHOD,
   SESSIONS_LIVE_IN_METHOD,
   type JsonValue,
@@ -14,6 +15,17 @@ import {
 import { HostError, type ApiHandler } from "pomade-kit/sdk";
 
 import { APP_INFO_METHOD, type AppInfo } from "../../shared/api.ts";
+import {
+  ROSTER_AGENTS_FOR_METHOD,
+  ROSTER_AGENTS_METHOD,
+  ROSTER_LAUNCH_SPEC_METHOD,
+  ROSTER_LIST_METHOD,
+  ROSTER_PROJECTS_FOR_METHOD,
+  type LaunchSpec,
+  type LaunchSpecParams,
+  type RosterAgentsForResult,
+  type RosterProjectsForResult,
+} from "../../shared/roster.ts";
 import {
   SESSIONS_FIND_METHOD,
   SESSIONS_GET_METHOD,
@@ -34,6 +46,9 @@ import {
   type SessionsUpdated,
 } from "../../shared/sessions.ts";
 import type { RealPath } from "../core/real-paths.ts";
+import { agentsFor, projectsFor, type ProjectReads } from "../roster/connections.ts";
+import { launchSpec } from "../roster/launch-spec.ts";
+import { enabledModes, type Roster } from "../roster/roster.ts";
 import { liveSessions, repoSessions } from "../sessions/for-git.ts";
 import { foundSessions } from "../sessions/for-runner.ts";
 import type { LiveState } from "../sessions/live-state.ts";
@@ -44,6 +59,9 @@ export interface ApiSources {
   sessions: Pick<SessionData, "answer" | "list" | "get" | "changeStatus" | "rename" | "moveToProject">;
   live: Pick<LiveState, "entries">;
   realPath: RealPath;
+  roster: Pick<Roster, "answer" | "list" | "agent">;
+  /** Pomade's projects, through the connection the API is served on. */
+  projects: ProjectReads;
 }
 
 type Params = Record<string, unknown>;
@@ -117,10 +135,42 @@ function findParams(raw: unknown): SessionsFindParams {
   return agent === undefined ? { cwd, startedFrom, startedTo } : { cwd, startedFrom, startedTo, agent };
 }
 
+/** A provider's session id: what `--resume` and `codex resume` take. */
+const SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function nameOf(params: Params, key: string, what: string): string {
+  const value = params[key];
+  if (typeof value !== "string" || value === "") throw new HostError("invalid-params", `"${key}" must be ${what}`);
+  return value;
+}
+
+function launchSpecParams(raw: unknown): LaunchSpecParams {
+  const params = paramsOf(raw);
+  const out: LaunchSpecParams = { agent: nameOf(params, "agent", "a roster id"), mode: nameOf(params, "mode", "a mode id") };
+  const { resume, sessionId, prompt } = params;
+  if (resume !== undefined) {
+    if (typeof resume !== "string" || !SESSION_ID.test(resume)) throw new HostError("invalid-params", '"resume" must be a session id');
+    out.resume = resume;
+  }
+  if (sessionId !== undefined) {
+    if (typeof sessionId !== "string" || !UUID.test(sessionId)) throw new HostError("invalid-params", '"sessionId" must be a UUID');
+    if (out.resume !== undefined) throw new HostError("invalid-params", '"resume" and "sessionId" cannot go together');
+    out.sessionId = sessionId;
+  }
+  if (prompt !== undefined) {
+    if (typeof prompt !== "string" || prompt.trim() === "" || prompt.length > AGENT_PROMPT_MAX || prompt.includes("\0")) {
+      throw new HostError("invalid-params", `"prompt" must be a non-empty text of at most ${AGENT_PROMPT_MAX} characters`);
+    }
+    out.prompt = prompt;
+  }
+  return out;
+}
+
 /** The kit's contract shapes are interfaces, which TypeScript does not take for JSON values; they hold only JSON. */
 const json = (value: SessionsForRepoResult | SessionsLiveInResult): JsonValue => value as unknown as JsonValue;
 
-export function createApi({ info, sessions, live, realPath }: ApiSources): Record<string, ApiHandler> {
+export function createApi({ info, sessions, live, realPath, roster, projects }: ApiSources): Record<string, ApiHandler> {
   const updated = async (changed: Promise<SessionsUpdated["sessions"]>): Promise<SessionsUpdated> => ({ sessions: await changed });
   /** The session `{ id }` names; `not-found` when no transcript of it is known. */
   const sessionOf = (raw: unknown): Session => {
@@ -129,6 +179,13 @@ export function createApi({ info, sessions, live, realPath }: ApiSources): Recor
     if (session === undefined) throw new HostError("not-found", `No session ${JSON.stringify(id)}`);
     return session;
   };
+  /** The agent `{ agent }` names, when the roster answers for it and it is not an orphan. */
+  const agentOf = (id: string): NonNullable<ReturnType<Roster["agent"]>> => {
+    const agent = roster.agent(id);
+    if (agent === undefined || agent.orphan) throw new HostError("not-found", `No agent ${JSON.stringify(id)} in the roster`);
+    return agent;
+  };
+  const listedIds = (): string[] => roster.list().map((a) => a.id);
   return {
     [APP_INFO_METHOD]: () => ({ ...info }),
     [SESSIONS_LIST_METHOD]: (params) => sessions.answer(sinceOf(params)),
@@ -158,5 +215,22 @@ export function createApi({ info, sessions, live, realPath }: ApiSources): Recor
     [SESSIONS_GET_METHOD]: (raw): SessionsGetResult => ({ session: sessionOf(raw) }),
     [SESSIONS_LAST_MESSAGE_METHOD]: (raw): SessionsLastMessageResult => ({ message: sessionOf(raw).summary.lastAnswer }),
     [SESSIONS_FIND_METHOD]: async (raw): Promise<SessionsFindResult> => ({ sessions: await foundSessions(sessions.list(), findParams(raw), realPath) }),
+    [ROSTER_LIST_METHOD]: () => ({ agents: roster.list() }) as unknown as JsonValue,
+    [ROSTER_LAUNCH_SPEC_METHOD]: (raw): LaunchSpec => {
+      const params = launchSpecParams(raw);
+      const { profile } = agentOf(params.agent);
+      const built = launchSpec({ command: profile.command, provider: profile.provider, modes: enabledModes(profile) }, params);
+      if (!built.ok) throw new HostError("invalid-params", built.problem);
+      return built.spec;
+    },
+    [ROSTER_PROJECTS_FOR_METHOD]: async (raw): Promise<RosterProjectsForResult> => {
+      const agent = nameOf(paramsOf(raw), "agent", "a roster id");
+      if (roster.agent(agent) === undefined) throw new HostError("not-found", `No agent ${JSON.stringify(agent)} in the roster`);
+      return { projects: await projectsFor(agent, listedIds(), projects) };
+    },
+    [ROSTER_AGENTS_FOR_METHOD]: async (raw): Promise<RosterAgentsForResult> => ({
+      agents: await agentsFor(nameOf(paramsOf(raw), "project", "a project id"), listedIds(), projects),
+    }),
+    [ROSTER_AGENTS_METHOD]: () => roster.answer(),
   };
 }

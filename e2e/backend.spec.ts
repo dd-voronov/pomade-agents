@@ -1,7 +1,7 @@
 import { readRunRecord } from "../src/backend/core/run-record.ts";
 import { INDEX_FILE } from "../src/backend/stores/index-file.ts";
 import { APP_INFO_METHOD } from "../src/shared/api.ts";
-import { BUILT_BACKEND } from "../harness/app.ts";
+import { BUILT_BACKEND, FIXTURE_AGENTS } from "../harness/app.ts";
 import { spawnBackend } from "../harness/backend-process.ts";
 import { startFakePomade } from "../harness/fake-pomade/server.ts";
 import { SEEDED_TRANSCRIPTS, fixtureSnapshots } from "../harness/sandbox.ts";
@@ -62,14 +62,17 @@ test("the built backend serves app.info to Pomade with every location inside the
   expect(await readRunRecord(stateDir)).toMatchObject({ pid: backend.pid, version: manifest.version });
 });
 
-test("the backend stops cleanly on SIGTERM and writes only its state folder (run record, parse index) and its data folder (settings, session records)", async ({ backend, pomade, sandbox, manifest }) => {
+test("the backend stops cleanly on SIGTERM and writes only its state folder (run record, parse index) and its data folder (settings, session records, agent profiles)", async ({ backend, pomade, sandbox, manifest }) => {
   const stateDir = `${sandbox.userData}/app-state/${manifest.id}`;
-  const dataFiles = Object.keys(SEEDED_TRANSCRIPTS).map((path) => `workspace/Apps/${manifest.id}/sessions/${sessionIdOf(path)}.yaml`);
+  const dataFiles = [
+    ...Object.keys(SEEDED_TRANSCRIPTS).map((path) => `workspace/Apps/${manifest.id}/sessions/${sessionIdOf(path)}.yaml`),
+    ...FIXTURE_AGENTS.map((id) => `workspace/Apps/${manifest.id}/agents/${id}/agent.yaml`),
+  ];
   await expect.poll(() => readRunRecord(stateDir)).not.toBeNull();
   await expect.poll(() => sandbox.snapshot(stateDir).then((files) => Object.keys(files).sort())).toEqual(["backend.json", INDEX_FILE]);
   await expect
     .poll(() => sandbox.snapshot(`${sandbox.workspace}/Apps/${manifest.id}`).then((files) => Object.keys(files).sort()))
-    .toEqual(["settings.yaml", ...dataFiles.map((path) => path.slice(path.indexOf("/sessions/") + 1))].sort());
+    .toEqual(["settings.yaml", ...dataFiles.map((path) => path.slice(`workspace/Apps/${manifest.id}/`.length))].sort());
   const fixtures = await fixtureSnapshots();
   const inSandbox = (folder: string, files: Record<string, string>): Record<string, string> =>
     Object.fromEntries(Object.entries(files).map(([path, hash]) => [`${folder}/${path}`, hash]));

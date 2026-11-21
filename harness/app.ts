@@ -27,3 +27,6 @@ export const FIXTURE_PROJECTS = [
   { id: "alpha", name: "Alpha", root: "Projects/alpha" },
   { id: "beta", name: "Beta", root: "Projects/beta" },
 ];
+
+/** The agents the fixture home and workspace hold, in roster order: the built-ins and the fixture folder agent. */
+export const FIXTURE_AGENTS = ["claude", "codex", "claude-libra"];

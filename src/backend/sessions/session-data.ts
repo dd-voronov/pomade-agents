@@ -209,7 +209,7 @@ export function startSessionData(options: SessionDataOptions): SessionData {
       return;
     }
     const held = records?.get(id);
-    const record = held?.record ?? null;
+    const record = held?.value ?? null;
     let problem = held?.problem ?? null;
     if (records !== null && held === undefined) {
       const firstRun = adoptedAt();

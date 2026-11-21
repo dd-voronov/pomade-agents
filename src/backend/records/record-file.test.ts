@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import type { AgentProfile } from "../../shared/roster.ts";
 import type { SessionRecord } from "../../shared/sessions.ts";
-import { parseRecord, parseSettings, renderRecord, rewriteRecord, settingsWithAdoptedAt } from "./record-file.ts";
+import { parseProfile, parseRecord, parseSettings, renderProfile, renderRecord, rewriteProfile, rewriteRecord, settingsWithAdoptedAt } from "./record-file.ts";
 
 const ID = "7b5c3451-0370-4bf9-b6fd-617d56545a78";
 const RECORD: SessionRecord = {
@@ -116,5 +117,65 @@ describe("the settings file", () => {
     expect(parseSettings("adoptedAt: soon\n")).toEqual({ ok: false, problem: "its adoptedAt is not a time" });
     expect(parseSettings("adoptedAt: 5\n").ok).toBe(false);
     expect(parseSettings("- a\n").ok).toBe(false);
+  });
+});
+
+describe("an agent profile file", () => {
+  const PROFILE: AgentProfile = {
+    id: "claude-libra",
+    provider: "claude",
+    kind: "folder",
+    configDir: "Agents/claude-libra",
+    command: "claude-libra",
+    role: "A meticulous librarian for the Knowledge vault.",
+    tags: ["knowledge", "vault"],
+    hidden: false,
+    modes: { normal: { enabled: true }, "full-autonomy": { enabled: true } },
+  };
+
+  it("is written in DESIGN §3.2's key order and reads back as it was written", () => {
+    const text = renderProfile(PROFILE);
+    expect(text.split("\n").map((l) => l.split(":")[0]).filter((k): k is string => k !== undefined && k !== "" && !k.startsWith(" "))).toEqual([
+      "id",
+      "provider",
+      "kind",
+      "configDir",
+      "command",
+      "role",
+      "tags",
+      "hidden",
+      "modes",
+    ]);
+    expect(parseProfile("claude-libra", text)).toEqual({ ok: true, value: PROFILE });
+  });
+
+  it("reads absent tags and hidden as none and false, an absent mode as not enabled, and leaves unknown modes out", () => {
+    const text = "id: codex\nprovider: codex\nkind: builtin\nconfigDir: ~/.codex\ncommand: codex\nmodes:\n  normal: { enabled: true }\n  plan: { enabled: true }\n";
+    expect(parseProfile("codex", text)).toEqual({
+      ok: true,
+      value: { id: "codex", provider: "codex", kind: "builtin", configDir: "~/.codex", command: "codex", tags: [], hidden: false, modes: { normal: { enabled: true } } },
+    });
+  });
+
+  it.each([
+    ["id: [\n", "not valid YAML"],
+    ["- a\n", "not a mapping"],
+    [renderProfile({ ...PROFILE, id: "other" }), 'its id is not "claude-libra"'],
+    [renderProfile(PROFILE).replace("provider: claude", "provider: gemini"), "its provider is not valid"],
+    [renderProfile(PROFILE).replace("command: claude-libra\n", ""), "its command is missing"],
+    [renderProfile(PROFILE).replace("hidden: false", "hidden: maybe"), "its hidden is not valid"],
+    [renderProfile(PROFILE).replace("normal:\n    enabled: true", "normal:\n    enabled: yes please"), "its modes is not valid"],
+  ])("names why it cannot be used: %j", (text, problem) => {
+    expect(parseProfile("claude-libra", text)).toEqual({ ok: false, problem: expect.stringContaining(problem) });
+  });
+
+  it("is rewritten key by key, keeping comments and keys the app does not know", () => {
+    const text = `# my librarian\n${renderProfile(PROFILE)}color: teal # mine\n`;
+    const next = rewriteProfile(text, { ...PROFILE, role: "Keeps the vault.", hidden: true });
+    expect(next).toContain("# my librarian");
+    expect(next).toContain("color: teal # mine");
+    expect(next).toContain("role: Keeps the vault.");
+    expect(parseProfile("claude-libra", next)).toEqual({ ok: true, value: { ...PROFILE, role: "Keeps the vault.", hidden: true } });
+    expect(rewriteProfile(text, PROFILE)).toBe(text);
   });
 });

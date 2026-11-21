@@ -18,12 +18,14 @@
   "events": {
     "publish": [
       "sessions.changed",
+      "roster.changed",
       "session.turnFinished",
       "session.closed",
       "session.statusChanged"
     ],
     "subscribe": [
       "pomade-agents:sessions.changed",
+      "pomade-agents:roster.changed",
       "pomade.ready",
       "project.created",
       "project.renamed",
@@ -45,7 +47,12 @@
     "sessions.liveIn",
     "sessions.get",
     "sessions.lastMessage",
-    "sessions.find"
+    "sessions.find",
+    "roster.list",
+    "roster.launchSpec",
+    "roster.projectsFor",
+    "roster.agentsFor",
+    "roster.agents"
   ],
   "outsideWorkspace": [
     "~/.claude/",

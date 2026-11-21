@@ -4,8 +4,9 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import type { AgentProfile } from "../../shared/roster.ts";
 import type { SessionRecord } from "../../shared/sessions.ts";
-import { RecordError, SESSIONS_FOLDER, SETTINGS_FILE, openRecordStore, type RecordStore } from "./record-store.ts";
+import { AGENTS_FOLDER, PROFILE_FILE, RecordError, SESSIONS_FOLDER, SETTINGS_FILE, openRecordStore, type RecordStore } from "./record-store.ts";
 
 const SOON = { timeout: 2000, interval: 20 };
 const NOW = new Date("2026-11-17T12:00:00.000Z");
@@ -53,8 +54,8 @@ describe("the record store", () => {
     await writeFile(join(dataDir, SESSIONS_FOLDER, "notes.txt"), "not a record");
     const s = await open();
     expect(s.settings()).toEqual({ ok: true, value: { adoptedAt: "2026-11-01T00:00:00.000Z" } });
-    expect(s.get("a")).toEqual({ record: record("a", { status: "done" }), problem: null });
-    expect(s.get("bad")).toMatchObject({ record: null, problem: expect.stringContaining("not valid YAML") });
+    expect(s.get("a")).toEqual({ value: record("a", { status: "done" }), problem: null });
+    expect(s.get("bad")).toMatchObject({ value: null, problem: expect.stringContaining("not valid YAML") });
     expect(lines.join("\n")).toContain("bad.yaml cannot be used");
   });
 
@@ -62,13 +63,13 @@ describe("the record store", () => {
     const s = await open();
     await s.create(record("a"));
     expect(await readFile(fileOf("a"), "utf8")).toBe("id: a\nprovider: codex\nagent: codex\nstatus: active\nupdated: 2026-11-17T12:00:00.000Z\n");
-    expect(s.get("a")?.record).toEqual(record("a", { updated: NOW.toISOString() }));
+    expect(s.get("a")?.value).toEqual(record("a", { updated: NOW.toISOString() }));
     expect(changes).toContain("a");
 
     await writeFile(fileOf("b"), "id: b\nprovider: codex\nagent: codex\nstatus: on-hold\n");
     await s.create(record("b"));
     expect(await readFile(fileOf("b"), "utf8")).toBe("id: b\nprovider: codex\nagent: codex\nstatus: on-hold\n");
-    expect(s.get("b")?.record?.status).toBe("on-hold");
+    expect(s.get("b")?.value?.status).toBe("on-hold");
     expect((await readdir(join(dataDir, SESSIONS_FOLDER))).sort()).toEqual(["a.yaml", "b.yaml"]);
   });
 
@@ -104,7 +105,7 @@ describe("the record store", () => {
     const s = await open();
     await s.create(record("a", { note: "0" }));
     await Promise.all(Array.from({ length: 10 }, () => s.update("a", (r) => ({ ...r, note: String(Number(r.note) + 1) }))));
-    expect(s.get("a")?.record?.note).toBe("10");
+    expect(s.get("a")?.value?.note).toBe("10");
     expect(await readFile(fileOf("a"), "utf8")).toContain("note: \"10\"");
     expect((await readdir(join(dataDir, SESSIONS_FOLDER))).filter((n) => n.endsWith(".tmp"))).toEqual([]);
   });
@@ -113,11 +114,11 @@ describe("the record store", () => {
     const s = await open();
     await s.create(record("a"));
     await writeFile(fileOf("a"), "id: a\nprovider: codex\nagent: codex\nstatus: done\n");
-    await expect.poll(() => s.get("a")?.record?.status, SOON).toBe("done");
+    await expect.poll(() => s.get("a")?.value?.status, SOON).toBe("done");
     await writeFile(fileOf("a"), "id: a\nstatus: [\n");
     await expect.poll(() => s.get("a")?.problem ?? null, SOON).toContain("not valid YAML");
     await writeFile(fileOf("a"), "id: a\nprovider: codex\nagent: codex\nstatus: on-hold\n");
-    await expect.poll(() => s.get("a")?.record?.status, SOON).toBe("on-hold");
+    await expect.poll(() => s.get("a")?.value?.status, SOON).toBe("on-hold");
     await unlink(fileOf("a"));
     await expect.poll(() => s.get("a"), SOON).toBeUndefined();
 
@@ -140,8 +141,58 @@ describe("the record store", () => {
     await rm(join(dataDir, SESSIONS_FOLDER), { recursive: true });
     await expect.poll(() => s.get("a"), SOON).toBeUndefined();
     await s.create(record("a", { status: "done" }));
-    expect(s.get("a")?.record?.status).toBe("done");
+    expect(s.get("a")?.value?.status).toBe("done");
     await writeFile(fileOf("b"), "id: b\nprovider: codex\nagent: codex\nstatus: done\n");
-    await expect.poll(() => s.get("b")?.record?.status, { timeout: 5000, interval: 50 }).toBe("done");
+    await expect.poll(() => s.get("b")?.value?.status, { timeout: 5000, interval: 50 }).toBe("done");
+  });
+
+  describe("agent profiles", () => {
+    const profile = (id: string, patch: Partial<AgentProfile> = {}): AgentProfile => ({
+      id,
+      provider: "claude",
+      kind: "folder",
+      configDir: `Agents/${id}`,
+      command: id,
+      tags: [],
+      hidden: false,
+      modes: { normal: { enabled: true } },
+      ...patch,
+    });
+    const profileFile = (id: string): string => join(dataDir, AGENTS_FOLDER, id, PROFILE_FILE);
+
+    it("writes each in its agent's folder, never over a file that is there, and changes it key by key", async () => {
+      await mkdir(join(dataDir, AGENTS_FOLDER, "b"), { recursive: true });
+      await writeFile(profileFile("b"), "# mine\nid: b\nprovider: codex\nkind: builtin\nconfigDir: ~/.codex\ncommand: codex\nmodes: {}\n");
+      const s = await open();
+      expect(s.profiles.ids()).toEqual(["b"]);
+      await s.profiles.create(profile("a"));
+      await s.profiles.create(profile("b"));
+      expect(s.profiles.get("a")).toEqual({ value: profile("a"), problem: null });
+      expect(s.profiles.get("b")?.value?.provider).toBe("codex");
+      await s.profiles.update("b", (p) => ({ ...p, hidden: true }));
+      expect(await readFile(profileFile("b"), "utf8")).toBe("# mine\nid: b\nprovider: codex\nkind: builtin\nconfigDir: ~/.codex\ncommand: codex\nmodes: {}\nhidden: true\n");
+      await expect(s.profiles.update("ghost", (p) => p)).rejects.toMatchObject({ kind: "missing", message: expect.stringContaining("Agent ghost has no profile file") });
+      expect(changes.every((id) => id === null || !["a", "b"].includes(id))).toBe(true);
+    });
+
+    it("re-reads a profile edited, broken, deleted, or its whole folder removed, on disk", async () => {
+      const s = await open();
+      const seen: string[] = [];
+      s.profiles.onChange((id) => seen.push(id));
+      await s.profiles.create(profile("a"));
+      await writeFile(profileFile("a"), "id: a\nprovider: [\n");
+      await expect.poll(() => s.profiles.get("a")?.problem ?? null, SOON).toContain("not valid YAML");
+      await expect(s.profiles.update("a", (p) => p)).rejects.toMatchObject({ kind: "unreadable" });
+      expect(await readFile(profileFile("a"), "utf8")).toBe("id: a\nprovider: [\n");
+      await unlink(profileFile("a"));
+      await expect.poll(() => s.profiles.get("a"), SOON).toBeUndefined();
+      await s.profiles.create(profile("a"));
+      await rm(join(dataDir, AGENTS_FOLDER), { recursive: true });
+      await expect.poll(() => s.profiles.ids(), SOON).toEqual([]);
+      await mkdir(join(dataDir, AGENTS_FOLDER, "c"), { recursive: true });
+      await writeFile(profileFile("c"), "id: c\nprovider: claude\nkind: folder\nconfigDir: Agents/c\ncommand: c\nmodes: {}\n");
+      await expect.poll(() => s.profiles.get("c")?.value?.command, { timeout: 5000, interval: 50 }).toBe("c");
+      expect(seen).toContain("a");
+    });
   });
 });

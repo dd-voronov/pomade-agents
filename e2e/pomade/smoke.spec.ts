@@ -1,7 +1,8 @@
 // The app inside a real Pomade: dev-linked from its build folder, then installed. It covers what
 // only Pomade can show — the strip icon, the panel and tab frames Pomade creates, its broker
-// between the panel and the backend, Pomade's own reads of the sessions contract, and the
-// backend's life with Pomade's.
+// between the panel and the backend, Pomade's own reads of the sessions contract and the roster
+// (its "+" menu, and its own scan when the backend does not answer), and the backend's life with
+// Pomade's.
 
 import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -12,9 +13,10 @@ import { SESSIONS_APP_ID, SESSIONS_FOR_REPO_METHOD, SESSIONS_LIVE_IN_METHOD, che
 import { connectSocket } from "pomade-kit/node";
 import type { HostClient } from "pomade-kit/sdk";
 
-import { BUILD_DIR, readManifest } from "../../harness/app.ts";
+import { BUILD_DIR, FIXTURE_AGENTS, readManifest } from "../../harness/app.ts";
 import { SEEDED_TRANSCRIPTS, createSandbox, fixtureSnapshots, type Sandbox } from "../../harness/sandbox.ts";
 import { readRunRecord } from "../../src/backend/core/run-record.ts";
+import { ROSTER_AGENTS_METHOD, isRosterAgentsAnswer } from "../../src/shared/roster.ts";
 import { launchPomade, pomadeApps, requireBuiltPomade } from "./pomade.ts";
 
 const manifest = readManifest();
@@ -114,7 +116,53 @@ test.describe("dev-linked into Pomade", () => {
     await page.screenshot({ path: join(ARTIFACTS, "in-pomade.png") });
   });
 
-  test("quitting Pomade stops the backend; the stores were never written, and Apps/ holds only the app's settings and session records", async () => {
+  test("the \"+\" menu lists the app's roster; with the backend not answering, Pomade's own scan", async () => {
+    const host = await platformClient(sandbox);
+    try {
+      await expect
+        .poll(async () => {
+          const answer = await host.apps.call(manifest.id, ROSTER_AGENTS_METHOD, {}).catch(() => null);
+          return isRosterAgentsAnswer(answer) ? answer.agents.filter((a) => a.profile !== null).map((a) => a.id) : [];
+        })
+        .toEqual(FIXTURE_AGENTS);
+    } finally {
+      host.close();
+    }
+    // Hidden in the app's roster only: Pomade's own scan still has it.
+    const libra = join(sandbox.workspace, "Apps", manifest.id, "agents", "claude-libra", "agent.yaml");
+    await writeFile(libra, (await readFile(libra, "utf8")).replace("hidden: false", "hidden: true"));
+
+    const menuItem = (id: string) => page.getByTestId(`tab-add-agent-${id}`);
+    await expect
+      .poll(async () => {
+        await page.getByTestId("tab-add").click();
+        await expect(menuItem("claude")).toBeVisible();
+        const hidden = (await menuItem("claude-libra").count()) === 0;
+        await page.keyboard.press("Escape");
+        return hidden;
+      }, { message: "the app's roster, with claude-libra hidden, fills the menu" })
+      .toBe(true);
+    await page.getByTestId("tab-add").click();
+    await expect(menuItem("codex")).toBeVisible();
+    await mkdir(ARTIFACTS, { recursive: true });
+    await page.getByTestId("tab-add-menu").screenshot({ path: join(ARTIFACTS, "plus-menu-app-roster.png") });
+    await page.keyboard.press("Escape");
+
+    // The backend stops answering (stopped, not gone): Pomade waits its 1.5 s, then uses its scan.
+    process.kill(backendPid, "SIGSTOP");
+    try {
+      await page.getByTestId("tab-add").click();
+      await expect(menuItem("claude-libra")).toBeVisible({ timeout: 10_000 });
+      await expect(menuItem("claude")).toBeVisible();
+      await expect(menuItem("codex")).toBeVisible();
+      await page.getByTestId("tab-add-menu").screenshot({ path: join(ARTIFACTS, "plus-menu-own-scan.png") });
+      await page.keyboard.press("Escape");
+    } finally {
+      process.kill(backendPid, "SIGCONT");
+    }
+  });
+
+  test("quitting Pomade stops the backend; the stores were never written, and Apps/ holds only the app's settings, session records and agent profiles", async () => {
     await app?.close();
     app = null;
     await expect.poll(() => alive(backendPid), { timeout: 10_000 }).toBe(false);
@@ -124,7 +172,9 @@ test.describe("dev-linked into Pomade", () => {
     for (const [path, hash] of Object.entries(fixtures.home)) expect(home[path], path).toBe(hash);
     const apps = Object.keys(await sandbox.snapshot(join(sandbox.workspace, "Apps")));
     expect(apps.filter((path) => path.startsWith(`${manifest.id}/sessions/`) && path.endsWith(".yaml"))).toHaveLength(Object.keys(SEEDED_TRANSCRIPTS).length);
-    expect(apps.filter((path) => !path.startsWith(`${manifest.id}/sessions/`))).toEqual([`${manifest.id}/settings.yaml`]);
+    expect(apps.filter((path) => !path.startsWith(`${manifest.id}/sessions/`)).sort()).toEqual(
+      [...FIXTURE_AGENTS.map((id) => `${manifest.id}/agents/${id}/agent.yaml`), `${manifest.id}/settings.yaml`].sort(),
+    );
   });
 });
 

@@ -250,6 +250,7 @@ becomes two panes:
 - **Folder agents:** one per `<workspace>/Agents/<name>/` that holds a `CLAUDE.md`. Folders named
   `_shared` or containing `template` are skipped. All folder agents are Claude Code instances run
   with `CLAUDE_CONFIG_DIR=<folder>`.
+- **Names:** the built-ins show as Claude and Codex, a folder agent as its folder's name.
 - **Each agent's launch command is its shell alias**, e.g. `claude-libra`. Pomade types it into
   an interactive shell.
 
@@ -274,14 +275,20 @@ modes:
 
 - **Model and effort aren't stored here.** The provider's own config is their single truth:
   `settings.json` `model` / `effortLevel` for Claude Code, `config.toml` for Codex.
-- **First run** creates one file per agent:
+- **Absent keys:** no `tags` is none, no `hidden` is `false`; a mode absent from `modes` is not
+  enabled.
+- **First sight** of an agent with no file — on the first run, and for every agent folder added
+  later — creates its file:
   - from Pomade's folder scan
   - plus `.pomade/agents.json` (command overrides, hidden agents)
   - plus a role line pre-filled from the first sentence under `## Role` in the agent's
     `CLAUDE.md`
-- **Orphans:** an `agent.yaml` whose `configDir` no longer exists (the folder was renamed
-  outside the app) is shown on a card, with **Re-link** to an unclaimed agent folder or
-  **Remove**.
+  - A folder another profile names as its `configDir` belongs to that profile: no second file.
+- **A file is never written over** when the app cannot use it (broken YAML, a malformed key): the
+  Roster reports it, and the agent answers from its first-sight values until it is fixed.
+- **Orphans:** a folder agent's `agent.yaml` whose `configDir` no longer exists (the folder was
+  renamed outside the app). It stays out of the "+" menu and launches, and is shown on a card, with
+  **Re-link** to an unclaimed agent folder or **Remove**. A built-in is never an orphan.
 - **Known limit:** command edits made in the app don't reach Pomade's `.pomade/agents.json`. The
   platform's fallback (§3.7) uses the last commands it knew itself.
 
@@ -319,8 +326,10 @@ Each card shows:
 - **The modes come from the provider and are listed in `agent.yaml`**, each with its own
   arguments — the shape Pomade's "+" menu reads from `roster.list`, with no translation.
 - A disabled mode is offered nowhere: not in the "+" menu, not by Runner.
-- **A launch spec** = the command line for an (agent, mode, resume id?, prompt?) combination.
-  Pomade's "+" menu and Runner both build their launches from it.
+- **A launch spec** = the command line for an (agent, mode, resume id or new session id?, prompt?)
+  combination, with the id the session will have and what to type to end the agent. Pomade's "+"
+  menu and Runner both build their launches from it. Claude Code takes a new session's id
+  (`--session-id`); Codex cannot, so a caller finds that session with `sessions.find`.
 - Custom modes are later ([[P-004]]).
 
 ### 3.6 Creating an agent
@@ -409,8 +418,9 @@ Registered with Pomade's broker (`pomade:E-028`). Callers reach it through the H
 | `sessions.forRepo({ folder, branch? })` | `{ sessions: RepoSession[] }`: sessions whose start folder is `folder` or inside it (a repo or worktree) and, with `branch`, whose recorded branch is that one; newest activity first | git (branch ↔ session link) |
 | `sessions.liveIn({ folder })` | `{ live, sessions: LiveSession[] }`: agent tabs and Runner agent runs (`kind: agent`; never script, git or service runs) running at or below `folder` now, including an agent tab not yet prompted; `live` is true exactly when `sessions` is non-empty | git (merge block, In progress rows), `pomade-git` (skip scheduled commit) |
 | `roster.list()` | `{ agents: RosterAgent[] }` (the shape in Pomade's `docs/HOST-API.md` §4 "`apps` — the broker", "Platform reads of app APIs"): id, name, command, provider, config dir, enabled modes with their arguments. Hidden agents are left out | Pomade "+" menu and agent launches, Runner |
-| `roster.launchSpec({ agent, mode, resume?, prompt? })` | the command line to type | Pomade "+" menu, Runner |
-| `roster.projectsFor(agent)` · `roster.agentsFor(project)` | project ids · agent ids (the connection setting) | Runner (job form) |
+| `roster.launchSpec({ agent, mode, resume?, sessionId?, prompt? })` | `{ command, args, line, sessionId, exit }`: the agent's command, the arguments, both as one shell line; the session's id (`null` when the provider cannot pre-assign it); what ends the agent. A disabled or unknown mode is refused | Pomade "+" menu, Runner |
+| `roster.projectsFor({ agent })` · `roster.agentsFor({ project })` | `{ projects }` stable project ids · `{ agents }` roster ids: the connection, read from each project's visible agents (`["*"]` = every agent; the Workspace offers every agent) | Runner (job form) |
+| `roster.agents()` | every agent with its profile, hidden ones and orphans included, its default model and effort; `roster.changed` says when it changes | the app's own frames |
 
 **The sessions contract.** `sessions.forRepo` and `sessions.liveIn` are a contract shared with
 Pomade, fixed in `pomade-kit/protocol` (`agent-sessions.ts`). The app imports its types and
