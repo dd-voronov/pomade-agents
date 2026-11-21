@@ -110,6 +110,16 @@ describe("the live state", () => {
     expect(state.ofSession("s1")).toEqual({ live: "closed", liveSince: "2026-11-21T11:00:00.000Z" });
   });
 
+  it("takes a session's state from a tab bound to it over a run of it, and from the run once the tab goes", () => {
+    const { state, tabs } = setup();
+    state.put("run", "r1", { sessionId: "s", agent: "claude", cwd: "/w", state: "working", job: "Nightly" });
+    expect(state.ofSession("s").live).toBe("working");
+    tabs.list([tab({ tabId: "t1", sessionId: "s", state: "idle" })]);
+    expect(state.ofSession("s").live).toBe("idle");
+    tabs.list([]);
+    expect(state.ofSession("s").live).toBe("working");
+  });
+
   it("keeps each source's entries apart: replacing the tabs leaves the runs", () => {
     const { state, tabs } = setup();
     state.put("run", "r1", { sessionId: "s9", agent: "claude", cwd: "/w", state: "working", job: "Nightly" });

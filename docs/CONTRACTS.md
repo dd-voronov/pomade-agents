@@ -23,7 +23,7 @@ and the backend's handlers in step with it.
 | `hostApi` | `0` |
 | `capabilities` | `project.read` (projects, their stable ids, names and folders, their visible agents) · `agentTabs.read` (each agent tab's session, folder and live state) — the backend's project attribution, live state and the project ↔ agent connection; the Sessions tab's project names |
 | `strip` | one icon, `agents` — action `panel` |
-| `events` | publishes `sessions.changed` and `roster.changed` (for its own UI frames) and `session.turnFinished` (declared, never published), `session.closed`, `session.statusChanged` ("Published events" below); subscribes to `pomade-agents:sessions.changed` and `pomade-agents:roster.changed` (its own, for its UI frames), `project.created` and `project.renamed` (the backend, and the UI frames for project names) and, for the backend, `pomade.ready`, `agentTab.changed`, `agentTab.exited` |
+| `events` | publishes `sessions.changed` and `roster.changed` (for its own UI frames) and `session.turnFinished` (declared, never published), `session.closed`, `session.statusChanged` ("Published events" below); subscribes to `pomade-agents:sessions.changed` and `pomade-agents:roster.changed` (its own, for its UI frames), `project.created` and `project.renamed` (the backend, and the UI frames for project names) and, for the backend, `pomade.ready`, `agentTab.changed`, `agentTab.exited` and Runner's `pomade-runner:run.started`, `pomade-runner:run.finished` ("Subscribed events" below) |
 | `backend` | `backend/main.mjs`, mode `with-pomade` |
 | `api` | the methods of "Published API" below — `sessions.forRepo`, `sessions.liveIn` and `roster.list` among them, which Pomade reads (HOST-API §4, "Platform reads of app APIs") |
 | `outsideWorkspace` | `~/.claude/`, `~/.codex/`, `~/.zshrc` — the paths outside the workspace the backend uses. The Host API defines no key for them; Pomade lists this one as not supported yet |
@@ -190,12 +190,18 @@ Events are not replayed, so a frame asks once its subscription stands, and again
 while the backend does not answer; a restarted backend is another epoch and answers whole.
 
 **Live state** (`src/backend/sessions/live-state.ts`) — detected, never set. The backend keeps one
-entry per live thing, each from its live source; the agent tabs are the source now
-(`agentTabs.list` on each connection and on `pomade.ready`, then every `agentTab.changed`; the
-tabs are dropped when the connection ends). A tab is live while its `state` is `working`,
-`needs-you` or `idle`; `exited`, or a tab that left the list, runs nothing. A session's `live` is
-the state of the entry bound to it — the most urgent of several: `needs-you`, `working`, `idle` —
-else `closed`. `liveSince` is when the backend saw the session enter that state: one already there
+entry per live thing, each from its live source. Two sources:
+
+- **Agent tabs** (`agentTabs.list` on each connection and on `pomade.ready`, then every
+  `agentTab.changed`; the tabs are dropped when the connection ends). A tab is live while its
+  `state` is `working`, `needs-you` or `idle`; `exited`, or a tab that left the list, runs nothing.
+- **Runner's agent runs** (`src/backend/sessions/runner-runs.ts`, "Subscribed events" below). A
+  run is `working` from its run started to its run finished, bound to its session once that is
+  known.
+
+A session's `live` is the state of the entry bound to it — a tab bound to it over a run of it (the
+tab sees the agent wait or ask; a run only that it runs), else the most urgent of several:
+`needs-you`, `working`, `idle` — else `closed`. `liveSince` is when the backend saw the session enter that state: one already there
 at a listing is dated then, a state that stays across listings keeps its date, a session that
 stops running is `closed` since that moment, and one never seen live this run is `closed` since
 `null`. A live-state change is a session change like any other: a new revision, and
@@ -220,8 +226,10 @@ kit's `checkRepoSessions` / `checkLiveIn` unchanged. Pomade asks them as the cal
   activity times or without a usable record is left out.
 - **`liveIn`** — one `LiveSession` per live entry whose folder is `folder` or inside it: an agent
   tab is `{ sessionId (null before its first prompt), agent: the tab's agentId, cwd, source: "tab",
-  job: null }`; a tab whose folder is not known yet is left out. `live` is true exactly when
-  `sessions` is not empty.
+  job: null }`, a tab whose folder is not known yet left out; a running Runner agent run is
+  `{ sessionId (null while not known), agent: the run's agent, cwd: the run's cwd, source: "run",
+  job: the job's name }` — one per run, beside a tab attached to the same session. Script, git and
+  service runs are never listed. `live` is true exactly when `sessions` is not empty.
 
 ### Reads for Runner
 
@@ -438,7 +446,7 @@ type SessionEventBase = {
   at: string;                                   // ISO 8601: when it happened
 };
 
-type SessionClosedEvent = SessionEventBase & { reason: "exit" | "tab-closed" | "crash" };
+type SessionClosedEvent = SessionEventBase & { reason: "exit" | "tab-closed" | "crash" | "run-finished" };
 type StatusChangedEvent = SessionEventBase & { from: SessionStatus; to: SessionStatus }; // status = to
 ```
 
@@ -446,14 +454,16 @@ A session is told of only with a usable record (it has the status); one without 
 left out.
 
 **B `session.closed`** — from Pomade's `agentTab.exited` (HOST-API §4 `events`), which fires once
-per end of an agent process in a tab and names the session bound to the tab then; `at` is when
-the backend heard it. `reason` is the platform's:
+per end of an agent process in a tab and names the session bound to the tab then, and from
+Runner's run finished of an agent run ("Subscribed events" below); `at` is when the backend heard
+it. `reason` is the platform's, or `run-finished`:
 
 | `reason` | Pomade's `agentTab.exited` reason means |
 |---|---|
 | `exit` | the agent quit with status 0 — `/exit`, or interrupted with Ctrl+C (status 130); the two are not told apart |
 | `tab-closed` | the tab was closed with the agent running — by the user or a bulk action; also an agent a bulk "exit all agents" had to kill |
 | `crash` | it ended with any other status, or the tab's shell died under it; the cause is not told |
+| `run-finished` | a Runner agent run of the session finished — whatever its `result` (`done`, `failed`, `stopped-by-you`); `startedByRunner: true` and `job` the job's name, whether or not the record holds the mark yet |
 
 - Pomade's `quit` (it quit or closed the workspace, and resumes the session at its next launch)
   is a pause, not an end: no event.
@@ -461,10 +471,14 @@ the backend heard it. `reason` is the platform's:
   no session to tell of: no event.
 - A session the app does not know yet (its transcript is still being read) is waited for up to
   5 s (`CLOSED_WAIT_MS`), then left out.
+- **One end, one B.** A run's session ends when the run finishes: an `agentTab.exited` of a tab
+  bound to it (the user attached) while the run runs, or within 5 s after its run finished
+  (`RUN_END_GRACE_MS`), publishes nothing. A session resumed in a tab after that ends as a tab's.
+- A run finished whose session the app cannot name (none in the payload, none placed, none found
+  by its folder and start) publishes nothing; the backend logs it.
 - `agentTab.changed` alone does not tell these apart: `closed` is both a closed tab and an agent
   handing the shell back, and `state: "exited"` carries no cause.
-- Subscribers treat a `reason` they do not know as an end too: the list grows when Runner's runs
-  finish B.
+- Subscribers treat a `reason` they do not know as an end too.
 
 **C `session.statusChanged`** — every status change `SessionData.changeStatus` makes (the UI's,
 another app's `sessions.setStatus`), per session, published **5 s after the session's last
@@ -478,6 +492,58 @@ change** (`STATUS_WINDOW_MS`, `src/backend/sessions/status-window.ts`):
 - `at` is when the last change was written.
 - A requested stop (SIGTERM, SIGINT) publishes every pending change at once, before the backend
   lets go of Pomade; a backend killed or crashed loses them.
+
+## Subscribed events
+
+Runner's run events (`src/shared/runner-events.ts`: `RUN_STARTED_EVENT`, `RUN_FINISHED_EVENT`, the
+readers `readRunStarted` / `readRunFinished`), declared in the manifest's `events.subscribe` and
+taken by the backend (`src/backend/sessions/runner-runs.ts`). The app never calls Runner (PLATFORM
+rule 4). Events are live only: one published while the backend is not connected is never heard.
+
+```ts
+// pomade-runner:run.started
+type AgentRunStarted = {
+  job: string;             // the job's id, non-empty
+  name: string;            // the job's name, non-empty: startedByRunner.job and LiveSession.job
+  run: string;             // the run's id, non-empty; job + run name one run
+  kind: "agent";
+  folder: string;          // workspace-relative
+  project: string | null;  // stable project id, non-empty; null: a workspace job
+  trigger: string;
+  sessionId: string | null; // non-empty; null while Runner does not know it (Codex)
+  agent: string;           // roster id, non-empty
+  mode: string;            // non-empty
+  cwd: string;             // absolute, symlinks resolved
+  startedByRunner: true;
+  startedAt: string;       // ISO 8601 with a zone (Z or ±hh:mm): when the run's session started
+};
+// pomade-runner:run.finished
+type AgentRunFinished = AgentRunStarted & {
+  result: string;          // non-empty: done · failed · stopped-by-you
+  exitCode: number | null; // an integer
+};                         // sessionId: the one Runner found by then, else null
+```
+
+- **Which payloads count.** Only `kind: "agent"` with every field above well-formed; extra fields
+  are ignored. Another `kind` (script, service, git) is not the app's: ignored silently. A payload
+  with no `kind`, or an agent run missing a field, is logged (one line per event, naming the
+  field) and ignored.
+- **Run started** — a live entry for the run ("Live state" above), and the session's record gets
+  `startedByRunner: { job: name }` through the record machinery (only that key and `updated`
+  change; a later job's run of the same session takes its name). With `sessionId`, at once, or
+  when the session's record is written — a session whose transcript is not read yet is marked on
+  first sight. Without it, the run is **placed**: the earliest session of the run's `agent`
+  started exactly in `cwd` (symlinks resolved) from 5 s before `startedAt` to 60 s after
+  (`PLACE_BEFORE_MS`, `PLACE_AFTER_MS`, the `sessions.find` matching), that no other run and no
+  agent tab holds — tried again whenever the sessions change, until the run is placed or finishes.
+- **Run finished** — its live entry goes; B with `reason: "run-finished"` ("Published events"
+  above) for the payload's `sessionId`, else the session the app placed, else one placed now by
+  the same rule; that session gets the mark too. A run finished the app never heard start (it
+  started while the backend was not connected) ends its session the same way.
+- **Runs held** live in the backend's memory only: all of them are let go of when the connection
+  to Pomade ends (no run finished can be heard while it is down) and when the backend stops — no
+  live entry stays and no B is published for them. `pomade.ready` drops nothing. A record's
+  `startedByRunner` stays.
 
 ## Backend
 
@@ -518,7 +584,8 @@ change** (`STATUS_WINDOW_MS`, `src/backend/sessions/status-window.ts`):
   projects (again on `project.created`, `project.renamed`, `pomade.ready`) and the agent tabs (again
   on `pomade.ready`), and takes every `agentTab.changed`: the first project each session is seen
   bound in is its `launchedFrom`; every tab's state and folder feed the live state. Every
-  `agentTab.exited` feeds event B. A rename refreshes `projectRoot` in the records of that project.
+  `agentTab.exited` feeds event B. Runner's `run.started` / `run.finished` come in on the same
+  connection ("Subscribed events" above). A rename refreshes `projectRoot` in the records of that project.
 - **Roster** (`src/backend/roster/`) — the agents (`roster.ts`), their first-sight values
   (`first-sight.ts`: the scan, `.pomade/agents.json`, the role line), default model and effort
   (`provider-config.ts`), launch specs (`launch-spec.ts`) and the connection (`connections.ts`).

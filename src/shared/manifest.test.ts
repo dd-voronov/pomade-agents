@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import { createApi } from "../backend/interfaces/api.ts";
 import { API_METHODS } from "./api.ts";
 import { ROSTER_CHANGED_EVENT } from "./roster.ts";
+import { RUN_FINISHED_EVENT, RUN_STARTED_EVENT } from "./runner-events.ts";
 import { SESSION_CLOSED_EVENT, SESSION_STATUS_CHANGED_EVENT, SESSION_TURN_FINISHED_EVENT } from "./session-events.ts";
 
 const read = (path: string): unknown => JSON.parse(readFileSync(new URL(path, import.meta.url), "utf8"));
@@ -27,12 +28,12 @@ describe("manifest.json", () => {
     });
     expect(parsed.unsupportedKeys).toEqual(["outsideWorkspace"]);
     // The UI hears the backend's change notices through the app's own published events; other apps
-    // hear the session events; the backend follows Pomade's projects and agent tabs for project
-    // attribution, live state and event B.
+    // hear the session events; the backend follows Pomade's projects and agent tabs, and Runner's
+    // runs, for project attribution, live state and event B.
     expect(parsed.manifest.capabilities).toEqual(["project.read", "agentTabs.read"]);
     expect(parsed.manifest.events).toEqual({
       publish: ["sessions.changed", ROSTER_CHANGED_EVENT, SESSION_TURN_FINISHED_EVENT, SESSION_CLOSED_EVENT, SESSION_STATUS_CHANGED_EVENT],
-      subscribe: ["pomade-agents:sessions.changed", "pomade-agents:roster.changed", "pomade.ready", "project.created", "project.renamed", "agentTab.changed", "agentTab.exited"],
+      subscribe: ["pomade-agents:sessions.changed", "pomade-agents:roster.changed", "pomade.ready", "project.created", "project.renamed", "agentTab.changed", "agentTab.exited", RUN_STARTED_EVENT, RUN_FINISHED_EVENT],
     });
   });
 

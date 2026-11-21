@@ -30,7 +30,9 @@
       "project.created",
       "project.renamed",
       "agentTab.changed",
-      "agentTab.exited"
+      "agentTab.exited",
+      "pomade-runner:run.started",
+      "pomade-runner:run.finished"
     ]
   },
   "backend": {

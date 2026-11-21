@@ -16,6 +16,7 @@ const context = (patch: Partial<RecordContext> = {}, summary: Parameters<typeof 
   summary: testSummary({ id: "s1", cwd: "/ws/Projects/beta/src", transcript: "/t/s1.jsonl", ...summary }),
   boundIn: null,
   projects: PROJECTS,
+  runnerJob: null,
   ...patch,
 });
 
@@ -108,6 +109,14 @@ describe("keeping a record current", () => {
 
   it("leaves the project alone while Pomade's projects are not known", () => {
     expect(refreshRecord(record, context({ projects: null }))).toMatchObject({ project: "beta", projectRoot: "Projects/beta" });
+  });
+
+  it("marks the session a Runner run started with its job, keeping a mark when no run is known, taking the latest job", () => {
+    const marked = refreshRecord(record, context({ runnerJob: "Morning summary" }));
+    expect(marked).toEqual({ ...record, transcript: "/t/s1.jsonl", startedByRunner: { job: "Morning summary" } });
+    expect(refreshRecord(marked, context()).startedByRunner).toEqual({ job: "Morning summary" });
+    expect(refreshRecord(marked, context({ runnerJob: "Nightly" })).startedByRunner).toEqual({ job: "Nightly" });
+    expect(newRecord(context({ runnerJob: "Nightly" }, { startedAt: "2026-11-18T00:00:00.000Z" }), ADOPTED)).toMatchObject({ status: "active", outsidePomade: true, startedByRunner: { job: "Nightly" } });
   });
 
   it("keeps the start folder it knows when the transcript has none yet", () => {

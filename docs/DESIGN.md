@@ -110,7 +110,7 @@ Two separate columns:
 | | Values | Set by |
 |---|---|---|
 | **Status** | Active · On hold · Done · Done–skip/Failed | the user only, in the Agents UI (row, detail panel, bulk) |
-| **Live state** | Working · Needs you · Idle · Closed | detected: the platform's live state per agent tab (`pomade:E-033`); Runner runs from its events; anything not running is Closed |
+| **Live state** | Working · Needs you · Idle · Closed | detected: the platform's live state per agent tab (`pomade:E-033`); Runner agent runs from its events — Working while the run runs, unless a tab attached to the session says otherwise; anything not running is Closed |
 
 - **New sessions start Active.**
 - **On the app's first run, every session that already exists is set to Done**, silently.
@@ -473,7 +473,8 @@ C adds `from` and `to`. B adds `reason`: exit · tab-closed · crash · run-fini
 - from the platform's **agent tab exited** event (`agentTab.exited`), plus the session bound to
   the tab then; its reasons are the platform's. Pomade quitting (`quit`) pauses a session, so it
   publishes nothing
-- for unattended runs, from Runner's **run finished**
+- for unattended runs, from Runner's **run finished**; while a run runs a session, a tab
+  attached to it ending is not the session's end — one end, one B
 
 **How C is timed:** it goes out 5 s after the session's last status change. A change taken back
 inside the window (the Sessions tab's Undo) publishes nothing; several changes inside it publish
@@ -485,7 +486,10 @@ Session Analyzer script on that transcript.
 
 **Subscribed:**
 - the platform's agent tab exited and binding changes (`pomade:E-031`, `pomade:E-033`)
-- Runner's run started / run finished (session id, job name), for ⏱ rows and B
+- Runner's run started / run finished of agent runs (`pomade-runner:run.started`,
+  `pomade-runner:run.finished`: session id, job name, agent, folder, start), for ⏱ rows,
+  `liveIn` and B. A run without a session id is matched to its session by folder and start time.
+  Runs are held in memory: one still running when the connection to Pomade ends is let go of
 
 ## 7. Command `pomade-agents`
 

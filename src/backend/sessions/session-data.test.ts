@@ -156,6 +156,32 @@ describe("the session data", () => {
     expect(await readFile(fileOf("late"), "utf8")).not.toContain("outsidePomade");
   });
 
+  it("marks a session a Runner run started, whether the mark comes before its record or after, changing only that key", async () => {
+    await mkdir(dataDir, { recursive: true });
+    await writeFile(join(dataDir, SETTINGS_FILE), `adoptedAt: ${FIRST_RUN}\n`);
+    const source = fakeSource();
+    const d = await start(source);
+    const later = { startedAt: "2026-11-18T00:00:00.000Z" };
+
+    d.markStartedByRunner("early", "Morning summary");
+    source.put(summary("early", later));
+    await expect.poll(() => session("early")?.record?.startedByRunner, SOON).toEqual({ job: "Morning summary" });
+    expect(await readFile(fileOf("early"), "utf8")).toContain("startedByRunner:\n  job: Morning summary\n");
+
+    source.put(summary("late", later));
+    await expect.poll(() => session("late")?.record?.status, SOON).toBe("active");
+    const text = `# kept by hand\n${await readFile(fileOf("late"), "utf8")}`;
+    await writeFile(fileOf("late"), text);
+    await expect.poll(async () => (await readFile(fileOf("late"), "utf8")).startsWith("# kept by hand"), SOON).toBe(true);
+    await expect.poll(() => session("late")?.record !== null, SOON).toBe(true);
+    d.markStartedByRunner("late", "Nightly");
+    await expect.poll(() => session("late")?.record?.startedByRunner, SOON).toEqual({ job: "Nightly" });
+    const marked = await readFile(fileOf("late"), "utf8");
+    const others = (t: string): string[] => t.split("\n").filter((line) => !line.startsWith("updated:") && !line.startsWith("startedByRunner:") && !line.startsWith("  job:"));
+    expect(others(marked)).toEqual(others(text));
+    expect(marked).toContain("startedByRunner:\n  job: Nightly\n");
+  });
+
   it("sets statuses and notes in bulk, renames and moves, writing the records", async () => {
     await mkdir(dataDir, { recursive: true });
     await writeFile(join(dataDir, SETTINGS_FILE), `adoptedAt: ${FIRST_RUN}\n`);

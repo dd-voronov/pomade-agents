@@ -6,7 +6,8 @@ import type { Session, SessionsChanged } from "../../shared/sessions.ts";
 import { testSession, testSummary } from "../../shared/test-sessions.ts";
 import type { ProjectPlace } from "./attribution.ts";
 import type { StatusChange } from "./session-data.ts";
-import { CLOSED_WAIT_MS, startSessionEvents, type SessionEvents } from "./session-events.ts";
+import { createLiveState, type LiveState } from "./live-state.ts";
+import { CLOSED_WAIT_MS, RUN_END_GRACE_MS, startSessionEvents, type SessionEvents } from "./session-events.ts";
 
 const WINDOW = 5000;
 const NOW = "2026-11-21T10:00:00.000Z";
@@ -54,6 +55,7 @@ describe("the session events", () => {
   let published: { name: string; payload: unknown }[];
   let lines: string[];
   let events: SessionEvents;
+  let live: LiveState;
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -61,8 +63,10 @@ describe("the session events", () => {
     sessions = fakeSessions();
     published = [];
     lines = [];
+    live = createLiveState(() => new Date());
     events = startSessionEvents({
       sessions,
+      live,
       publish: (name, payload) => {
         published.push({ name, payload });
         return Promise.resolve();
@@ -163,10 +167,58 @@ describe("the session events", () => {
     expect(lines.join("\n")).toContain("session never ended but is not known with a record");
   });
 
+  it("publishes B with run-finished and the run's job when a Runner run finished, whatever the record holds yet", async () => {
+    sessions.put(inAlpha("r"));
+    events.runFinished("r", "Nightly");
+    events.runFinished("late", "Nightly");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(published).toEqual([
+      {
+        name: SESSION_CLOSED_EVENT,
+        payload: {
+          sessionId: "r",
+          provider: "claude-code",
+          agent: "claude",
+          project: { id: "alpha", root: "Projects/alpha" },
+          cwd: "/ws/Projects/alpha",
+          transcript: "/home/.claude/projects/-ws/r.jsonl",
+          name: "Grill",
+          status: "active",
+          startedByRunner: true,
+          job: "Nightly",
+          at: NOW,
+          reason: "run-finished",
+        },
+      },
+    ]);
+    expect(isSessionClosedEvent(published[0]?.payload)).toBe(true);
+    sessions.put(inAlpha("late"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(published[1]?.payload).toMatchObject({ sessionId: "late", reason: "run-finished", startedByRunner: true, job: "Nightly" });
+  });
+
+  it("publishes one B for a run's session a tab is attached to: the run's, not the tab's while the run runs or just after", async () => {
+    sessions.put(inAlpha("r"));
+    live.put("run", "j\0r1", { sessionId: "r", agent: "claude", cwd: "/ws/Projects/alpha", state: "working", job: "Nightly" });
+    events.tabExited(exited("r", "tab-closed"));
+    live.put("run", "j\0r1", null);
+    events.runFinished("r", "Nightly");
+    await vi.advanceTimersByTimeAsync(RUN_END_GRACE_MS - 1);
+    events.tabExited(exited("r", "exit"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(published.map((p) => (p.payload as { reason: string }).reason)).toEqual(["run-finished"]);
+    // The user resumes it in a tab later: that end is the tab's.
+    await vi.advanceTimersByTimeAsync(1);
+    events.tabExited(exited("r", "exit"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(published.map((p) => (p.payload as { reason: string }).reason)).toEqual(["run-finished", "exit"]);
+  });
+
   it("logs a publish that fails and goes on", async () => {
     await events.stop();
     events = startSessionEvents({
       sessions,
+      live,
       publish: () => Promise.reject(new Error("Pomade is not connected")),
       realPath: (path) => Promise.resolve(path),
       windowMs: WINDOW,

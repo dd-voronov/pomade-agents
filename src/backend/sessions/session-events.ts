@@ -6,8 +6,13 @@
 // - **B `session.closed`** — from Pomade's `agentTab.exited`: an agent process in a tab ended,
 //   with the session bound to the tab then. `quit` (Pomade quit or closed the workspace and will
 //   resume the session at its next launch) is a pause, not an end, and an exit with no session
-//   bound has no session to tell of: neither publishes. A session the app does not know yet (its
+//   bound has no session to tell of: neither publishes. And from Runner's run finished of an agent
+//   run (`runFinished`, `runner-runs.ts`): reason `run-finished`, `startedByRunner: true` with the
+//   job's name, whatever the record holds yet. A session the app does not know yet (its
 //   transcript is still being read) is waited for up to `CLOSED_WAIT_MS`.
+// - **One end, one B.** A session a Runner run runs ends when the run finishes: an agent tab
+//   bound to it (the user attached) that exits while the run runs, or within `RUN_END_GRACE_MS`
+//   after its run finished, publishes nothing.
 //
 // `stop` publishes the pending status changes and resolves once they are sent.
 
@@ -24,17 +29,23 @@ import {
 import type { Session } from "../../shared/sessions.ts";
 import type { RealPath } from "../core/real-paths.ts";
 import type { ProjectPlace } from "./attribution.ts";
+import type { LiveState } from "./live-state.ts";
 import type { SessionData } from "./session-data.ts";
 import { REAL_TIMERS, createStatusWindow, type SettledStatus, type Timers } from "./status-window.ts";
 
 /** How long a closed session the app does not know yet is waited for. */
 export const CLOSED_WAIT_MS = 5000;
 
+/** How long after a run's B an exit of a tab bound to the same session is the same end. */
+export const RUN_END_GRACE_MS = 5000;
+
 /** Publishes one of the app's own events; rejects when it could not. */
 export type Publish = (name: string, payload: SessionClosedEvent | StatusChangedEvent) => Promise<void>;
 
 export interface SessionEventsOptions {
   sessions: Pick<SessionData, "get" | "projects" | "onChange" | "onStatusChange">;
+  /** What runs now: whether a Runner run runs a session. */
+  live: Pick<LiveState, "entries">;
   publish: Publish;
   realPath: RealPath;
   windowMs: number;
@@ -46,6 +57,8 @@ export interface SessionEventsOptions {
 export interface SessionEvents {
   /** Pomade's `agentTab.exited`. */
   tabExited(exited: AgentTabExitedPayload): void;
+  /** A Runner agent run of job `job` (its name) that ran session `sessionId` finished. */
+  runFinished(sessionId: string, job: string): void;
   /** Publish the pending status changes, stop listening; resolves once they are sent. */
   stop(): Promise<void>;
 }
@@ -78,7 +91,7 @@ export async function eventBase(session: Session, projects: readonly ProjectPlac
 }
 
 export function startSessionEvents(options: SessionEventsOptions): SessionEvents {
-  const { sessions, publish, realPath, now, log } = options;
+  const { sessions, live, publish, realPath, now, log } = options;
   const timers = options.timers ?? REAL_TIMERS;
   const sending = new Set<Promise<void>>();
 
@@ -108,22 +121,50 @@ export function startSessionEvents(options: SessionEventsOptions): SessionEvents
 
   // ── B ────────────────────────────────────────────────────────────────────
 
-  /** Exits whose session is not known yet: session id → what to publish once it is. */
-  const waiting = new Map<string, { reason: SessionClosedReason; at: string; timer: unknown }>();
+  /** An end to publish: why, when, and the run's job when a Runner run ended (`null`: a tab's). */
+  interface End {
+    reason: SessionClosedReason;
+    at: string;
+    job: string | null;
+  }
 
-  const closed = (id: string, reason: SessionClosedReason, at: string): boolean => {
+  /** Ends whose session is not known yet: session id → what to publish once it is. */
+  const waiting = new Map<string, End & { timer: unknown }>();
+  /** Sessions whose run published B: session id → when (ms). */
+  const runEnded = new Map<string, number>();
+
+  const closed = (id: string, { reason, at, job }: End): boolean => {
     const session = sessions.get(id);
     if (session === undefined || session.record === null) return false;
     send(SESSION_CLOSED_EVENT, async () => {
       const base = await eventBase(session, sessions.projects(), at, realPath);
-      return base === null ? null : { ...base, reason };
+      if (base === null) return null;
+      return job === null ? { ...base, reason } : { ...base, startedByRunner: true, job, reason };
     });
     return true;
   };
 
+  const end = (sessionId: string, ending: End): void => {
+    if (closed(sessionId, ending)) return;
+    const held = waiting.get(sessionId);
+    if (held !== undefined) timers.clear(held.timer);
+    const timer = timers.set(() => {
+      waiting.delete(sessionId);
+      log(`events: session ${sessionId} ended but is not known with a record; ${SESSION_CLOSED_EVENT} not published`);
+    }, CLOSED_WAIT_MS);
+    waiting.set(sessionId, { ...ending, timer });
+  };
+
+  /** A Runner run runs the session now, or its run ended it moments ago. */
+  const endedByRun = (sessionId: string): boolean => {
+    if (live.entries().some((e) => e.source === "run" && e.sessionId === sessionId)) return true;
+    const at = runEnded.get(sessionId);
+    return at !== undefined && now().getTime() - at < RUN_END_GRACE_MS;
+  };
+
   const unsubscribeSessions = sessions.onChange(() => {
-    for (const [id, { reason, at, timer }] of [...waiting]) {
-      if (!closed(id, reason, at)) continue;
+    for (const [id, { timer, ...ending }] of [...waiting]) {
+      if (!closed(id, ending)) continue;
       timers.clear(timer);
       waiting.delete(id);
     }
@@ -132,16 +173,15 @@ export function startSessionEvents(options: SessionEventsOptions): SessionEvents
   return {
     tabExited({ sessionId, reason }) {
       const closing = CLOSING_REASONS[reason];
-      if (sessionId === null || closing === undefined) return;
-      const at = now().toISOString();
-      if (closed(sessionId, closing, at)) return;
-      const held = waiting.get(sessionId);
-      if (held !== undefined) timers.clear(held.timer);
-      const timer = timers.set(() => {
-        waiting.delete(sessionId);
-        log(`events: session ${sessionId} ended but is not known with a record; ${SESSION_CLOSED_EVENT} not published`);
-      }, CLOSED_WAIT_MS);
-      waiting.set(sessionId, { reason: closing, at, timer });
+      if (sessionId === null || closing === undefined || endedByRun(sessionId)) return;
+      end(sessionId, { reason: closing, at: now().toISOString(), job: null });
+    },
+
+    runFinished(sessionId, job) {
+      const at = now();
+      for (const [id, ms] of [...runEnded]) if (at.getTime() - ms >= RUN_END_GRACE_MS) runEnded.delete(id);
+      runEnded.set(sessionId, at.getTime());
+      end(sessionId, { reason: "run-finished", at: at.toISOString(), job });
     },
 
     async stop() {

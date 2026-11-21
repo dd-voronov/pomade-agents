@@ -2,10 +2,12 @@
 // never set. One entry per live thing, from its live source; each source replaces or changes only
 // its own entries. Agent tabs are a source (`agentTabs.list`, then every `agentTab.changed`;
 // pomade:E-033): a tab is live while its state is `working`, `needs-you` or `idle`, and `exited`
-// or gone means nothing runs there.
+// or gone means nothing runs there. Runner's agent runs are the other (`runner-runs.ts`): a run is
+// Working from its run started to its run finished.
 //
 // A session's live state is that of the live entry bound to it — the most urgent when several are
-// (needs-you, then working, then idle) — and Closed when none is. `since` is when the backend saw
+// (needs-you, then working, then idle) — and Closed when none is. A tab bound to the session wins
+// over a run of it: the tab sees the agent wait or ask, a run only that it runs. `since` is when the backend saw
 // the session enter that state: a state already there when the backend first lists it is dated
 // then, and a session never seen live this run is Closed since `null`.
 
@@ -68,7 +70,8 @@ export function createLiveState(now: () => Date): LiveState {
     let best: LiveEntry | null = null;
     for (const entry of live.values()) {
       if (entry.sessionId !== sessionId) continue;
-      if (best === null || URGENCY[entry.state] > URGENCY[best.state]) best = entry;
+      const tabOverRun = best !== null && entry.source !== best.source ? entry.source === "tab" : null;
+      if (best === null || (tabOverRun ?? URGENCY[entry.state] > URGENCY[best.state])) best = entry;
     }
     return best === null ? closedOf(sessionId) : { live: best.state, liveSince: best.since };
   };

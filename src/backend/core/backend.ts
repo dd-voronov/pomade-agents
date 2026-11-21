@@ -1,6 +1,6 @@
 // The backend process's life: record the run, index the agents' session stores, keep the session
-// records and the roster, stay connected to Pomade over its socket — following its projects and agent tabs, which
-// are what runs now — serve the app's API on every connection and publish its session events
+// records and the roster, stay connected to Pomade over its socket — following its projects, its agent tabs and
+// Runner's agent runs, which are what runs now — serve the app's API on every connection and publish its session events
 // (HOST-API §2 "Backends"). Pomade starts it with the app and stops it with SIGTERM; a requested
 // stop publishes the status changes still inside their window first.
 
@@ -17,6 +17,7 @@ import { openRecordStore, type RecordStore } from "../records/record-store.ts";
 import type { ProjectReads } from "../roster/connections.ts";
 import { startRoster } from "../roster/roster.ts";
 import { createLiveState, followTabs } from "../sessions/live-state.ts";
+import { startRunnerRuns } from "../sessions/runner-runs.ts";
 import { startSessionData } from "../sessions/session-data.ts";
 import { startSessionEvents } from "../sessions/session-events.ts";
 import { startSessionStore } from "../stores/session-store.ts";
@@ -95,6 +96,7 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
   // Events B and C go to other apps through the connection that is up when they are due.
   const events = startSessionEvents({
     sessions,
+    live,
     publish: async (name, payload) => {
       if (host === null) throw new Error("Pomade is not connected");
       await host.events.publish(name, payload);
@@ -104,6 +106,7 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
     now: options.now,
     log,
   });
+  const runs = startRunnerRuns({ live, sessions, events, realPath, log });
 
   const connection = stayConnected(
     { env, role: "backend" },
@@ -123,14 +126,18 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
             listTabs: (list) => tabs.list(list),
             tabChanged: (tab, closed) => tabs.changed(tab, closed),
             tabExited: (exited) => events.tabExited(exited),
+            runStarted: (payload) => runs.started(payload),
+            runFinished: (payload) => runs.finished(payload),
           },
           { workspace: locations.workspace, log },
         );
       },
       onDisconnect() {
         host = null;
-        // Pomade's agents end with it; a Pomade that comes back lists its tabs again.
+        // Pomade's agents end with it; a Pomade that comes back lists its tabs again. Runner's run
+        // finished is not heard while the connection is down, so no run is held across it.
         tabs.list([]);
+        runs.drop();
         log("Pomade went away; reconnecting");
       },
       onRejected(reason) {
@@ -141,6 +148,7 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
 
   return {
     async stop() {
+      runs.stop();
       await events.stop();
       connection.stop();
       sessions.stop();

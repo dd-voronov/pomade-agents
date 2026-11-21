@@ -7,8 +7,10 @@
 //   `settings.yaml` with `adoptedAt` — a first run cut short starts over and keeps the records it
 //   wrote.
 // - **Records follow.** The fields the app keeps current in a record (transcript, start folder,
-//   first binding, project and its root) are written when they change; a record that cannot be
-//   read is left alone and its session shows without one.
+//   first binding, the Runner job that started it, project and its root) are written when they
+//   change; a record that cannot be read is left alone and its session shows without one. A
+//   Runner mark for a session not known yet, or without its record yet, is held until the record
+//   is there and holds it.
 // - **Changes in.** Status, note, name and Move to project go to the record file and nowhere else;
 //   every status change goes through `changeStatus`, which tells its listeners each session whose
 //   status it changed.
@@ -82,6 +84,8 @@ export interface SessionData {
   setProjects(projects: ProjectPlace[]): void;
   /** A Pomade tab in project `projectId` is bound to session `sessionId`. */
   bind(sessionId: string, projectId: string): void;
+  /** A Runner agent run of job `job` (its name) started session `sessionId`: its record gets `startedByRunner: { job }`. */
+  markStartedByRunner(sessionId: string, job: string): void;
   /** Set the status of sessions — the one way a status changes. `note`: a string sets it, `null` removes it, omitted keeps it. */
   changeStatus(ids: readonly string[], status: SessionStatus, note?: string | null): Promise<Session[]>;
   /** Called after `changeStatus` changed a session's status; returns an unsubscribe function. */
@@ -115,6 +119,8 @@ export function startSessionData(options: SessionDataOptions): SessionData {
   let projects: ProjectPlace[] | null = null;
   /** The project of the first tab seen bound to each session. */
   const boundIn = new Map<string, string>();
+  /** Runner marks not in the session's record yet: session id → job name. */
+  const runnerJobs = new Map<string, string>();
   let adopting = false;
 
   const entries = new Map<string, Entry>();
@@ -153,7 +159,7 @@ export function startSessionData(options: SessionDataOptions): SessionData {
   const latest = (id: string): SessionSummary | null =>
     latestSummary([...(transcriptsOf.get(id) ?? [])].flatMap((path) => byTranscript.get(path) ?? []));
 
-  const contextOf = (summary: SessionSummary): RecordContext => ({ summary, boundIn: boundIn.get(summary.id) ?? null, projects });
+  const contextOf = (summary: SessionSummary): RecordContext => ({ summary, boundIn: boundIn.get(summary.id) ?? null, projects, runnerJob: runnerJobs.get(summary.id) ?? null });
 
   /** Sessions with a write of the app's own in flight; `true`: asked again meanwhile. */
   const writing = new Map<string, boolean>();
@@ -210,6 +216,7 @@ export function startSessionData(options: SessionDataOptions): SessionData {
     }
     const held = records?.get(id);
     const record = held?.value ?? null;
+    if (record !== null && record.startedByRunner?.job === runnerJobs.get(id)) runnerJobs.delete(id);
     let problem = held?.problem ?? null;
     if (records !== null && held === undefined) {
       const firstRun = adoptedAt();
@@ -388,6 +395,12 @@ export function startSessionData(options: SessionDataOptions): SessionData {
     bind(sessionId, projectId) {
       if (boundIn.has(sessionId)) return;
       boundIn.set(sessionId, projectId);
+      mark(sessionId);
+    },
+
+    markStartedByRunner(sessionId, job) {
+      if (records?.get(sessionId)?.value?.startedByRunner?.job === job) return;
+      runnerJobs.set(sessionId, job);
       mark(sessionId);
     },
 

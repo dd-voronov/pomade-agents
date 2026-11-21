@@ -3,6 +3,8 @@
 // — and the agent tabs: which session each one is bound to, where it runs and what its agent is
 // doing (`agentTabs.list`, again on `pomade.ready`, then every `agentTab.changed`; pomade:E-033) —
 // and every end of an agent process in a tab, with the session bound to it then (`agentTab.exited`).
+// Runner's run started / run finished (`pomade-runner:run.started`, `pomade-runner:run.finished`)
+// come through the same bus, as Runner publishes them; the app never calls Runner.
 // Subscriptions end with the connection; the next one sets them up again.
 
 import { realpath } from "node:fs/promises";
@@ -11,6 +13,7 @@ import { join } from "node:path";
 import type { AgentTabExitedPayload, AgentTabInfo, ProjectInfo } from "pomade-kit/protocol";
 import type { HostClient } from "pomade-kit/sdk";
 
+import { RUN_FINISHED_EVENT, RUN_STARTED_EVENT } from "../../shared/runner-events.ts";
 import type { ProjectPlace } from "../sessions/attribution.ts";
 
 /** Where the facts go: the session data and the live state. */
@@ -23,6 +26,10 @@ export interface PlatformFacts {
   tabChanged(tab: AgentTabInfo, closed: boolean): void;
   /** An agent process in a tab ended. */
   tabExited(exited: AgentTabExitedPayload): void;
+  /** Runner's run started, its payload as it crossed the bus. */
+  runStarted(payload: unknown): void;
+  /** Runner's run finished, its payload as it crossed the bus. */
+  runFinished(payload: unknown): void;
 }
 
 export interface FollowOptions {
@@ -78,6 +85,8 @@ export function followPomade(host: HostClient, facts: PlatformFacts, { workspace
         facts.tabChanged(tab, changes.includes("closed"));
       }),
       host.events.subscribe("agentTab.exited", (exited) => facts.tabExited(exited)),
+      host.events.subscribe(RUN_STARTED_EVENT, (payload) => facts.runStarted(payload)),
+      host.events.subscribe(RUN_FINISHED_EVENT, (payload) => facts.runFinished(payload)),
       host.events.subscribe("pomade.ready", () => {
         run("list the projects", loadProjects);
         run("list the agent tabs", loadTabs);

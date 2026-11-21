@@ -41,7 +41,7 @@ export type SessionEventBase = {
 };
 
 /** Why a session's process ended. Subscribers treat a reason they do not know as an end too. */
-export type SessionClosedReason = "exit" | "tab-closed" | "crash";
+export type SessionClosedReason = "exit" | "tab-closed" | "crash" | "run-finished";
 
 export type SessionClosedEvent = SessionEventBase & {
   reason: SessionClosedReason;

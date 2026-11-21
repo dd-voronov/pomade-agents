@@ -3,7 +3,8 @@
 //
 // First sight: on the first run (the adoption) every session is Done; later, a session started
 // before the adoption is Done too (its record went missing, or it ran on another Mac), and any other
-// is Active and "outside Pomade" until a Pomade tab is seen bound to it.
+// is Active and "outside Pomade" until a Pomade tab is seen bound to it. A session a Runner agent
+// run started carries the job's name (`startedByRunner`) from the moment the app hears of the run.
 
 
 import type { SessionRecord, SessionSummary } from "../../shared/sessions.ts";
@@ -17,6 +18,8 @@ export interface RecordContext {
   boundIn: string | null;
   /** Pomade's projects in sidebar order; `null` while not known. */
   projects: readonly ProjectPlace[] | null;
+  /** The name of the Runner job whose agent run started the session; `null`: none known this backend run. */
+  runnerJob: string | null;
 }
 
 /** A session id that can name its record file: no path separators, no leading dot. */
@@ -46,11 +49,12 @@ export function newRecord(context: RecordContext, adoptedAt: string | null): Ses
 }
 
 /** The record with the fields the app keeps current: the transcript and start folder, the first
- *  binding to a tab, and the effective project with its root as Pomade names it now. Everything
- *  else — name, status, note, a Move to project — stays as it is. */
-export function refreshRecord(record: SessionRecord, { summary, boundIn, projects }: RecordContext): SessionRecord {
+ *  binding to a tab, the Runner job that started it, and the effective project with its root as
+ *  Pomade names it now. Everything else — name, status, note, a Move to project — stays as it is. */
+export function refreshRecord(record: SessionRecord, { summary, boundIn, projects, runnerJob }: RecordContext): SessionRecord {
   const next: SessionRecord = { ...record, transcript: summary.transcript };
   if (summary.cwd !== null) next.cwd = summary.cwd;
+  if (runnerJob !== null) next.startedByRunner = { job: runnerJob };
   if (boundIn !== null) {
     delete next.outsidePomade;
     if (next.launchedFrom === undefined) next.launchedFrom = boundIn;
