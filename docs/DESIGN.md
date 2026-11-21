@@ -152,31 +152,91 @@ Also:
 
 ### 2.7 Sessions tab
 
-- **Scope** follows Pomade's sidebar selection: a project → that project's sessions; Workspace
-  → all sessions, with a Project column and filter.
-- **Groups**, top to bottom: Active · On hold · Done · Done–skip/Failed. None is ever hidden.
-  Within each group, rows are sorted by last activity.
-- **Row:** live state · name · agent · provider · model + effort · context % · ~$ est. · last
-  active. The note sits under the row.
-- **Filters:** agent, folder, and search over names and messages. Multi-select + **bulk Set
-  status**.
-- **Detail panel on the right:**
-  - start folder, start time
-  - first message, last message, last agent answer ("show more" expands in place)
-  - **Open / Resume · Set status (+ note) · Rename · Move to project**
-- The layout above is the agreed starting point. It's groomed with prototypes before it's built
-  (`T-001`).
+The tab has two layouts and moves between them by selection: the **table** while no session is
+selected, the **list with the detail panel** once one is.
+
+**Both layouts**
+
+- **Scope** is the tab's project: a project's tab shows that project's sessions; the Workspace's
+  tab shows every session, with the project named on each row and a Project filter (its
+  "Workspace (no project)" entry is the Workspace bucket).
+- **Header:** "Sessions", the scope's name, the session count and the sum of ~$ est.
+  (Done–skip/Failed left out).
+- **Statuses**, in order: Active · On hold · Done · Done–skip/Failed. Rows are sorted by last
+  activity, newest first. Done and Done–skip/Failed show their latest 10 with "Show all N" when
+  they hold more than 12.
+- **Marks:** status is a small colored square; live state is a round mark — a spinner for
+  Working, a red dot for Needs you, a grey dot for Idle, nothing for Closed.
+- **Name:** the session's name, or the first message in grey when it is unnamed; a fork mark;
+  chips for an unattended run (⏱ + job name), "shared folder" and "outside Pomade".
+- **Context %** is a bar with the number: amber from 75 %, red from 90 %. A model missing from
+  the price table shows "—" for context and cost.
+- **The note** sits under its row.
+- **Search** covers names, the first and last message, the last agent answer and notes; a match
+  outside what the row shows adds a snippet line under it ("Last message: …"), and matches are
+  highlighted. **Filters:** agent, folder (workspace-relative paths in the Workspace scope) and,
+  in the Workspace scope, project. While a search or filter is on, the toolbar shows the match
+  count and "Clear".
+- **Selecting several:** the row's checkbox, Cmd+click, Shift+click or Shift+arrows for a range,
+  Space, Cmd+A. While rows are checked a bar replaces the toolbar: "N selected", **Set status**
+  with the four statuses, Clear. Bulk sets no note.
+- **Changing a status:** the detail panel, the bulk bar, the row menu (right-click, or ⋯ on
+  hover), or dragging rows onto a status (a group header, a status tab). Every change shows a
+  toast with **Undo**.
+- **Keys:** ↑ ↓ move, Space checks, Enter opens or resumes, F2 renames, `/` focuses search, Esc
+  clears the checks, then closes the detail panel.
+- **Empty states:** no sessions in this scope; nothing matches (with "Clear search and
+  filters"); a line in each empty status.
+- **Sessions hidden from the tab** — today those that hold only a `/clear` — are left out of the
+  rows, counts and sums; the header says how many are hidden and shows them on request.
+- Light theme only. One density.
 - Deep reading = Resume. There is no transcript viewer in v1.
+
+**Table — nothing selected.** One scrolling table over the full width:
+
+- A column header, then four collapsible groups with sticky headers; each header carries the
+  status mark, the count and the group's ~$ sum (Done–skip/Failed: "not in totals"). No group is
+  ever hidden.
+- One 28 px line per session: checkbox · live mark · name · project (Workspace scope) · agent ·
+  model · effort · context % · ~$ est. · last active · Open/Resume and ⋯ on hover.
+- As the tab narrows, columns go in this order: effort → model → ~$ est. → context % → agent.
+  The name and last active always stay.
+
+**List with the detail panel — a session selected.** Clicking a row selects it and the tab
+becomes two panes:
+
+- **Left, the list:** status tabs with counts on top (the selected session's status is the open
+  tab); below, that status's sessions as two-line rows — name, agent and last active; then
+  project (Workspace scope) · agent · model · effort, context % and ~$ est. While a search or
+  filter is on, the list shows the matches of every status, grouped, instead of one tab.
+- **Right, the detail panel**, over the rest of the width:
+  - the name (click or F2 to rename in place), close
+  - live state and since when, or last active
+  - **Open tab / Resume · Rename · Move to project**
+  - notes for a Runner-started session, a fork (with a link to its parent), a shared folder,
+    outside Pomade
+  - **Status** as four buttons, with the one-line note field under them
+  - facts: project, started in (folder relative to the project, branch), started, last active,
+    agent and provider, model and effort, context %, ~$ est.
+  - first message, last message, last agent answer — long texts are clamped, "Show more"
+    expands in place
+- Closing the panel (its ×, or Esc) returns to the table.
 
 ### 2.8 Live now panel
 
-- **Every running session**, grouped by project, with the active project first.
-  - Row: name, live state, since when.
+- **Header:** "Live now" with "N running · M need you"; under it the **Sessions** and
+  **Roster** buttons.
+- **Every running session**, grouped by project, the active project first with a "current"
+  tag; clicking a group header switches to that project.
+  - Within a project: Needs you → Working → Idle, then the most recent.
+  - Row, two lines: the name (or the first message in grey) and since when; then the live state
+    in words and the agent.
   - Unattended runs show ⏱ and the job name.
 - **Click a row:**
   - an agent tab → Pomade switches to its project and focuses the tab
   - a Runner run → its attached terminal tab opens
 - **The Agents icon's badge** counts the sessions in **Needs you**.
+- **Nothing running:** "No agents running".
 - The red unread dots on tabs and the per-project counters are the platform's and stay as they
   are.
 
@@ -200,7 +260,7 @@ room for future per-agent files (custom modes, own harness).
 
 ```yaml
 id: claude-libra
-provider: claude-code          # claude-code | codex
+provider: claude               # claude | codex — Pomade's roster names
 kind: folder                   # builtin | folder
 configDir: Agents/claude-libra # workspace-relative; builtins: ~/.claude, ~/.codex
 command: claude-libra          # what Pomade types to launch it
@@ -254,9 +314,10 @@ Each card shows:
 | Mode | Claude Code | Codex |
 |---|---|---|
 | Normal | the agent's own settings, no flags | default approvals |
-| Full autonomy | `--dangerously-skip-permissions` | `--yolo` |
+| Full autonomy | `--dangerously-skip-permissions` | `--dangerously-bypass-approvals-and-sandbox` |
 
-- **The modes come from the provider and are listed in `agent.yaml`.**
+- **The modes come from the provider and are listed in `agent.yaml`**, each with its own
+  arguments — the shape Pomade's "+" menu reads from `roster.list`, with no translation.
 - A disabled mode is offered nowhere: not in the "+" menu, not by Runner.
 - **A launch spec** = the command line for an (agent, mode, resume id?, prompt?) combination.
   Pomade's "+" menu and Runner both build their launches from it.
