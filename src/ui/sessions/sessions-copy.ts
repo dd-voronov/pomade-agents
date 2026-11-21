@@ -21,3 +21,12 @@ export function applyAnswer(copy: SessionsCopy | null, answer: SessionsAnswer): 
 export function isBehind(copy: SessionsCopy | null, notice: SessionsSince): boolean {
   return copy === null || copy.since.epoch !== notice.epoch || copy.since.revision < notice.revision;
 }
+
+/** The copy with the sessions a change method answered (`SessionsUpdated`) as they are now; the
+ *  next `sessions.list` answer brings the same, so `since` stays. */
+export function applyUpdated(copy: SessionsCopy, sessions: readonly Session[]): SessionsCopy {
+  if (sessions.length === 0) return copy;
+  const next = new Map(copy.byId);
+  for (const session of sessions) next.set(session.id, session);
+  return { ...copy, byId: next };
+}

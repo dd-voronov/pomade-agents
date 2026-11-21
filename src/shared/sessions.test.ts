@@ -6,6 +6,7 @@ import {
   isSessionRecord,
   isSessionsAnswer,
   isSessionsChanged,
+  isSessionsUpdated,
   isSessionSummary,
   type SessionRecord,
   type SessionSummary,
@@ -40,6 +41,8 @@ describe("sessions shapes", () => {
     expect(isSessionsAnswer({ epoch: "e", revision: 2, full: false, sessions: [session], removed: ["x"], indexing: false, recordsOff: null })).toBe(true);
     expect(isSessionsAnswer({ epoch: "e", revision: 2, full: true, sessions: [], removed: [], indexing: true, recordsOff: "No workspace" })).toBe(true);
     expect(isSessionsChanged({ epoch: "e", revision: 0 })).toBe(true);
+    expect(isSessionsUpdated({ sessions: [session] })).toBe(true);
+    expect(isSessionsUpdated({ sessions: [] })).toBe(true);
   });
 
   it("refuses anything else", () => {
@@ -55,6 +58,8 @@ describe("sessions shapes", () => {
     expect(isSession(testSession({ attribution: { projects: [], by: "guess" as "folder", sharedFolder: false } }))).toBe(false);
     expect(isSessionsChanged({ epoch: "e" })).toBe(false);
     expect(isSessionsChanged(null)).toBe(false);
+    expect(isSessionsUpdated({ sessions: [{ id: "s" }] })).toBe(false);
+    expect(isSessionsUpdated({})).toBe(false);
   });
 
   it("takes a session record with its own keys only, names and notes one line", () => {

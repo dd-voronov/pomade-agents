@@ -98,3 +98,41 @@ export function NoteIcon({ size = 16 }: IconProps): ReactElement {
     </Glyph>
   );
 }
+
+/** A cross — close. */
+export function CloseIcon({ size = 16 }: IconProps): ReactElement {
+  return (
+    <Glyph size={size}>
+      <path d="M4 4l8 8M12 4l-8 8" />
+    </Glyph>
+  );
+}
+
+/** A folder — a session's start folder. */
+export function FolderIcon({ size = 16 }: IconProps): ReactElement {
+  return (
+    <Glyph size={size}>
+      <path d="M2 4.5c0-.6.4-1 1-1h3.2l1.5 1.5H13c.6 0 1 .4 1 1v6c0 .6-.4 1-1 1H3c-.6 0-1-.4-1-1z" />
+    </Glyph>
+  );
+}
+
+/** An "i" in a circle — a note about the session. */
+export function InfoIcon({ size = 16 }: IconProps): ReactElement {
+  return (
+    <Glyph size={size}>
+      <circle cx="8" cy="8" r="6" />
+      <path d="M8 7.25V11M8 5v.01" />
+    </Glyph>
+  );
+}
+
+/** A triangle with "!" — a change that did not go through. */
+export function WarningIcon({ size = 16 }: IconProps): ReactElement {
+  return (
+    <Glyph size={size}>
+      <path d="M8 2.5l6 10.5H2z" />
+      <path d="M8 6.5v3M8 11.25v.01" />
+    </Glyph>
+  );
+}

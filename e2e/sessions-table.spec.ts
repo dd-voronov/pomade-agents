@@ -13,7 +13,7 @@ import type { JsonValue } from "pomade-kit/protocol";
 import type { FakePomade } from "../harness/fake-pomade/server.ts";
 import type { Sandbox } from "../harness/sandbox.ts";
 import { SESSIONS_LIST_METHOD, SESSIONS_SET_STATUS_METHOD, isSessionsAnswer, type Session } from "../src/shared/sessions.ts";
-import { costSum, formatHeaderSum, formatMoney } from "../src/ui/sessions/table-model.ts";
+import { columnsFor, costSum, formatHeaderSum, formatMoney } from "../src/ui/sessions/table-model.ts";
 import { expect, test, type Shell } from "./fixtures.ts";
 import { answer, claudeSession, projectFolder, prompt, seedIntoProject } from "./transcripts.ts";
 
@@ -157,7 +157,11 @@ test.describe("a project's sessions", () => {
     const all: string[] = [];
     for (let width = 1600; width >= 400; width -= 20) {
       await page.setViewportSize({ width, height: 640 });
-      all.push((await table.getAttribute("data-columns")) ?? "");
+      // The table measures itself after the resize: wait until it shows the columns its width fits.
+      const fits = columnsFor(await table.evaluate((el) => el.clientWidth), false);
+      const shown = (Object.keys(fits) as (keyof typeof fits)[]).filter((column) => fits[column]).join(" ");
+      await expect(table).toHaveAttribute("data-columns", shown);
+      all.push(shown);
     }
     expect(all.filter((columns, i) => columns !== all[i - 1])).toEqual(["effort model cost context agent", "model cost context agent", "cost context agent", "context agent", "agent", ""]);
     await expect(row(alpha, SEEDED.claude).getByTestId("cell-name")).toBeVisible();

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { SessionsAnswer } from "../../shared/sessions.ts";
 import { testSession } from "../../shared/test-sessions.ts";
-import { applyAnswer, isBehind } from "./sessions-copy.ts";
+import { applyAnswer, applyUpdated, isBehind } from "./sessions-copy.ts";
 
 const answer = (a: Partial<SessionsAnswer>): SessionsAnswer => ({
   epoch: "e1",
@@ -38,5 +38,16 @@ describe("the UI's copy of the sessions", () => {
     expect(isBehind(copy, { epoch: "e1", revision: 4 })).toBe(false);
     expect(isBehind(copy, { epoch: "e1", revision: 5 })).toBe(true);
     expect(isBehind(copy, { epoch: "e2", revision: 1 })).toBe(true);
+  });
+
+  it("takes the sessions a change answered, keeping the others and where it stands", () => {
+    const copy = applyAnswer(null, answer({ revision: 4, sessions: [testSession({ id: "a" }), testSession({ id: "b" })] }));
+    const onHold = testSession({ id: "b", record: { id: "b", provider: "claude-code", agent: "claude", status: "on-hold", note: "later" } });
+    const updated = applyUpdated(copy, [onHold]);
+    expect([...updated.byId.keys()]).toEqual(["a", "b"]);
+    expect(updated.byId.get("b")?.record).toMatchObject({ status: "on-hold", note: "later" });
+    expect(updated.since).toEqual(copy.since);
+    expect(copy.byId.get("b")?.record?.status).toBe("active");
+    expect(applyUpdated(copy, [])).toBe(copy);
   });
 });

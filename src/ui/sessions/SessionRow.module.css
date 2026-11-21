@@ -3,11 +3,18 @@
 
 .row {
   padding: 0 var(--space-2);
+  cursor: default;
   transition: background var(--dur-fast) var(--ease);
 }
 
 .row:hover {
   background: var(--hover-bg);
+}
+
+/* The row selected before the detail panel closed: where ↑ ↓ go on from. */
+.row[data-last-selected] {
+  background: var(--accent-soft);
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 
 .line {
@@ -41,124 +48,13 @@
   padding-left: var(--name-indent);
 }
 
-.nameText {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: var(--fw-medium);
-}
-
-.nameText[data-unnamed] {
-  color: var(--text-faint);
-  font-weight: 400;
-}
-
-.fork {
-  display: inline-flex;
-  flex: none;
-  color: var(--text-faint);
-}
-
-/* Chips show whole or not at all: those that do not fit wrap onto a clipped second line, and the
-   cap keeps room for the name. */
-.chips {
-  display: flex;
-  flex: none;
-  flex-wrap: wrap;
-  gap: 4px 6px;
-  max-width: calc(100% - 84px);
-  height: 16px;
-  overflow: hidden;
-}
-
-/* A zero-width first item, so even a lone chip that is too wide wraps away instead of being cut. */
-.chips::before {
-  content: "";
-  flex: none;
-  width: 0;
-  height: 16px;
-  margin-right: -6px;
-}
-
-.chip {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  gap: 3px;
-  height: 16px;
-  padding: 0 5px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  color: var(--text-muted);
-  font-size: 10.5px;
-  font-weight: var(--fw-medium);
-  line-height: 14px;
-  white-space: nowrap;
-}
-
-.chip[data-kind="runner"] {
-  border-color: transparent;
-  background: var(--accent-soft);
-  color: var(--badge-fg);
-}
-
-.chip svg {
-  flex: none;
-}
-
 .effort {
-  color: var(--text-faint);
-}
-
-.dash {
   color: var(--text-faint);
 }
 
 .contextCell {
   display: flex;
   align-items: center;
-}
-
-.context {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-variant-numeric: tabular-nums;
-}
-
-.bar {
-  flex: none;
-  width: 28px;
-  height: 4px;
-  border-radius: 2px;
-  background: var(--active-bg);
-  overflow: hidden;
-}
-
-.fill {
-  display: block;
-  height: 100%;
-  border-radius: 2px;
-  background: var(--text-faint);
-}
-
-.context[data-level="high"] .fill {
-  background: var(--warning);
-}
-
-.context[data-level="high"] .percent {
-  color: var(--warning);
-}
-
-.context[data-level="full"] .fill {
-  background: var(--danger);
-}
-
-.context[data-level="full"] .percent {
-  color: var(--danger);
-  font-weight: var(--fw-semibold);
 }
 
 /* The note sits under its row, from the name's start. */

@@ -1,12 +1,13 @@
-// The workspace's project names by stable id, from Pomade's project list (`project.list`, the
-// `project.read` capability); asked again when a project is created or renamed. `null` until the
-// first answer.
+// The workspace's projects by stable id — names and workspace-relative roots — from Pomade's
+// project list (`project.list`, the `project.read` capability); asked again when a project is
+// created or renamed. `null` until the first answer.
 
 import { useEffect, useState } from "react";
+import type { ProjectRef } from "pomade-kit/protocol";
 import type { HostClient } from "pomade-kit/sdk";
 
-export function useProjectNames(host: HostClient): ReadonlyMap<string, string> | null {
-  const [names, setNames] = useState<ReadonlyMap<string, string> | null>(null);
+export function useProjects(host: HostClient): ReadonlyMap<string, ProjectRef> | null {
+  const [projects, setProjects] = useState<ReadonlyMap<string, ProjectRef> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -15,7 +16,7 @@ export function useProjectNames(host: HostClient): ReadonlyMap<string, string> |
       const mine = ++asked;
       try {
         const list = await host.project.list();
-        if (!cancelled && mine === asked) setNames(new Map(list.projects.map((p) => [p.id, p.name])));
+        if (!cancelled && mine === asked) setProjects(new Map(list.projects.map((p) => [p.id, p])));
       } catch {
         // Names fall back to the welcome's scope name and project ids until the next change asks again.
       }
@@ -28,5 +29,5 @@ export function useProjectNames(host: HostClient): ReadonlyMap<string, string> |
     };
   }, [host]);
 
-  return names;
+  return projects;
 }

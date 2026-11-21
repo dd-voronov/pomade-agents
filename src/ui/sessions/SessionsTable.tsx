@@ -1,6 +1,8 @@
 // The Sessions table (DESIGN §2.7 "Table — nothing selected"): one scrolling list with a sticky
 // column header and the four collapsible status groups. It measures its own width and shows the
-// columns that fit; which groups are collapsed or expanded is kept while the sessions change.
+// columns that fit. Which groups are collapsed or expanded is the tab's, so it stays while the
+// sessions change and across the detail panel. Opened again from the panel, it scrolls to the row
+// that was selected.
 
 import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactElement, type RefObject } from "react";
 import { SESSION_STATUSES, type SessionStatus } from "pomade-kit/protocol";
@@ -20,13 +22,15 @@ export interface SessionsTableProps {
   /** Every session the UI holds, by id: a fork's parent may be outside the scope. */
   byId: ReadonlyMap<string, Session>;
   now: Date;
+  collapsed: ReadonlySet<SessionStatus>;
+  /** Long groups that show all their rows. */
+  expanded: ReadonlySet<SessionStatus>;
+  onToggleCollapsed: (status: SessionStatus) => void;
+  onToggleExpanded: (status: SessionStatus) => void;
+  /** The row selected before the detail panel closed: marked, and scrolled into view when the table opens. */
+  lastSelected: string | null;
+  onSelect: (id: string) => void;
 }
-
-const toggled = (set: ReadonlySet<SessionStatus>, status: SessionStatus): Set<SessionStatus> => {
-  const next = new Set(set);
-  if (!next.delete(status)) next.add(status);
-  return next;
-};
 
 function useWidth(): [RefObject<HTMLDivElement>, number | null] {
   const ref = useRef<HTMLDivElement>(null);
@@ -80,10 +84,27 @@ function ColumnHeader({ columns }: { columns: Columns }): ReactElement {
   );
 }
 
-export function SessionsTable({ groups, workspace, names, byId, now }: SessionsTableProps): ReactElement {
+export function SessionsTable({
+  groups,
+  workspace,
+  names,
+  byId,
+  now,
+  collapsed,
+  expanded,
+  onToggleCollapsed,
+  onToggleExpanded,
+  lastSelected,
+  onSelect,
+}: SessionsTableProps): ReactElement {
   const [ref, width] = useWidth();
-  const [collapsed, setCollapsed] = useState<ReadonlySet<SessionStatus>>(new Set());
-  const [expanded, setExpanded] = useState<ReadonlySet<SessionStatus>>(new Set());
+  const revealed = useRef(lastSelected);
+  useLayoutEffect(() => {
+    const id = revealed.current;
+    if (id === null) return;
+    const row = ref.current?.querySelector(`[data-session-id="${CSS.escape(id)}"]`);
+    row?.scrollIntoView({ block: "center" });
+  }, [ref]);
   // Until the first measure (before paint) every column is laid out.
   const columns = columnsFor(width ?? Infinity, workspace);
   const shown = Object.entries(columns)
@@ -102,9 +123,20 @@ export function SessionsTable({ groups, workspace, names, byId, now }: SessionsT
           sessions={groups[status]}
           collapsed={collapsed.has(status)}
           expanded={expanded.has(status)}
-          onToggleCollapsed={(s) => setCollapsed((set) => toggled(set, s))}
-          onToggleExpanded={(s) => setExpanded((set) => toggled(set, s))}
-          row={(session) => <SessionRow key={session.id} session={session} columns={columns} names={names} fork={forkTooltip(session, byId)} now={now} />}
+          onToggleCollapsed={onToggleCollapsed}
+          onToggleExpanded={onToggleExpanded}
+          row={(session) => (
+            <SessionRow
+              key={session.id}
+              session={session}
+              columns={columns}
+              names={names}
+              fork={forkTooltip(session, byId)}
+              now={now}
+              lastSelected={session.id === lastSelected}
+              onSelect={onSelect}
+            />
+          )}
         />
       ))}
     </div>

@@ -52,3 +52,11 @@
   color: var(--text);
   font-size: var(--fs-sm);
 }
+
+/* The list and the detail panel side by side; each scrolls on its own. */
+.split {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  border-top: 1px solid var(--border);
+}

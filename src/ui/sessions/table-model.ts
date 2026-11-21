@@ -13,6 +13,15 @@ export const STATUS_LABELS: Record<SessionStatus, string> = {
   "done-skip": "Done–skip/Failed",
 };
 
+/** The statuses where room is short — the list's status tabs and the detail panel's status buttons;
+ *  each carries its full label as a tooltip. */
+export const STATUS_SHORT_LABELS: Record<SessionStatus, string> = {
+  active: "Active",
+  "on-hold": "On hold",
+  done: "Done",
+  "done-skip": "Skip/Failed",
+};
+
 /** The one line an empty group shows. */
 export const EMPTY_GROUP_TEXT: Record<SessionStatus, string> = {
   active: "Nothing active. New sessions start here.",

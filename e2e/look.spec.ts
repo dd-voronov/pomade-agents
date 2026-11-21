@@ -2,6 +2,8 @@
 // review land in e2e/artifacts/. The app is light only, whatever the system appearance.
 
 import { mkdirSync } from "node:fs";
+import { chmod } from "node:fs/promises";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { Sandbox } from "../harness/sandbox.ts";
@@ -111,6 +113,104 @@ test.describe("the Sessions table", () => {
     await expect(workspace.getByTestId("sessions-count")).toHaveAttribute("data-count", String(3 + ALPHA.length + BETA.length + 1));
     await workspace.getByTestId("group-toggle-done").click();
     await page.screenshot({ path: `${ARTIFACTS}/sessions-workspace.png`, animations: "disabled" });
+    expect(backend.running()).toBe(true);
+  });
+});
+
+const DETAIL = "4d4d4d4d-0000-4000-8000-000000000001";
+const DETAIL_ANSWER = [
+  "Here is the shorter version, five bullets per section:",
+  "",
+  "1. The table shows while nothing is selected; a click opens the list with the detail panel.",
+  "2. The open status tab follows the selected session; another tab keeps the selection.",
+  "3. The status is four buttons; the note under them is saved on Enter or when you leave it.",
+  "4. A refused change says so in the panel and leaves the row as it was.",
+  "5. Esc or the close button returns to the table, scrolled to the row.",
+  "",
+  "I left the toolbar, the bulk bar and Resume out: they arrive with their own tickets.",
+  "Shall I also cut the glossary section down to the four new names?",
+].join("\n");
+
+/** `seedLook`, plus a session started in Alpha's `docs/` on a branch, with two prompts and a long answer. */
+async function seedDetailLook(sandbox: Sandbox): Promise<void> {
+  await seedLook(sandbox);
+  const docs = join(projectFolder(sandbox, "alpha"), "docs");
+  await claudeSession(
+    sandbox,
+    DETAIL,
+    prompt(
+      [
+        "Write the sessions doc for the detail panel: what the list shows, what the panel shows, which keys move the selection, and what happens when a change cannot be written.",
+        "Keep it in the voice of the other docs: present tense, no history.",
+        "Put the keys in a table.",
+        "Mention that the selection is kept in the tab's route, so a reload keeps it.",
+        "Then list what is left for the next tickets.",
+      ].join("\n"),
+      "2026-11-17T08:00:00.000Z",
+      docs,
+      "feature/session-detail",
+    ) +
+      answer({ model: "claude-opus-5-5", effort: "high", input: 420_000, output: 9000, at: "2026-11-17T08:04:00.000Z", cwd: docs, text: "A first draft." }) +
+      prompt("Make it shorter: five bullets per section at most", "2026-11-17T08:20:00.000Z", docs, "feature/session-detail") +
+      answer({ model: "claude-opus-5-5", effort: "high", input: 450_000, output: 3000, at: "2026-11-17T08:22:00.000Z", cwd: docs, text: DETAIL_ANSWER }),
+  );
+}
+
+test.describe("the list with the detail panel", () => {
+  test.use({ seed: { into: seedDetailLook } });
+
+  test("a project, a long answer, a refused change, a narrow tab, the Workspace and the table after Esc", async ({ page, openShell, pomade, sandbox, manifest, backend }) => {
+    const set = (list: string[], status: string, note?: string) => pomade.fake.callApi(SESSIONS_SET_STATUS_METHOD, note === undefined ? { ids: list, status } : { ids: list, status, note });
+    await expect.poll(async () => set([...ALPHA, ...BETA, DETAIL], "done").then(() => true, () => false), { timeout: 10_000 }).toBe(true);
+    await set([ALPHA[0] ?? "", ALPHA[1] ?? "", ALPHA[3] ?? "", SEEDED_CLAUDE, DETAIL], "active");
+    await set([ALPHA[4] ?? ""], "on-hold", "Waiting for my live test of the grey active border");
+    await set([SEEDED_CODEX], "done-skip", "Wrong approach, restarted in a new session");
+    await set([DETAIL], "active", "Review the bullets before the round");
+
+    const { panel, tabFrame } = await openShell(page);
+    await panel.getByTestId("open-sessions").click();
+    const alpha = tabFrame("alpha");
+    await alpha.locator(`[data-testid="session-row"][data-session-id="${DETAIL}"]`).click();
+    await expect(alpha.getByTestId("detail-panel")).toBeVisible();
+    await alpha.locator(`[data-testid="session-row"][data-session-id="${ALPHA[1] ?? ""}"]`).hover();
+    await page.screenshot({ path: `${ARTIFACTS}/detail-project.png` });
+
+    await alpha.getByTestId("last-answer-more").click();
+    await alpha.getByTestId("first-message-more").click();
+    await page.mouse.move(0, 0);
+    await page.screenshot({ path: `${ARTIFACTS}/detail-expanded.png` });
+    await alpha.getByTestId("detail-panel").evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
+    await page.screenshot({ path: `${ARTIFACTS}/detail-expanded-scrolled.png` });
+    await alpha.getByTestId("detail-panel").evaluate((el) => el.scrollTo({ top: 0 }));
+
+    const folder = join(sandbox.workspace, "Apps", manifest.id, "sessions");
+    await chmod(folder, 0o555);
+    try {
+      await alpha.getByTestId("status-on-hold").click();
+      await expect(alpha.getByTestId("change-failure")).toBeVisible();
+      await alpha.getByTestId("note-input").focus();
+      await page.screenshot({ path: `${ARTIFACTS}/detail-failed.png` });
+    } finally {
+      await chmod(folder, 0o755);
+    }
+    await alpha.getByTestId("detail-name").click();
+
+    await page.setViewportSize({ width: 860, height: 720 });
+    await page.screenshot({ path: `${ARTIFACTS}/detail-narrow.png` });
+    await page.setViewportSize({ width: 1280, height: 720 });
+
+    await page.keyboard.press("Escape");
+    await expect(alpha.getByTestId("sessions-table")).toBeVisible();
+    await page.screenshot({ path: `${ARTIFACTS}/detail-closed-table.png` });
+
+    pomade.fake.setActiveProject(null);
+    await panel.getByTestId("open-sessions").click();
+    const workspace = tabFrame("__workspace__");
+    await workspace.locator(`[data-testid="session-row"][data-session-id="${SEEDED_CODEX}"]`).click();
+    await expect(workspace.getByTestId("detail-panel")).toBeVisible();
+    await page.screenshot({ path: `${ARTIFACTS}/detail-workspace.png` });
+    await workspace.getByTestId("status-tab-done").click();
+    await page.screenshot({ path: `${ARTIFACTS}/detail-workspace-done-tab.png` });
     expect(backend.running()).toBe(true);
   });
 });

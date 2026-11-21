@@ -1,0 +1,43 @@
+.dash {
+  color: var(--text-faint);
+}
+
+.context {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bar {
+  flex: none;
+  width: 28px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--active-bg);
+  overflow: hidden;
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--text-faint);
+}
+
+.context[data-level="high"] .fill {
+  background: var(--warning);
+}
+
+.context[data-level="high"] .percent {
+  color: var(--warning);
+}
+
+.context[data-level="full"] .fill {
+  background: var(--danger);
+}
+
+.context[data-level="full"] .percent {
+  color: var(--danger);
+  font-weight: var(--fw-semibold);
+}

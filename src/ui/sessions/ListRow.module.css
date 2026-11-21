@@ -1,0 +1,93 @@
+/* A two-line row in the list beside the detail panel. */
+
+.row {
+  margin: 0 var(--space-2);
+  padding: 4px var(--space-2);
+  border-radius: var(--radius-sm);
+  cursor: default;
+  scroll-margin: var(--space-1) 0;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.row + .row {
+  margin-top: 1px;
+}
+
+.row:hover {
+  background: var(--hover-bg);
+}
+
+.row[aria-selected="true"] {
+  background: var(--accent-soft);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.first,
+.second {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.first {
+  height: 19px;
+}
+
+.second {
+  height: 18px;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+.when {
+  flex: none;
+  margin-left: auto;
+  padding-left: var(--space-2);
+  color: var(--text-faint);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sep {
+  color: var(--border-strong);
+}
+
+.numbers {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-3);
+  margin-left: auto;
+  padding-left: var(--space-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 18px;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+.note > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note svg {
+  flex: none;
+  color: var(--text-faint);
+}

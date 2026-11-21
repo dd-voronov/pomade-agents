@@ -28,6 +28,7 @@
   --ok: #2f9e6f;
 
   --font-ui: -apple-system, "SF Pro Text", "SF Pro", system-ui, sans-serif;
+  --font-mono: "SF Mono", "Menlo", "Monaco", ui-monospace, monospace;
   --fs-base: 13px;
   --fs-sm: 12px;
   --fs-xs: 11px;

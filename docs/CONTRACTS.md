@@ -35,15 +35,26 @@ One UI bundle; `welcome.surface` and the frame's route pick the view (`src/ui/co
 | Surface | Route | View |
 |---|---|---|
 | panel (the `agents` icon) | any | Live now |
-| tab | `sessions`, `""`, anything else | Sessions |
+| tab | `sessions`, `""`, anything else | Sessions — the table |
+| tab | `sessions/<id>` | Sessions — the list with the detail panel, session `<id>` selected |
 | tab | `roster`, `roster/…` | Roster |
 
 - `sessions` is the route Pomade's History icon opens (HOST-API §4 `apps`, "Platform reads of app
   APIs").
+- **The selection is the route.** `<id>` is the session id, URI-encoded (`sessionsRoute`,
+  `selectedSessionOf`). Selecting a session, moving the selection and closing the panel show at
+  once and ask Pomade to navigate the tab (`tabs.openApp({ route, projectId: <the tab's project> })`);
+  the `route.changed` that answers each of these is not applied again (`src/ui/sessions/useSelection.ts`),
+  any other `route.changed` selects what its route names. A reload and a restart of Pomade open the
+  tab at its last route, so the selection stays. An `<id>` the tab's scope does not hold shows the table.
 - **A tab's scope** is the project it was opened in, `welcome.project`; the tab keeps it and ignores
   `project.changed`. The Workspace project's tab (`"__workspace__"`) shows every session, with a Project
-  column. Project names come from `project.list`, asked again on `project.created` and
-  `project.renamed`.
+  column. Project names and roots come from `project.list`, asked again on `project.created` and
+  `project.renamed`; the detail panel's "started in" is the start folder relative to the project's
+  root under the workspace `app.info` names (else relative to the workspace, else as recorded).
+- **Status and note** are set from the detail panel through `sessions.setStatus` ("Sessions"
+  below), one call at a time; the frame takes the changed sessions from its answer, so the row
+  moves at once, and a refused change leaves the rows as they were.
 - The app has one tab per project — Pomade's icon-less app tab. `tabs.openApp({ route })` opens it
   or navigates it; the frame follows `route.changed`.
 

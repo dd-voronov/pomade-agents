@@ -397,3 +397,8 @@ export function isSessionsAnswer(value: unknown): value is SessionsAnswer {
 export function isSessionsChanged(value: unknown): value is SessionsChanged {
   return isObject(value) && typeof value.epoch === "string" && isCount(value.revision);
 }
+
+/** True for a well-formed answer of a change method (`SessionsUpdated`). */
+export function isSessionsUpdated(value: unknown): value is SessionsUpdated {
+  return isObject(value) && Array.isArray(value.sessions) && value.sessions.every(isSession);
+}

@@ -1,0 +1,68 @@
+/* A session's name in a row; the row lays it out in a flex line. */
+
+.name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--fw-medium);
+}
+
+.name[data-unnamed] {
+  color: var(--text-faint);
+  font-weight: 400;
+}
+
+.fork {
+  display: inline-flex;
+  flex: none;
+  color: var(--text-faint);
+}
+
+/* Chips show whole or not at all: those that do not fit wrap onto a clipped second line, and the
+   cap keeps room for the name. */
+.chips {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  max-width: calc(100% - 84px);
+  height: 16px;
+  overflow: hidden;
+}
+
+/* A zero-width first item, so even a lone chip that is too wide wraps away instead of being cut. */
+.chips::before {
+  content: "";
+  flex: none;
+  width: 0;
+  height: 16px;
+  margin-right: -6px;
+}
+
+.chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 3px;
+  height: 16px;
+  padding: 0 5px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: var(--fw-medium);
+  line-height: 14px;
+  white-space: nowrap;
+}
+
+.chip[data-kind="runner"] {
+  border-color: transparent;
+  background: var(--accent-soft);
+  color: var(--badge-fg);
+}
+
+.chip svg {
+  flex: none;
+}
