@@ -1,6 +1,6 @@
 // The backend process's life: record the run, index the agents' session stores, keep the session
-// records, stay connected to Pomade over its socket — following its projects and agent tabs — and
-// serve the app's API on every connection (HOST-API §2 "Backends"). Pomade starts it with the app
+// records, stay connected to Pomade over its socket — following its projects and agent tabs, which
+// are what runs now — and serve the app's API on every connection (HOST-API §2 "Backends"). Pomade starts it with the app
 // and stops it with SIGTERM.
 
 import type { HostClient } from "pomade-kit/sdk";
@@ -11,9 +11,11 @@ import { SESSIONS_CHANGED_EVENT } from "../../shared/sessions.ts";
 import { createApi } from "../interfaces/api.ts";
 import { followPomade } from "../interfaces/platform.ts";
 import { openRecordStore, type RecordStore } from "../records/record-store.ts";
+import { createLiveState, followTabs } from "../sessions/live-state.ts";
 import { startSessionData } from "../sessions/session-data.ts";
 import { startSessionStore } from "../stores/session-store.ts";
 import { resolveHome, resolveLocations, type Env } from "./locations.ts";
+import { createRealPaths } from "./real-paths.ts";
 import { removeRunRecord, writeRunRecord } from "./run-record.ts";
 
 export interface BackendOptions {
@@ -58,7 +60,10 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
       log(noRecords);
     }
   }
-  const sessions = startSessionData({ summaries: store, records, noRecords, now: options.now, log });
+  const live = createLiveState(options.now);
+  const tabs = followTabs(live);
+  const sessions = startSessionData({ summaries: store, records, noRecords, live, now: options.now, log });
+  const realPath = createRealPaths();
 
   // The UI frames subscribe to the app's own `sessions.changed`; the backend publishes it to them
   // through whichever Pomade connection is up.
@@ -73,14 +78,25 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
       onConnect(connected) {
         host = connected;
         log(`connected to Pomade ${connected.welcome.pomadeVersion}`);
-        connected.api.serve(createApi({ info, sessions })).then(
+        connected.api.serve(createApi({ info, sessions, live, realPath })).then(
           ({ methods }) => log(`serving ${methods.join(", ")}`),
           (err: unknown) => log(`could not serve the API: ${message(err)}`),
         );
-        followPomade(connected, sessions, { workspace: locations.workspace, log });
+        followPomade(
+          connected,
+          {
+            setProjects: (projects) => sessions.setProjects(projects),
+            bind: (sessionId, projectId) => sessions.bind(sessionId, projectId),
+            listTabs: (list) => tabs.list(list),
+            tabChanged: (tab, closed) => tabs.changed(tab, closed),
+          },
+          { workspace: locations.workspace, log },
+        );
       },
       onDisconnect() {
         host = null;
+        // Pomade's agents end with it; a Pomade that comes back lists its tabs again.
+        tabs.list([]);
         log("Pomade went away; reconnecting");
       },
       onRejected(reason) {

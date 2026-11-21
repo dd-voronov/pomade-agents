@@ -1,6 +1,6 @@
 // The sessions the app answers for (DESIGN §2.4, §2.6, §4): each session the stores know joined
-// with its record and the project(s) it shows in, kept current as the transcripts, the records on
-// disk and Pomade's projects and tabs change.
+// with its record, the project(s) it shows in and its live state, kept current as the transcripts,
+// the records on disk, Pomade's projects and tabs and what runs now change.
 //
 // - **First sight.** A session without a record gets one (`rules.ts`). The first run waits for the
 //   first walk of the stores, records every session found then as Done, and only then writes
@@ -33,6 +33,7 @@ import type {
 import { RecordError, type RecordStore } from "../records/record-store.ts";
 import type { SummariesAnswer } from "../stores/session-store.ts";
 import { attribute, type ProjectPlace } from "./attribution.ts";
+import type { LiveState } from "./live-state.ts";
 import { isRecordId, latestSummary, newRecord, refreshRecord, sameRecord, type RecordContext } from "./rules.ts";
 
 const NOTIFY_MS = 150;
@@ -50,6 +51,8 @@ export interface SessionDataOptions {
   /** The record files; `null` when they cannot be kept, `noRecords` says why. */
   records: RecordStore | null;
   noRecords: string;
+  /** What runs now: each session's live state. */
+  live: Pick<LiveState, "ofSession" | "onChange">;
   now: () => Date;
   log: (line: string) => void;
 }
@@ -57,6 +60,8 @@ export interface SessionDataOptions {
 export interface SessionData {
   /** Sessions since `since`, or all of them. */
   answer(since?: SessionsSince): SessionsAnswer;
+  /** Every session as it is now. */
+  list(): Session[];
   /** Called (coalesced) after sessions changed; returns an unsubscribe function. */
   onChange(listener: (changed: SessionsChanged) => void): () => void;
   /** Pomade's projects, in sidebar order. */
@@ -82,7 +87,7 @@ interface Entry {
 }
 
 export function startSessionData(options: SessionDataOptions): SessionData {
-  const { summaries: source, records, noRecords, now, log } = options;
+  const { summaries: source, records, noRecords, live, now, log } = options;
   const epoch = randomUUID();
   let revision = 0;
   let stopped = false;
@@ -196,7 +201,7 @@ export function startSessionData(options: SessionDataOptions): SessionData {
     } else if (record !== null && !sameRecord(refreshRecord(record, contextOf(summary)), record)) {
       refresh(id);
     }
-    put(id, { id, summary, record, recordProblem: problem, attribution: attribute({ cwd: summary.cwd, record, projects }) });
+    put(id, { id, summary, record, recordProblem: problem, attribution: attribute({ cwd: summary.cwd, record, projects }), ...live.ofSession(id) });
   };
 
   const flush = (): void => {
@@ -317,6 +322,9 @@ export function startSessionData(options: SessionDataOptions): SessionData {
   };
 
   const unsubscribeSource = source.onChange(() => pull());
+  const unsubscribeLive = live.onChange((ids) => {
+    for (const id of ids) mark(id);
+  });
   const unsubscribeRecords = records?.onChange((id) => {
     if (id !== null) {
       mark(id);
@@ -336,6 +344,11 @@ export function startSessionData(options: SessionDataOptions): SessionData {
       for (const entry of entries.values()) if (after === null || entry.revision > after) sessions.push(entry.session);
       const gone = after === null ? [] : [...removed].filter(([, at]) => at > after).map(([id]) => id);
       return { epoch, revision, full: after === null, sessions, removed: gone, indexing, recordsOff: recordsOff() };
+    },
+
+    list() {
+      flush();
+      return [...entries.values()].map((entry) => entry.session);
     },
 
     onChange(listener) {
@@ -386,6 +399,7 @@ export function startSessionData(options: SessionDataOptions): SessionData {
     stop() {
       stopped = true;
       unsubscribeSource();
+      unsubscribeLive();
       unsubscribeRecords?.();
       for (const timer of [flushTimer, notifyTimer]) if (timer) clearTimeout(timer);
     },

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { testSession } from "../../shared/test-sessions.ts";
+import { testSession, testSummary } from "../../shared/test-sessions.ts";
 import { createApi, type ApiSources } from "./api.ts";
 
 function api() {
@@ -22,9 +22,11 @@ function api() {
       calls.push(["moveToProject", id, project]);
       return Promise.resolve(testSession({ id }));
     },
+    list: () => [testSession({ id: "a", summary: testSummary({ id: "a", cwd: "/w/repo", branch: "main" }) })],
   };
+  const live = { entries: () => [] };
   const info = { version: "0", startedAt: "", workspace: null, dataDir: null, stateDir: "/s" };
-  return { handlers: createApi({ info, sessions }), calls };
+  return { handlers: createApi({ info, sessions, live, realPath: (p) => Promise.resolve(p) }), calls };
 }
 
 const call = (method: string, params: unknown): unknown => {
@@ -70,5 +72,25 @@ describe("the API's params", () => {
     ["sessions.moveToProject", { id: "a", project: "" }],
   ])("refuses %s with %j as invalid-params", (method, params) => {
     expect(() => call(method, params)).toThrow(expect.objectContaining({ code: "invalid-params" }));
+  });
+
+  it("answers git's questions for a well-formed folder and branch", async () => {
+    const ctx = { from: "pomade" };
+    const { handlers } = api();
+    expect(await handlers["sessions.forRepo"]?.({ folder: "/w" }, ctx)).toMatchObject({ sessions: [{ id: "a", cwd: "/w/repo" }] });
+    expect(await handlers["sessions.forRepo"]?.({ folder: "/w", branch: "other" }, ctx)).toEqual({ sessions: [] });
+    expect(await handlers["sessions.liveIn"]?.({ folder: "/w" }, ctx)).toEqual({ live: false, sessions: [] });
+  });
+
+  it.each<[string, unknown]>([
+    ["sessions.forRepo", null],
+    ["sessions.forRepo", {}],
+    ["sessions.forRepo", { folder: "relative/path" }],
+    ["sessions.forRepo", { folder: "/w", branch: "" }],
+    ["sessions.forRepo", { folder: "/w", branch: 3 }],
+    ["sessions.liveIn", { folder: 1 }],
+    ["sessions.liveIn", { folder: "/w\nx" }],
+  ])("refuses %s with %j as invalid-params", async (method, params) => {
+    await expect(Promise.resolve().then(() => call(method, params))).rejects.toMatchObject({ code: "invalid-params" });
   });
 });

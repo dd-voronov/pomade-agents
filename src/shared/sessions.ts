@@ -1,11 +1,11 @@
 // Sessions as the UI and the backend both know them (docs/CONTRACTS.md "Sessions"): what the
 // backend learns from the providers' transcript stores (the summary, DESIGN §2.2–2.3), the session
-// record the app keeps for each one (DESIGN §4), the project(s) it shows in (DESIGN §2.6), the
-// methods that answer and change them and the event that says they changed.
+// record the app keeps for each one (DESIGN §4), the project(s) it shows in (DESIGN §2.6), its live
+// state (DESIGN §2.4), the methods that answer and change them and the event that says they changed.
 //
 // The shapes are type aliases, so they are JSON values to the broker as they are.
 
-import { AGENT_TAB_TITLE_MAX, SESSION_STATUSES, type SessionStatus } from "pomade-kit/protocol";
+import { AGENT_TAB_TITLE_MAX, SESSION_LIVE_STATES, SESSION_STATUSES, type SessionLiveState, type SessionStatus } from "pomade-kit/protocol";
 
 /** Answers `SessionsAnswer`: every session, or the changes since a revision. */
 export const SESSIONS_LIST_METHOD = "sessions.list";
@@ -124,7 +124,7 @@ export type Attribution = {
   sharedFolder: boolean;
 };
 
-/** One session: what its transcript says, its record, and where it shows. */
+/** One session: what its transcript says, its record, where it shows, and what it is doing now. */
 export type Session = {
   id: string;
   /** The session's latest transcript. */
@@ -134,6 +134,10 @@ export type Session = {
   /** Why the record file cannot be read; the app leaves it alone until it reads again. */
   recordProblem: string | null;
   attribution: Attribution;
+  /** What it is doing now, from the agent tab bound to it; `closed` when none runs it. */
+  live: SessionLiveState;
+  /** When the backend saw it enter `live` (ISO 8601); `null`: Closed, and not seen live since the backend started. */
+  liveSince: string | null;
 };
 
 /** Where a caller's copy stands: the `epoch` and `revision` of the last answer it applied. */
@@ -314,7 +318,9 @@ export function isSession(value: unknown): value is Session {
     isSessionSummary(v.summary) &&
     (v.record === null || isSessionRecord(v.record)) &&
     isStringOrNull(v.recordProblem) &&
-    isAttribution(v.attribution)
+    isAttribution(v.attribution) &&
+    (SESSION_LIVE_STATES as readonly unknown[]).includes(v.live) &&
+    isStringOrNull(v.liveSince)
   );
 }
 

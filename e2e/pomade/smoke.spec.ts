@@ -1,15 +1,19 @@
 // The app inside a real Pomade: dev-linked from its build folder, then installed. It covers what
 // only Pomade can show — the strip icon, the panel and tab frames Pomade creates, its broker
-// between the panel and the backend, and the backend's life with Pomade's.
+// between the panel and the backend, Pomade's own reads of the sessions contract, and the
+// backend's life with Pomade's.
 
 import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { expect, test, type ElectronApplication, type Page } from "@playwright/test";
+import { SESSIONS_APP_ID, SESSIONS_FOR_REPO_METHOD, SESSIONS_LIVE_IN_METHOD, checkLiveIn, checkRepoSessions } from "pomade-kit/protocol";
+import { connectSocket } from "pomade-kit/node";
+import type { HostClient } from "pomade-kit/sdk";
 
 import { BUILD_DIR, readManifest } from "../../harness/app.ts";
-import { createSandbox, fixtureSnapshots, type Sandbox } from "../../harness/sandbox.ts";
+import { SEEDED_TRANSCRIPTS, createSandbox, fixtureSnapshots, type Sandbox } from "../../harness/sandbox.ts";
 import { readRunRecord } from "../../src/backend/core/run-record.ts";
 import { launchPomade, pomadeApps, requireBuiltPomade } from "./pomade.ts";
 
@@ -27,6 +31,19 @@ function alive(pid: number): boolean {
   } catch {
     return false;
   }
+}
+
+/** Pomade's own client (`pomade-git`'s identity: the platform key) on the sandbox's Pomade. */
+async function platformClient(sandbox: Sandbox): Promise<HostClient> {
+  const connected = await connectSocket({
+    socketPath: sandbox.socketPath,
+    appId: "pomade",
+    keyFile: join(sandbox.userData, "app-keys", "pomade"),
+    role: "command",
+    env: {},
+  });
+  if (connected.status !== "connected") throw new Error(`could not reach Pomade as its platform client: ${connected.status}`);
+  return connected.host;
 }
 
 test.describe.configure({ mode: "serial" });
@@ -65,6 +82,21 @@ test.describe("dev-linked into Pomade", () => {
     expect(alive(backendPid)).toBe(true);
   });
 
+  test("Pomade, as the caller pomade, gets well-formed forRepo and liveIn answers", async () => {
+    const host = await platformClient(sandbox);
+    try {
+      const folder = sandbox.workspace;
+      const forRepo = await host.apps.call(SESSIONS_APP_ID, SESSIONS_FOR_REPO_METHOD, { folder });
+      expect(checkRepoSessions(forRepo)).toEqual((forRepo as { sessions: unknown }).sessions);
+      const liveIn = await host.apps.call(SESSIONS_APP_ID, SESSIONS_LIVE_IN_METHOD, { folder });
+      expect(checkLiveIn(liveIn)).toEqual({ ok: true, result: liveIn });
+      // Pomade's own "agent live here?" joins this app's answer with its terminals.
+      expect(await host.agents.liveIn(folder)).toEqual({ live: false, agents: [] });
+    } finally {
+      host.close();
+    }
+  });
+
   test("Sessions and Roster open, focus and navigate the one Agents tab", async () => {
     const panel = page.frameLocator(PANEL_FRAME);
     const tab = page.frameLocator(TAB_FRAME);
@@ -82,7 +114,7 @@ test.describe("dev-linked into Pomade", () => {
     await page.screenshot({ path: join(ARTIFACTS, "in-pomade.png") });
   });
 
-  test("quitting Pomade stops the backend; the stores and Apps/ were never written", async () => {
+  test("quitting Pomade stops the backend; the stores were never written, and Apps/ holds only the app's settings and session records", async () => {
     await app?.close();
     app = null;
     await expect.poll(() => alive(backendPid), { timeout: 10_000 }).toBe(false);
@@ -90,7 +122,9 @@ test.describe("dev-linked into Pomade", () => {
     const fixtures = await fixtureSnapshots();
     const home = await sandbox.snapshot(sandbox.home);
     for (const [path, hash] of Object.entries(fixtures.home)) expect(home[path], path).toBe(hash);
-    expect(await sandbox.snapshot(join(sandbox.workspace, "Apps"))).toEqual({});
+    const apps = Object.keys(await sandbox.snapshot(join(sandbox.workspace, "Apps")));
+    expect(apps.filter((path) => path.startsWith(`${manifest.id}/sessions/`) && path.endsWith(".yaml"))).toHaveLength(Object.keys(SEEDED_TRANSCRIPTS).length);
+    expect(apps.filter((path) => !path.startsWith(`${manifest.id}/sessions/`))).toEqual([`${manifest.id}/settings.yaml`]);
   });
 });
 

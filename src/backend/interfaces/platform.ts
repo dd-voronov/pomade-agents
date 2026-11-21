@@ -1,7 +1,8 @@
 // What the backend learns from Pomade on each connection (HOST-API §4): the projects — their stable
 // ids and folders (`project.list`, again on `project.created`, `project.renamed` and `pomade.ready`)
-// — and which session each agent tab is bound to (`agentTabs.list`, then every `agentTab.changed`;
-// pomade:E-033). Subscriptions end with the connection; the next one sets them up again.
+// — and the agent tabs: which session each one is bound to, where it runs and what its agent is
+// doing (`agentTabs.list`, again on `pomade.ready`, then every `agentTab.changed`; pomade:E-033).
+// Subscriptions end with the connection; the next one sets them up again.
 
 import { realpath } from "node:fs/promises";
 import { join } from "node:path";
@@ -11,10 +12,14 @@ import type { HostClient } from "pomade-kit/sdk";
 
 import type { ProjectPlace } from "../sessions/attribution.ts";
 
-/** Where the facts go: the session data. */
+/** Where the facts go: the session data and the live state. */
 export interface PlatformFacts {
   setProjects(projects: ProjectPlace[]): void;
   bind(sessionId: string, projectId: string): void;
+  /** Every agent tab, as Pomade lists them now. */
+  listTabs(tabs: readonly AgentTabInfo[]): void;
+  /** One agent tab as it is now; `closed`: it left the list. */
+  tabChanged(tab: AgentTabInfo, closed: boolean): void;
 }
 
 export interface FollowOptions {
@@ -53,7 +58,9 @@ export function followPomade(host: HostClient, facts: PlatformFacts, { workspace
     if (tab.sessionId !== null) facts.bind(tab.sessionId, tab.projectId);
   };
   const loadTabs = async (): Promise<void> => {
-    for (const tab of await host.agentTabs.list()) bindTab(tab);
+    const tabs = await host.agentTabs.list();
+    for (const tab of tabs) bindTab(tab);
+    facts.listTabs(tabs);
   };
   const run = (what: string, task: () => Promise<void>): void => {
     task().catch((err: unknown) => log(`pomade: could not ${what}: ${message(err)}`));
@@ -63,7 +70,10 @@ export function followPomade(host: HostClient, facts: PlatformFacts, { workspace
     await Promise.all([
       host.events.subscribe("project.created", () => run("list the projects", loadProjects)),
       host.events.subscribe("project.renamed", () => run("list the projects", loadProjects)),
-      host.events.subscribe("agentTab.changed", ({ tab }) => bindTab(tab)),
+      host.events.subscribe("agentTab.changed", ({ tab, changes }) => {
+        bindTab(tab);
+        facts.tabChanged(tab, changes.includes("closed"));
+      }),
       host.events.subscribe("pomade.ready", () => {
         run("list the projects", loadProjects);
         run("list the agent tabs", loadTabs);

@@ -7,9 +7,9 @@ import { dirname, join } from "node:path";
 
 import { SEEDED_TRANSCRIPTS, type Sandbox } from "../harness/sandbox.ts";
 
-/** One prompt of the user's, as a Claude Code transcript line. */
-export const prompt = (text: string, at: string, cwd = "/fixture/workspace/Projects/alpha"): string =>
-  `${JSON.stringify({ type: "user", message: { role: "user", content: text }, origin: { kind: "human" }, promptSource: "typed", timestamp: at, cwd })}\n`;
+/** One prompt of the user's, as a Claude Code transcript line; `branch` is the git branch it records. */
+export const prompt = (text: string, at: string, cwd = "/fixture/workspace/Projects/alpha", branch?: string): string =>
+  `${JSON.stringify({ type: "user", message: { role: "user", content: text }, origin: { kind: "human" }, promptSource: "typed", timestamp: at, cwd, ...(branch === undefined ? {} : { gitBranch: branch }) })}\n`;
 
 export interface Turn {
   model: string;

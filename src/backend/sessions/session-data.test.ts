@@ -10,6 +10,7 @@ import { testSummary } from "../../shared/test-sessions.ts";
 import { SESSIONS_FOLDER, SETTINGS_FILE, openRecordStore, type RecordStore } from "../records/record-store.ts";
 import type { SummariesAnswer } from "../stores/session-store.ts";
 import type { ProjectPlace } from "./attribution.ts";
+import { createLiveState, followTabs, type LiveState } from "./live-state.ts";
 import { startSessionData, type SessionData, type SummarySource } from "./session-data.ts";
 
 const SOON = { timeout: 2000, interval: 20 };
@@ -52,6 +53,7 @@ describe("the session data", () => {
   let ws: string;
   let records: RecordStore | null = null;
   let data: SessionData | null = null;
+  let live: LiveState = createLiveState(() => clock);
   let clock = new Date(FIRST_RUN);
   const lines: string[] = [];
 
@@ -66,7 +68,8 @@ describe("the session data", () => {
 
   async function start(source: SummarySource, withRecords = true): Promise<SessionData> {
     records = withRecords ? await openRecordStore({ dataDir, now: () => clock, log: (l) => lines.push(l) }) : null;
-    data = startSessionData({ summaries: source, records, noRecords: "No workspace is open", now: () => clock, log: (l) => lines.push(l) });
+    live = createLiveState(() => clock);
+    data = startSessionData({ summaries: source, records, noRecords: "No workspace is open", live, now: () => clock, log: (l) => lines.push(l) });
     return data;
   }
 
@@ -260,6 +263,28 @@ describe("the session data", () => {
     expect(delta.sessions.map((s) => s.id)).toEqual(["b"]);
     expect(d.answer({ epoch: "another", revision: 0 }).full).toBe(true);
     await expect.poll(() => notices.at(-1)?.revision, SOON).toBe(d.answer().revision);
+  });
+
+  it("answers each session's live state, and a change of it as a change since a revision with a notice", async () => {
+    const source = fakeSource();
+    source.put(summary("a"), summary("b"));
+    source.indexed();
+    const d = await start(source, false);
+    expect(session("a")).toMatchObject({ live: "closed", liveSince: null });
+    const notices: SessionsChanged[] = [];
+    d.onChange((n) => notices.push(n));
+    const before = d.answer();
+
+    clock = new Date("2026-11-17T12:30:00.000Z");
+    const tabs = followTabs(live);
+    tabs.list([{ tabId: "t", projectId: "beta", agentId: "claude", cwd: `${ws}/Projects/beta`, launchedAt: null, sessionId: "a", title: "Claude", titleSource: "default", unnamed: false, state: "working" }]);
+    const delta = d.answer({ epoch: before.epoch, revision: before.revision });
+    expect(delta.sessions.map((s) => [s.id, s.live, s.liveSince])).toEqual([["a", "working", "2026-11-17T12:30:00.000Z"]]);
+    await expect.poll(() => notices.at(-1)?.revision, SOON).toBe(d.answer().revision);
+
+    tabs.list([]);
+    expect(session("a")).toMatchObject({ live: "closed", liveSince: "2026-11-17T12:30:00.000Z" });
+    expect(d.list().map((s) => s.id).sort()).toEqual(["a", "b"]);
   });
 
   it("without a workspace keeps no records, answers the sessions with why, and refuses changes", async () => {

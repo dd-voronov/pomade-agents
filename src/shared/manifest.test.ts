@@ -47,7 +47,9 @@ describe("manifest.json", () => {
       changeStatus: none,
       rename: none,
       moveToProject: none,
+      list: () => [],
     };
-    expect(Object.keys(createApi({ info, sessions }))).toEqual(api);
+    const live = { entries: () => [] };
+    expect(Object.keys(createApi({ info, sessions, live, realPath: (p: string) => Promise.resolve(p) }))).toEqual(api);
   });
 });

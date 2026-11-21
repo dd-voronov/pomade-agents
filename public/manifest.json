@@ -36,7 +36,9 @@
     "sessions.list",
     "sessions.setStatus",
     "sessions.rename",
-    "sessions.moveToProject"
+    "sessions.moveToProject",
+    "sessions.forRepo",
+    "sessions.liveIn"
   ],
   "outsideWorkspace": [
     "~/.claude/",

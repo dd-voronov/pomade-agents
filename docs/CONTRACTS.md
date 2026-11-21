@@ -21,11 +21,11 @@ and the backend's handlers in step with it.
 |---|---|
 | `id` · `name` | `pomade-agents` · Agents |
 | `hostApi` | `0` |
-| `capabilities` | `project.read` (projects, their stable ids, names and folders) · `agentTabs.read` (which session each agent tab is bound to) — the backend's project attribution; the Sessions tab's project names |
+| `capabilities` | `project.read` (projects, their stable ids, names and folders) · `agentTabs.read` (each agent tab's session, folder and live state) — the backend's project attribution and live state; the Sessions tab's project names |
 | `strip` | one icon, `agents` — action `panel` |
 | `events` | publishes `sessions.changed`; subscribes to `pomade-agents:sessions.changed` (its own, for its UI frames), `project.created` and `project.renamed` (the backend, and the UI frames for project names) and, for the backend, `pomade.ready`, `agentTab.changed` |
 | `backend` | `backend/main.mjs`, mode `with-pomade` |
-| `api` | the methods of "Published API" below |
+| `api` | the methods of "Published API" below — `sessions.forRepo` and `sessions.liveIn` among them, which Pomade reads (HOST-API §4, "Platform reads of app APIs") |
 | `outsideWorkspace` | `~/.claude/`, `~/.codex/`, `~/.zshrc` — the paths outside the workspace the backend uses. The Host API defines no key for them; Pomade lists this one as not supported yet |
 
 ## Surfaces and routes
@@ -50,7 +50,8 @@ One UI bundle; `welcome.surface` and the frame's route pick the view (`src/ui/co
 ## Published API
 
 Served by the backend through Pomade's broker (`api.serve`); callers use `apps.call`. The UI calls
-it the same way. Method names and shapes are in `src/shared/api.ts`.
+it the same way. Method names and shapes are in `src/shared/api.ts`; the sessions contract's are
+`pomade-kit/protocol`'s.
 
 | Method | Params | Answer |
 |---|---|---|
@@ -59,6 +60,8 @@ it the same way. Method names and shapes are in `src/shared/api.ts`.
 | `sessions.setStatus` | `{ ids: string[], status, note?: string \| null }` | `SessionsUpdated` |
 | `sessions.rename` | `{ id, name: string \| null }` | `SessionsUpdated` |
 | `sessions.moveToProject` | `{ id, project: string \| null }` | `SessionsUpdated` |
+| `sessions.forRepo` | `SessionsForRepoParams` `{ folder, branch? }` | `SessionsForRepoResult` `{ sessions: RepoSession[] }` |
+| `sessions.liveIn` | `SessionsLiveInParams` `{ folder }` | `SessionsLiveInResult` `{ live, sessions: LiveSession[] }` |
 
 ```ts
 interface AppInfo {
@@ -72,8 +75,9 @@ interface AppInfo {
 
 ### Sessions
 
-A session joins three things (DESIGN §2.4, §2.6, §4), all shapes in `src/shared/sessions.ts`: what
-its transcript says (the summary), the record the app keeps for it, and where it shows.
+A session joins four things (DESIGN §2.4, §2.6, §4), all shapes in `src/shared/sessions.ts`: what
+its transcript says (the summary), the record the app keeps for it, where it shows, and what it is
+doing now (its live state).
 
 ```ts
 type SessionSummary = {
@@ -114,6 +118,8 @@ type Session = {
   record: SessionRecord | null;       // null: no workspace, first run still indexing, or the file cannot be used
   recordProblem: string | null;       // why the record file cannot be used
   attribution: Attribution;
+  live: SessionLiveState;             // the kit's: working · needs-you · idle · closed
+  liveSince: string | null;           // when the backend saw it enter `live`; null: Closed, not seen live this run
 };
 
 type SessionsAnswer = {
@@ -164,6 +170,40 @@ own event in `events.subscribe`) and, when behind it, ask `sessions.list` with t
 Events are not replayed, so a frame asks once its subscription stands, and again every second
 while the backend does not answer; a restarted backend is another epoch and answers whole.
 
+**Live state** (`src/backend/sessions/live-state.ts`) — detected, never set. The backend keeps one
+entry per live thing, each from its live source; the agent tabs are the source now
+(`agentTabs.list` on each connection and on `pomade.ready`, then every `agentTab.changed`; the
+tabs are dropped when the connection ends). A tab is live while its `state` is `working`,
+`needs-you` or `idle`; `exited`, or a tab that left the list, runs nothing. A session's `live` is
+the state of the entry bound to it — the most urgent of several: `needs-you`, `working`, `idle` —
+else `closed`. `liveSince` is when the backend saw the session enter that state: one already there
+at a listing is dated then, a state that stays across listings keeps its date, a session that
+stops running is `closed` since that moment, and one never seen live this run is `closed` since
+`null`. A live-state change is a session change like any other: a new revision, and
+`sessions.changed`.
+
+### The sessions contract (git)
+
+`sessions.forRepo` and `sessions.liveIn` follow `pomade-kit/protocol` `agent-sessions` (DESIGN §5
+"The sessions contract"): types and constants imported from the kit; every answer passes the
+kit's `checkRepoSessions` / `checkLiveIn` unchanged. Pomade asks them as the caller `pomade`, with a
+1.5 s limit (`src/backend/sessions/for-git.ts`).
+
+- **Folders** — the caller's `folder` (absolute, else `invalid-params`) and every recorded folder
+  are compared absolute with symlinks resolved; each folder is resolved once and kept 30 s
+  (`src/backend/core/real-paths.ts`); one that does not exist stands as it is. "At or below" is
+  the folder itself or a path inside it — never a sibling sharing its name's start.
+- **`forRepo`** — the sessions whose start folder (resolved) is `folder` or inside it, and with
+  `branch` (a non-empty string) whose recorded branch is exactly that one; newest `lastActiveAt`
+  first. `RepoSession` from the session: `name` and `status` from its record, `live`, `cwd`
+  resolved, `branch`, `project` = the first project of its attribution (`null`: the Workspace),
+  `startedAt` / `lastActiveAt` from the summary. A session without a start folder, without both
+  activity times or without a usable record is left out.
+- **`liveIn`** — one `LiveSession` per live entry whose folder is `folder` or inside it: an agent
+  tab is `{ sessionId (null before its first prompt), agent: the tab's agentId, cwd, source: "tab",
+  job: null }`; a tab whose folder is not known yet is left out. `live` is true exactly when
+  `sessions` is not empty.
+
 Adding a method: its name in the manifest's `api` and in `API_METHODS`, its shapes in
 `src/shared/`, its handler in `src/backend/interfaces/api.ts`.
 
@@ -197,7 +237,7 @@ Adding a method: its name in the manifest's `api` and in `API_METHODS`, its shap
 - **Pomade** (`src/backend/interfaces/platform.ts`) — on each connection the backend lists the
   projects (again on `project.created`, `project.renamed`, `pomade.ready`) and the agent tabs (again
   on `pomade.ready`), and takes every `agentTab.changed`: the first project each session is seen
-  bound in is its `launchedFrom`. A rename refreshes `projectRoot` in the records of that project.
+  bound in is its `launchedFrom`; every tab's state and folder feed the live state. A rename refreshes `projectRoot` in the records of that project.
 - **Locations** (`src/backend/core/locations.ts`) — app data in `<workspace>/Apps/pomade-agents/`,
   machine-local state in `<userData>/app-state/pomade-agents/`, the built-in agents' stores under
   `HOME`.
@@ -232,7 +272,7 @@ Adding a method: its name in the manifest's `api` and in `API_METHODS`, its shap
 - Playwright fixtures (`e2e/fixtures.ts`): `manifest`, `sandbox`, `pomade`, `backend`, `openShell`, and
   the option `seed` — `test.use({ seed: { into(sandbox) } })` writes into the sandbox before the
   backend starts (`null` by default).
-- Transcript helpers (`e2e/transcripts.ts`): `prompt` and `answer` (Claude Code lines; an answer
-  carries its model, effort and usage), `claudeSession(sandbox, id, lines)`, `projectFolder(sandbox,
+- Transcript helpers (`e2e/transcripts.ts`): `prompt` and `answer` (Claude Code lines; a prompt
+  may record a git branch, an answer carries its model, effort and usage), `claudeSession(sandbox, id, lines)`, `projectFolder(sandbox,
   projectId)`, and `seedIntoProject(sandbox, projectId)`, which moves the seeded transcripts' start
   folders into a fixture project.

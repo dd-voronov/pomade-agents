@@ -2,6 +2,15 @@
 // in the manifest's `api`. The UI reaches it with `apps.call`, as other apps and Pomade do.
 // Params are checked here; a malformed one is `invalid-params`.
 
+import {
+  SESSIONS_FOR_REPO_METHOD,
+  SESSIONS_LIVE_IN_METHOD,
+  type JsonValue,
+  type SessionsForRepoParams,
+  type SessionsForRepoResult,
+  type SessionsLiveInParams,
+  type SessionsLiveInResult,
+} from "pomade-kit/protocol";
 import { HostError, type ApiHandler } from "pomade-kit/sdk";
 
 import { APP_INFO_METHOD, type AppInfo } from "../../shared/api.ts";
@@ -16,11 +25,16 @@ import {
   type SessionsSince,
   type SessionsUpdated,
 } from "../../shared/sessions.ts";
+import type { RealPath } from "../core/real-paths.ts";
+import { liveSessions, repoSessions } from "../sessions/for-git.ts";
+import type { LiveState } from "../sessions/live-state.ts";
 import type { SessionData } from "../sessions/session-data.ts";
 
 export interface ApiSources {
   info: AppInfo;
-  sessions: Pick<SessionData, "answer" | "changeStatus" | "rename" | "moveToProject">;
+  sessions: Pick<SessionData, "answer" | "list" | "changeStatus" | "rename" | "moveToProject">;
+  live: Pick<LiveState, "entries">;
+  realPath: RealPath;
 }
 
 type Params = Record<string, unknown>;
@@ -56,7 +70,28 @@ function textOf(params: Params, key: string, max: number): string | null {
   return value;
 }
 
-export function createApi({ info, sessions }: ApiSources): Record<string, ApiHandler> {
+/** `{ folder }` of the sessions contract: an absolute folder. */
+function folderOf(params: Params): string {
+  const { folder } = params;
+  if (typeof folder !== "string" || !folder.startsWith("/") || /[\r\n\0]/.test(folder)) throw new HostError("invalid-params", '"folder" must be an absolute folder');
+  return folder;
+}
+
+function forRepoParams(raw: unknown): SessionsForRepoParams {
+  const params = paramsOf(raw);
+  const { branch } = params;
+  if (branch !== undefined && (typeof branch !== "string" || branch.trim() === "")) throw new HostError("invalid-params", '"branch" must be a branch name');
+  return branch === undefined ? { folder: folderOf(params) } : { folder: folderOf(params), branch };
+}
+
+function liveInParams(raw: unknown): SessionsLiveInParams {
+  return { folder: folderOf(paramsOf(raw)) };
+}
+
+/** The kit's contract shapes are interfaces, which TypeScript does not take for JSON values; they hold only JSON. */
+const json = (value: SessionsForRepoResult | SessionsLiveInResult): JsonValue => value as unknown as JsonValue;
+
+export function createApi({ info, sessions, live, realPath }: ApiSources): Record<string, ApiHandler> {
   const updated = async (changed: Promise<SessionsUpdated["sessions"]>): Promise<SessionsUpdated> => ({ sessions: await changed });
   return {
     [APP_INFO_METHOD]: () => ({ ...info }),
@@ -82,5 +117,7 @@ export function createApi({ info, sessions }: ApiSources): Record<string, ApiHan
       }
       return updated(sessions.moveToProject(idOf(params.id, "id"), project).then((s) => [s]));
     },
+    [SESSIONS_FOR_REPO_METHOD]: async (raw) => json({ sessions: await repoSessions(sessions.list(), forRepoParams(raw), realPath) }),
+    [SESSIONS_LIVE_IN_METHOD]: async (raw) => json(await liveSessions(live.entries(), liveInParams(raw), realPath)),
   };
 }
