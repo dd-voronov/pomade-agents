@@ -5,7 +5,7 @@ test("Sessions opens the app's tab at Sessions; a second click focuses it instea
   await panel.getByTestId("open-sessions").click();
 
   const tab = tabFrame("alpha");
-  await expect(tab.getByRole("heading", { name: "Sessions" })).toBeVisible();
+  await expect(tab.getByRole("heading", { name: "Sessions", exact: true })).toBeVisible();
   await expect(tab.getByTestId("view-sessions")).toHaveAttribute("aria-current", "page");
   await expect(tab.locator("html")).toHaveAttribute("data-surface", "tab");
   await expect(page.getByRole("tab")).toHaveCount(1);
@@ -16,7 +16,7 @@ test("Sessions opens the app's tab at Sessions; a second click focuses it instea
   await expect(page.getByRole("tab")).toHaveCount(1);
   await expect(page.locator('iframe[data-testid^="tab-frame-"]')).toHaveCount(1);
   await expect(page.getByTestId("tab-alpha")).toHaveAttribute("aria-selected", "true");
-  await expect(tab.getByRole("heading", { name: "Sessions" })).toBeVisible();
+  await expect(tab.getByRole("heading", { name: "Sessions", exact: true })).toBeVisible();
 });
 
 test("Roster opens the tab at the Roster; a second click focuses it", async ({ page, openShell, pomade }) => {
@@ -38,7 +38,7 @@ test("Sessions and Roster share the project's one tab: Pomade navigates it, the 
   const { panel, tabFrame } = await openShell(page);
   await panel.getByTestId("open-sessions").click();
   const tab = tabFrame("alpha");
-  await expect(tab.getByRole("heading", { name: "Sessions" })).toBeVisible();
+  await expect(tab.getByRole("heading", { name: "Sessions", exact: true })).toBeVisible();
   await tab.locator("body").evaluate((body) => body.setAttribute("data-kept", "yes"));
 
   await panel.getByTestId("open-roster").click();
@@ -46,7 +46,7 @@ test("Sessions and Roster share the project's one tab: Pomade navigates it, the 
   await expect(page.locator('iframe[data-testid^="tab-frame-"]')).toHaveCount(1);
 
   await tab.getByTestId("view-sessions").click();
-  await expect(tab.getByRole("heading", { name: "Sessions" })).toBeVisible();
+  await expect(tab.getByRole("heading", { name: "Sessions", exact: true })).toBeVisible();
   await expect(tab.getByTestId("view-sessions")).toHaveAttribute("aria-current", "page");
   await expect(tab.locator("body")).toHaveAttribute("data-kept", "yes");
 });
@@ -54,7 +54,7 @@ test("Sessions and Roster share the project's one tab: Pomade navigates it, the 
 test("each project gets its own tab", async ({ page, openShell, pomade }) => {
   const { panel, tabFrame } = await openShell(page);
   await panel.getByTestId("open-sessions").click();
-  await expect(tabFrame("alpha").getByRole("heading", { name: "Sessions" })).toBeVisible();
+  await expect(tabFrame("alpha").getByRole("heading", { name: "Sessions", exact: true })).toBeVisible();
 
   pomade.fake.setActiveProject("beta");
   await panel.getByTestId("open-roster").click();

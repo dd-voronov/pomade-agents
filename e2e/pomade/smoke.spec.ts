@@ -69,7 +69,7 @@ test.describe("dev-linked into Pomade", () => {
     const panel = page.frameLocator(PANEL_FRAME);
     const tab = page.frameLocator(TAB_FRAME);
     await panel.getByTestId("open-sessions").click();
-    await expect(tab.getByRole("heading", { name: "Sessions" })).toBeVisible();
+    await expect(tab.getByRole("heading", { name: "Sessions", exact: true })).toBeVisible();
     await panel.getByTestId("open-sessions").click();
     await expect(page.locator(TAB_FRAME)).toHaveCount(1);
 
@@ -77,7 +77,7 @@ test.describe("dev-linked into Pomade", () => {
     await expect(tab.getByRole("heading", { name: "Roster" })).toBeVisible();
     await expect(page.locator(TAB_FRAME)).toHaveCount(1);
     await tab.getByTestId("view-sessions").click();
-    await expect(tab.getByRole("heading", { name: "Sessions" })).toBeVisible();
+    await expect(tab.getByRole("heading", { name: "Sessions", exact: true })).toBeVisible();
     await mkdir(ARTIFACTS, { recursive: true });
     await page.screenshot({ path: join(ARTIFACTS, "in-pomade.png") });
   });

@@ -57,3 +57,44 @@ export function UnpluggedIcon({ size = 16 }: IconProps): ReactElement {
     </Glyph>
   );
 }
+
+/** A chevron pointing right; turned down, it says a group is open. */
+export function ChevronIcon({ size = 16 }: IconProps): ReactElement {
+  return (
+    <Glyph size={size}>
+      <path d="M6 4l4 4-4 4" />
+    </Glyph>
+  );
+}
+
+/** A forked branch — a session forked from another. */
+export function ForkIcon({ size = 16 }: IconProps): ReactElement {
+  return (
+    <Glyph size={size}>
+      <circle cx="4.5" cy="3.5" r="1.5" />
+      <circle cx="11.5" cy="3.5" r="1.5" />
+      <circle cx="8" cy="12.5" r="1.5" />
+      <path d="M4.5 5v1.5c0 1 .8 1.5 1.75 1.5h3.5c.95 0 1.75-.5 1.75-1.5V5M8 8v3" />
+    </Glyph>
+  );
+}
+
+/** A stopwatch — an unattended run. */
+export function TimerIcon({ size = 16 }: IconProps): ReactElement {
+  return (
+    <Glyph size={size}>
+      <circle cx="8" cy="9" r="4.75" />
+      <path d="M8 6.5V9l1.75 1.25M6.5 1.75h3M8 1.75v2.5" />
+    </Glyph>
+  );
+}
+
+/** A note with a folded corner — the note under a row. */
+export function NoteIcon({ size = 16 }: IconProps): ReactElement {
+  return (
+    <Glyph size={size}>
+      <path d="M3 3.5h10v6.5L10 13H3z" />
+      <path d="M13 10h-3v3" />
+    </Glyph>
+  );
+}

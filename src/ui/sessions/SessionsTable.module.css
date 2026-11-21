@@ -1,0 +1,48 @@
+/* The table's scroll box and its sticky column header. The custom properties set here are the
+   layout every row and group header shares. */
+
+.table {
+  --columns-height: 28px;
+  /* The name's start past the row padding: under the group header's label. */
+  --name-indent: 36px;
+
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding-bottom: var(--space-5);
+}
+
+.columns {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: var(--columns);
+  align-items: center;
+  height: var(--columns-height);
+  padding: 0 var(--space-2);
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-raised);
+  color: var(--text-faint);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  user-select: none;
+}
+
+.heading {
+  min-width: 0;
+  padding: 0 var(--space-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.name {
+  padding-left: var(--name-indent);
+}
+
+.number {
+  text-align: right;
+}

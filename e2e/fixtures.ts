@@ -17,7 +17,13 @@ export interface Shell {
   tabFrame(projectId: string): FrameLocator;
 }
 
+export interface Seed {
+  into(sandbox: Sandbox): Promise<void>;
+}
+
 interface Fixtures {
+  /** Writes into the sandbox before the backend starts (`test.use({ seed: { into } })`); none by default. */
+  seed: Seed | null;
   manifest: AppManifest;
   sandbox: Sandbox;
   pomade: FakePomade;
@@ -39,6 +45,7 @@ export function shellOf(page: Page): Shell {
 }
 
 export const test = base.extend<Fixtures>({
+  seed: [null, { option: true }],
   manifest: async ({}, use) => {
     await use(readManifest());
   },
@@ -57,7 +64,8 @@ export const test = base.extend<Fixtures>({
     await use(pomade);
     await pomade.close();
   },
-  backend: async ({ sandbox, pomade }, use) => {
+  backend: async ({ seed, sandbox, pomade }, use) => {
+    if (seed !== null) await seed.into(sandbox);
     const backend = spawnBackend(sandbox, { entry: BUILT_BACKEND });
     await expect.poll(() => pomade.backendCount(), { message: `the backend connects\n${backend.output()}` }).toBe(1);
     await use(backend);

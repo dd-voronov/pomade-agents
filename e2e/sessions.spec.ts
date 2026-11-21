@@ -1,6 +1,7 @@
-// The session stores reach the UI: the backend indexes the sandbox's stores, the Sessions view
-// counts what it indexed, and a store that changes reaches the view within ~2 s — through the
-// backend's `sessions.changed` notice and a `sessions.list` delta, no polling.
+// The session stores reach the UI: the backend indexes the sandbox's stores, the Workspace's
+// Sessions tab counts what it indexed (the seeded sessions started outside the fixture projects),
+// and a store that changes reaches the tab within ~2 s — through the backend's `sessions.changed`
+// notice and a `sessions.list` delta, no polling.
 
 import { appendFile, mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -14,12 +15,19 @@ import { prompt } from "./transcripts.ts";
 const WITHIN_MS = 2000;
 const CLAUDE_TRANSCRIPT = Object.keys(SEEDED_TRANSCRIPTS).find((path) => path.startsWith("home/.claude/")) ?? "";
 
-test("the Sessions view counts every session the backend indexed, and a growing or new transcript reaches it within 2 s", async ({ page, openShell, pomade, sandbox, backend }) => {
+test("the Workspace's Sessions tab counts every session the backend indexed, and a growing or new transcript reaches it within 2 s", async ({
+  page,
+  openShell,
+  pomade,
+  sandbox,
+  backend,
+}) => {
+  pomade.fake.setActiveProject(null);
   const { panel, tabFrame } = await openShell(page);
   await panel.getByTestId("open-sessions").click();
-  const count = tabFrame("alpha").getByTestId("sessions-count");
-  await expect(count).toHaveText("3 sessions indexed.", { timeout: 10_000 });
-  await expect(count).toHaveAttribute("data-count", "3");
+  const count = tabFrame("__workspace__").getByTestId("sessions-count");
+  await expect(count).toHaveAttribute("data-count", "3", { timeout: 10_000 });
+  await expect(count).not.toHaveAttribute("data-indexing");
   const revision = Number(await count.getAttribute("data-revision"));
 
   // A transcript grows: the view's copy moves on, and the summary holds the new message.
@@ -37,13 +45,14 @@ test("the Sessions view counts every session the backend indexed, and a growing 
   await mkdir(dirname(fresh), { recursive: true });
   const created = Date.now();
   await writeFile(fresh, prompt("A brand new session", "2026-11-17T12:01:00.000Z"));
-  await expect(count).toHaveText("4 sessions indexed.", { timeout: WITHIN_MS });
+  await expect(count).toHaveAttribute("data-count", "4", { timeout: WITHIN_MS });
   expect(Date.now() - created).toBeLessThan(WITHIN_MS);
   expect(backend.running()).toBe(true);
 });
 
-test("the Sessions view says it is reading the stores while the backend does not answer", async ({ page, openShell }) => {
+test("the Sessions tab says it is reading the stores while the backend does not answer", async ({ page, openShell }) => {
   const { panel, tabFrame } = await openShell(page);
   await panel.getByTestId("open-sessions").click();
-  await expect(tabFrame("alpha").getByTestId("sessions-count")).toHaveText("Reading the agents' session stores…");
+  await expect(tabFrame("alpha").getByTestId("sessions-reading")).toContainText("Reading the session stores…");
+  await expect(tabFrame("alpha").getByTestId("sessions-count")).toHaveCount(0);
 });

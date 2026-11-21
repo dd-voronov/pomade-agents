@@ -21,9 +21,9 @@ and the backend's handlers in step with it.
 |---|---|
 | `id` · `name` | `pomade-agents` · Agents |
 | `hostApi` | `0` |
-| `capabilities` | `project.read` (projects, their stable ids and folders) · `agentTabs.read` (which session each agent tab is bound to) — the backend's project attribution |
+| `capabilities` | `project.read` (projects, their stable ids, names and folders) · `agentTabs.read` (which session each agent tab is bound to) — the backend's project attribution; the Sessions tab's project names |
 | `strip` | one icon, `agents` — action `panel` |
-| `events` | publishes `sessions.changed`; subscribes to `pomade-agents:sessions.changed` (its own, for its UI frames) and, for the backend, `pomade.ready`, `project.created`, `project.renamed`, `agentTab.changed` |
+| `events` | publishes `sessions.changed`; subscribes to `pomade-agents:sessions.changed` (its own, for its UI frames), `project.created` and `project.renamed` (the backend, and the UI frames for project names) and, for the backend, `pomade.ready`, `agentTab.changed` |
 | `backend` | `backend/main.mjs`, mode `with-pomade` |
 | `api` | the methods of "Published API" below |
 | `outsideWorkspace` | `~/.claude/`, `~/.codex/`, `~/.zshrc` — the paths outside the workspace the backend uses. The Host API defines no key for them; Pomade lists this one as not supported yet |
@@ -40,6 +40,10 @@ One UI bundle; `welcome.surface` and the frame's route pick the view (`src/ui/co
 
 - `sessions` is the route Pomade's History icon opens (HOST-API §4 `apps`, "Platform reads of app
   APIs").
+- **A tab's scope** is the project it was opened in, `welcome.project`; the tab keeps it and ignores
+  `project.changed`. The Workspace project's tab (`"__workspace__"`) shows every session, with a Project
+  column. Project names come from `project.list`, asked again on `project.created` and
+  `project.renamed`.
 - The app has one tab per project — Pomade's icon-less app tab. `tabs.openApp({ route })` opens it
   or navigates it; the frame follows `route.changed`.
 
@@ -225,4 +229,10 @@ Adding a method: its name in the manifest's `api` and in `API_METHODS`, its shap
   backend over the unix socket and by frames through the shell page (`harness/shell/`).
 - `spawnBackend(sandbox, { entry })` (`harness/backend-process.ts`) — `{ pid, output(), running(),
   stop() }`.
-- Playwright fixtures (`e2e/fixtures.ts`): `manifest`, `sandbox`, `pomade`, `backend`, `openShell`.
+- Playwright fixtures (`e2e/fixtures.ts`): `manifest`, `sandbox`, `pomade`, `backend`, `openShell`, and
+  the option `seed` — `test.use({ seed: { into(sandbox) } })` writes into the sandbox before the
+  backend starts (`null` by default).
+- Transcript helpers (`e2e/transcripts.ts`): `prompt` and `answer` (Claude Code lines; an answer
+  carries its model, effort and usage), `claudeSession(sandbox, id, lines)`, `projectFolder(sandbox,
+  projectId)`, and `seedIntoProject(sandbox, projectId)`, which moves the seeded transcripts' start
+  folders into a fixture project.

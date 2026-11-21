@@ -56,17 +56,19 @@ test("the first run records every existing session as Done, silently, and a sess
   expect(await readFile(join(dataDir, "sessions", "5b0e8f52-3c1d-4a7e-9f21-6d8c0b4a7e13.yaml"), "utf8")).toContain("status: done");
   expect(pomade.fake.notices).toEqual([]);
 
+  // The seeded sessions, and the new one, started outside the fixture projects: they are the Workspace's.
+  pomade.fake.setActiveProject(null);
   const { panel, tabFrame } = await openShell(page);
   await panel.getByTestId("open-sessions").click();
-  const frame = tabFrame("alpha");
-  await expect(frame.getByTestId("sessions-status-done")).toHaveAttribute("data-count", "3");
-  await expect(frame.getByTestId("sessions-status-active")).toHaveAttribute("data-count", "0");
+  const frame = tabFrame("__workspace__");
+  await expect(frame.getByTestId("group-done")).toHaveAttribute("data-count", "3");
+  await expect(frame.getByTestId("group-active")).toHaveAttribute("data-count", "0");
 
   const started = Date.now();
   await claudeSession(sandbox, NEW_ID, prompt("Start something new", soon()));
-  await expect(frame.getByTestId("sessions-status-active")).toHaveAttribute("data-count", "1", { timeout: WITHIN_MS });
+  await expect(frame.getByTestId("group-active")).toHaveAttribute("data-count", "1", { timeout: WITHIN_MS });
   expect(Date.now() - started).toBeLessThan(WITHIN_MS);
-  await expect(frame.getByTestId("sessions-status-active")).toHaveText("Active 1");
+  await expect(frame.getByTestId("group-active").getByTestId("session-row")).toHaveAttribute("data-session-id", NEW_ID);
   expect((await sessionOf(pomade, NEW_ID))?.record).toMatchObject({ status: "active", outsidePomade: true });
   expect(await readFile(join(dataDir, "sessions", `${NEW_ID}.yaml`), "utf8")).toContain("status: active");
 });

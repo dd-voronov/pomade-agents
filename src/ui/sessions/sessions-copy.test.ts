@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { SessionsAnswer } from "../../shared/sessions.ts";
 import { testSession } from "../../shared/test-sessions.ts";
-import { applyAnswer, countByStatus, isBehind } from "./sessions-copy.ts";
+import { applyAnswer, isBehind } from "./sessions-copy.ts";
 
 const answer = (a: Partial<SessionsAnswer>): SessionsAnswer => ({
   epoch: "e1",
@@ -38,15 +38,5 @@ describe("the UI's copy of the sessions", () => {
     expect(isBehind(copy, { epoch: "e1", revision: 4 })).toBe(false);
     expect(isBehind(copy, { epoch: "e1", revision: 5 })).toBe(true);
     expect(isBehind(copy, { epoch: "e2", revision: 1 })).toBe(true);
-  });
-
-  it("counts the sessions by status, leaving out those without a record", () => {
-    const withStatus = (id: string, status: "active" | "done") => testSession({ id, record: { id, provider: "codex", agent: "codex", status } });
-    expect(countByStatus([withStatus("a", "done"), withStatus("b", "done"), withStatus("c", "active"), testSession({ id: "d", record: null })])).toEqual({
-      active: 1,
-      "on-hold": 0,
-      done: 2,
-      "done-skip": 0,
-    });
   });
 });
