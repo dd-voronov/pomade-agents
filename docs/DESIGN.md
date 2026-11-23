@@ -337,7 +337,7 @@ Each card shows:
 **Claude Code agents only in v1.**
 
 1. **Form:**
-   - **name**: `[a-z0-9-]`. Refused if the folder exists, or if `zsh -ilc 'type <name>'`
+   - **name**: `[a-z0-9-]`, starting with a letter or digit. Refused if the folder exists, or if `zsh -ilc 'type <name>'`
      resolves (an existing alias or command).
    - **provider**
    - **role line**
