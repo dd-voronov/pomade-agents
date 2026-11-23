@@ -26,7 +26,7 @@ and the backend's handlers in step with it.
 | `events` | publishes `sessions.changed` and `roster.changed` (for its own UI frames) and `session.turnFinished` (declared, never published), `session.closed`, `session.statusChanged` ("Published events" below); subscribes to `pomade-agents:sessions.changed` and `pomade-agents:roster.changed` (its own, for its UI frames), `project.created` and `project.renamed` (the backend, and the UI frames for project names) and, for the backend, `pomade.ready`, `agentTab.changed`, `agentTab.exited` and Runner's `pomade-runner:run.started`, `pomade-runner:run.finished` ("Subscribed events" below) |
 | `backend` | `backend/main.mjs`, mode `with-pomade` |
 | `api` | the methods of "Published API" below — `sessions.forRepo`, `sessions.liveIn` and `roster.list` among them, which Pomade reads (HOST-API §4, "Platform reads of app APIs") |
-| `outsideWorkspace` | `~/.claude/`, `~/.codex/`, `~/.zshrc` — the paths outside the workspace the backend uses. The Host API defines no key for them; Pomade lists this one as not supported yet |
+| `outsideWorkspace` | `~/.claude/`, `~/.codex/`, `~/.zshrc` — the paths outside the workspace the backend uses; Pomade shows them at install (HOST-API §1) |
 
 ## Surfaces and routes
 
@@ -42,19 +42,24 @@ One UI bundle; `welcome.surface` and the frame's route pick the view (`src/ui/co
 - `sessions` is the route Pomade's History icon opens (HOST-API §4 `apps`, "Platform reads of app
   APIs").
 - **The selection is the route.** `<id>` is the session id, URI-encoded (`sessionsRoute`,
-  `selectedSessionOf`). Selecting a session, moving the selection and closing the panel show at
-  once and ask Pomade to navigate the tab (`tabs.openApp({ route, projectId: <the tab's project> })`);
-  the `route.changed` that answers each of these is not applied again (`src/ui/sessions/useSelection.ts`),
-  any other `route.changed` selects what its route names. A reload and a restart of Pomade open the
-  tab at its last route, so the selection stays. An `<id>` the tab's scope does not hold shows the table.
+  `selectedSessionOf`). Selecting a session, moving the selection and closing the panel are the
+  tab navigating by itself (`useRoute`'s `navigate`, `src/ui/core/useRoute.ts`): the view changes at
+  once and Pomade records the route for the tab (`tabs.setRoute(route)`), sending no `route.changed`
+  back (`src/ui/sessions/useSelection.ts`). Every `route.changed` selects what its route names. A
+  reload and a restart of Pomade open the tab at its last route, so the selection stays. An `<id>`
+  the tab's scope does not hold shows the table.
 - **A tab's scope** is the project it was opened in, `welcome.project`; the tab keeps it and ignores
   `project.changed`. The Workspace project's tab (`"__workspace__"`) shows every session, with a Project
   column. Project names and roots come from `project.list`, asked again on `project.created` and
   `project.renamed`; the detail panel's "started in" is the start folder relative to the project's
-  root under the workspace `app.info` names (else relative to the workspace, else as recorded).
+  root under the workspace `app.info` names — with symlinks resolved (`workspaceReal`), else as
+  Pomade names it (`workspace`) — else relative to the workspace, else as recorded.
 - **Status and note** are set from the detail panel through `sessions.setStatus` ("Sessions"
   below), one call at a time; the frame takes the changed sessions from its answer, so the row
-  moves at once, and a refused change leaves the rows as they were.
+  moves at once, and a refused change leaves the rows as they were. The panel says what was not
+  done and why in plain words, by the error's code (`failureText`, `src/ui/sessions/detail-model.ts`:
+  `io-error` "The record file could not be written.", `not-ready`, `not-found`, `app-absent`,
+  `app-not-responding`, else "Something went wrong."); the backend's message is its hover text.
 - The app has one tab per project — Pomade's icon-less app tab. `tabs.openApp({ route })` opens it
   or navigates it; the frame follows `route.changed`.
 
@@ -86,7 +91,8 @@ it the same way. Method names and shapes are in `src/shared/api.ts`, `src/shared
 interface AppInfo {
   version: string;          // the manifest's
   startedAt: string;        // ISO 8601 — when this backend process started
-  workspace: string | null; // the open workspace's root, absolute; null when none is open
+  workspace: string | null; // the open workspace's root, absolute, as Pomade names it; null when none is open
+  workspaceReal: string | null; // the same root with symlinks resolved (how transcripts record folders in it); workspace when it cannot be resolved
   dataDir: string | null;   // <workspace>/Apps/pomade-agents; null without a workspace
   stateDir: string;         // <userData>/app-state/pomade-agents
 }
@@ -559,6 +565,8 @@ type AgentRunFinished = AgentRunStarted & {
     only the keys whose values change — comments, extra keys, order and quoting stay. New records
     are linked into place (never over a file that is there), changes are written to a temporary
     file and renamed, one at a time per file, each applied to the file as it is on disk then. A
+    write the system refuses fails naming the file it was for, never the temporary one, and the
+    system's reason (`<path> could not be written (EACCES: permission denied)`). A
     file that is not valid YAML, not a mapping, or not a record of its session is never written
     over; its session answers `record: null` with `recordProblem`. A record deleted by hand is
     written again with its session's first-sight values.
@@ -597,8 +605,9 @@ type AgentRunFinished = AgentRunStarted & {
 - **Session stores** (`src/backend/stores/`) — `~/.claude/projects/<encoded-cwd>/*.jsonl`,
   `<workspace>/Agents/<name>/projects/<encoded-cwd>/*.jsonl` for every folder agent (a folder with
   a `CLAUDE.md`, not `_shared`, no "template" in its name), `~/.codex/sessions/**/rollout-*.jsonl`.
-  One recursive `fs.watch` per store root (FSEvents on macOS: no descriptor per file); a root that
-  does not exist yet, and roster changes, are checked every 2 s. Each transcript is read from the
+  One recursive `fs.watch` per store root (FSEvents on macOS: no descriptor per file), walked when
+  its watch starts and once more 1 s later (the stream misses what changes before it runs); a root
+  that does not exist yet, and roster changes, are checked every 2 s. Each transcript is read from the
   offset its last parse reached, opened and closed per read, and read once more 500 ms after it
   changed.
 - **Parse index** — `<stateDir>/session-index.json`: `{ parser, prices, files: { <path>: { mark:
@@ -613,18 +622,23 @@ type AgentRunFinished = AgentRunStarted & {
 
 ## Test harness
 
-- `createSandbox(appId)` (`harness/sandbox.ts`) — `{ root, home, workspace, userData, socketPath,
-  appKey, backendEnv(), snapshot(folder), cleanup() }`. `home` and `workspace` start as copies of
-  `harness/fixtures/`, their stores seeded with three of the synthetic transcripts in
-  `harness/fixtures/transcripts/` (`SEEDED_TRANSCRIPTS`), which the unit tests read too.
+- `createSandbox(appId, { workspaceLink? })` (`harness/sandbox.ts`) — `{ root, home, workspace,
+  workspaceReal, userData, socketPath, appKey, backendEnv(), snapshot(folder), cleanup() }`. `home`
+  and the workspace start as copies of `harness/fixtures/`, their stores seeded with three of the
+  synthetic transcripts in `harness/fixtures/transcripts/` (`SEEDED_TRANSCRIPTS`), which the unit
+  tests read too. `workspaceReal` is where the workspace's files are; `workspace` is what Pomade
+  and the backend are given — the same folder, or with `workspaceLink` a symlink to it.
 - `startFakePomade({ manifest, socketPath, appKey, host })` (`harness/fake-pomade/server.ts`) —
   `{ fake, shellSocketUrl, backendCount(), close() }`: pomade-kit's fake host, reached by the
-  backend over the unix socket and by frames through the shell page (`harness/shell/`).
+  backend over the unix socket and by frames through the shell page (`harness/shell/`). The app's
+  tabs are the fake host's own (`fake.appTabs`, `fake.onAppTab`): `tabs.openApp` opens, focuses or
+  navigates them, `tabs.setRoute` records a tab's route; the shell shows each open tab with a frame
+  attached to it (`{ tabId }`), so a frame reload opens at the tab's recorded route.
 - `spawnBackend(sandbox, { entry })` (`harness/backend-process.ts`) — `{ pid, output(), running(),
   stop() }`.
 - Playwright fixtures (`e2e/fixtures.ts`): `manifest`, `sandbox`, `pomade`, `backend`, `openShell`, and
-  the option `seed` — `test.use({ seed: { into(sandbox) } })` writes into the sandbox before the
-  backend starts (`null` by default).
+  the options `seed` — `test.use({ seed: { into(sandbox) } })` writes into the sandbox before the
+  backend starts (`null` by default) — and `workspaceLink` (`false` by default).
 - Transcript helpers (`e2e/transcripts.ts`): `prompt` and `answer` (Claude Code lines; a prompt
   may record a git branch, an answer carries its model, effort, usage and text), `claudeSession(sandbox, id, lines)`, `projectFolder(sandbox,
   projectId)`, and `seedIntoProject(sandbox, projectId)`, which moves the seeded transcripts' start

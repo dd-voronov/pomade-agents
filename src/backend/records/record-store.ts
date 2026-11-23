@@ -200,26 +200,41 @@ const tmpPathFor = (path: string): string => join(dirname(path), `.${basename(pa
 async function writeNew(path: string, text: string): Promise<boolean> {
   await mkdir(dirname(path), { recursive: true });
   const tmp = tmpPathFor(path);
-  await writeFile(tmp, text, "utf8");
+  try {
+    await writeFile(tmp, text, "utf8");
+  } catch (err) {
+    throw writeFailure(path, err);
+  }
   try {
     await link(tmp, path);
     return true;
   } catch (err) {
     if (code(err) === "EEXIST") return false;
-    throw err;
+    throw writeFailure(path, err);
   } finally {
     await unlink(tmp);
   }
 }
 
+/** A failed write as the caller reads it: the file it was for, never the temporary one, and the
+ *  system's reason without the path it names (`EACCES: permission denied`). */
+export function writeFailure(path: string, err: unknown): Error {
+  const reason = message(err).split(", ")[0] ?? "";
+  return new Error(`${path} could not be written (${reason})`);
+}
+
 async function replace(path: string, text: string): Promise<void> {
   const tmp = tmpPathFor(path);
-  await writeFile(tmp, text, "utf8");
+  try {
+    await writeFile(tmp, text, "utf8");
+  } catch (err) {
+    throw writeFailure(path, err);
+  }
   try {
     await rename(tmp, path);
   } catch (err) {
     await unlink(tmp).catch(() => undefined);
-    throw err;
+    throw writeFailure(path, err);
   }
 }
 

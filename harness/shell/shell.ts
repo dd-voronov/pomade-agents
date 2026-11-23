@@ -1,5 +1,5 @@
 // The fake Pomade's window. It hosts the app's frames the way Pomade does — a side panel for the
-// strip icon, one tab per project in the tab area — and relays each frame's postMessage traffic to
+// strip icon, the app's tabs the host opens in the tab area — and relays each frame's postMessage traffic to
 // the fake host in Node (`?host=<ws url>`); `?app=<url>` is the app's page.
 
 import "../../src/ui/core/tokens.css";
@@ -44,7 +44,14 @@ window.addEventListener("message", (event) => {
   }
 });
 
-function build(app: Extract<HostToShell, { type: "ready" }>["app"]): (projectId: string, route: string) => void {
+/** The tab area: one tab per app tab the host has open, each with its frame. */
+interface TabStrip {
+  opened(tabId: string, projectId: string): void;
+  focused(tabId: string): void;
+  closed(tabId: string): void;
+}
+
+function build(app: Extract<HostToShell, { type: "ready" }>["app"]): TabStrip {
   const iconUrl = app.icon === null ? null : new URL(app.icon, appUrl).href;
   const icon = (parent: HTMLElement): void => {
     if (iconUrl === null) return;
@@ -72,44 +79,61 @@ function build(app: Extract<HostToShell, { type: "ready" }>["app"]): (projectId:
   const panes = element("div", "panes", main);
   const tabs = new Map<string, { button: HTMLButtonElement; iframe: HTMLIFrameElement }>();
 
-  const select = (projectId: string): void => {
+  const show = (tabId: string): void => {
     for (const [id, tab] of tabs) {
-      tab.button.setAttribute("aria-selected", String(id === projectId));
-      tab.iframe.hidden = id !== projectId;
+      tab.button.setAttribute("aria-selected", String(id === tabId));
+      tab.iframe.hidden = id !== tabId;
     }
   };
 
-  return (projectId, route) => {
-    if (!tabs.has(projectId)) {
-      const button = element("button", "tab", tabStrip);
-      button.type = "button";
-      button.setAttribute("role", "tab");
-      button.dataset.testid = `tab-${projectId}`;
-      button.title = `Project: ${projectId}`;
-      icon(button);
-      button.append(app.name);
-      button.addEventListener("click", () => select(projectId));
-      const iframe = openFrame(panes, `tab-frame-${projectId}`, { type: "open", frame: `tab:${projectId}`, surface: "tab", route, projectId });
-      tabs.set(projectId, { button, iframe });
-    }
-    select(projectId);
+  return {
+    opened(tabId, projectId) {
+      if (!tabs.has(tabId)) {
+        const button = element("button", "tab", tabStrip);
+        button.type = "button";
+        button.setAttribute("role", "tab");
+        button.dataset.testid = `tab-${projectId}`;
+        button.title = `Project: ${projectId}`;
+        icon(button);
+        button.append(app.name);
+        button.addEventListener("click", () => show(tabId));
+        const iframe = openFrame(panes, `tab-frame-${projectId}`, { type: "open", frame: `tab:${tabId}`, surface: "tab", tabId });
+        tabs.set(tabId, { button, iframe });
+      }
+      show(tabId);
+    },
+    focused: show,
+    closed(tabId) {
+      const tab = tabs.get(tabId);
+      if (tab === undefined) return;
+      tab.button.remove();
+      tab.iframe.remove();
+      frames.delete(`tab:${tabId}`);
+      tabs.delete(tabId);
+    },
   };
 }
 
-let showTab: ((projectId: string, route: string) => void) | null = null;
+let strip: TabStrip | null = null;
 
 socket.addEventListener("message", (event) => {
   const message = JSON.parse(String(event.data)) as HostToShell;
   switch (message.type) {
     case "ready":
       document.title = `Fake Pomade — ${message.app.name}`;
-      showTab = build(message.app);
+      strip = build(message.app);
       return;
     case "post":
       frames.get(message.frame)?.contentWindow?.postMessage(message.message, "*");
       return;
-    case "tab":
-      showTab?.(message.projectId, message.route);
+    case "tab-opened":
+      strip?.opened(message.tabId, message.projectId);
+      return;
+    case "tab-focused":
+      strip?.focused(message.tabId);
+      return;
+    case "tab-closed":
+      strip?.closed(message.tabId);
       return;
   }
 });

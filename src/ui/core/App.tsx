@@ -13,12 +13,12 @@ import { NoHost, Rejected } from "./Unavailable.tsx";
 import { useRoute } from "./useRoute.ts";
 
 function Hosted({ host }: { host: HostClient }): ReactElement {
-  const route = useRoute(host);
+  const { route, navigate } = useRoute(host);
   const view = viewFor(host.welcome.surface, route);
   if (view === "live-now") return <LiveNowPanel host={host} />;
   return (
     <TabView host={host} view={view}>
-      {view === "roster" ? <RosterTab /> : <SessionsTab host={host} route={route} />}
+      {view === "roster" ? <RosterTab /> : <SessionsTab host={host} route={route} navigate={navigate} />}
     </TabView>
   );
 }

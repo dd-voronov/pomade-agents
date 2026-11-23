@@ -112,6 +112,14 @@ test.describe("dev-linked into Pomade", () => {
     await expect(page.locator(TAB_FRAME)).toHaveCount(1);
     await tab.getByTestId("view-sessions").click();
     await expect(tab.getByRole("heading", { name: "Sessions", exact: true })).toBeVisible();
+
+    // Selecting a session records the tab's route in Pomade (`tabs.setRoute`): opening Sessions
+    // again is then a route Pomade navigates the tab to, and the table comes back.
+    await tab.getByTestId("session-row").first().click();
+    await expect(tab.getByTestId("detail-panel")).toBeVisible();
+    await panel.getByTestId("open-sessions").click();
+    await expect(tab.getByTestId("detail-panel")).toHaveCount(0);
+    await expect(tab.getByTestId("sessions-table")).toBeVisible();
     await mkdir(ARTIFACTS, { recursive: true });
     await page.screenshot({ path: join(ARTIFACTS, "in-pomade.png") });
   });

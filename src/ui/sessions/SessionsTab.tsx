@@ -29,6 +29,7 @@ import { useStatusChange } from "./useStatusChange.ts";
 const CLOCK_MS = 30_000;
 
 const NO_PROJECTS: ReadonlyMap<string, ProjectRef> = new Map();
+const NO_ROOTS: readonly string[] = [];
 
 const toggled = (set: ReadonlySet<SessionStatus>, status: SessionStatus): Set<SessionStatus> => {
   const next = new Set(set);
@@ -43,18 +44,22 @@ function forTheTab(event: KeyboardEvent): boolean {
   return !(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || (target instanceof HTMLElement && target.isContentEditable));
 }
 
-export function SessionsTab({ host, route }: { host: HostClient; route: string }): ReactElement {
+export function SessionsTab({ host, route, navigate }: { host: HostClient; route: string; navigate: (route: string) => void }): ReactElement {
   const { copy, update } = useSessions(host);
   const projects = useProjects(host) ?? NO_PROJECTS;
   const names = useMemo(() => new Map([...projects].map(([id, p]) => [id, p.name])), [projects]);
   const backend = useBackendInfo(host);
-  const workspaceRoot = backend.status === "running" ? backend.info.workspace : null;
+  const workspaceRoots = useMemo(() => {
+    if (backend.status !== "running") return NO_ROOTS;
+    const { workspaceReal, workspace } = backend.info;
+    return [...new Set([workspaceReal, workspace].filter((root) => root !== null))];
+  }, [backend]);
   const now = useNow(CLOCK_MS);
   const scope = host.welcome.project;
   const workspace = scope.id === WORKSPACE_PROJECT_ID;
   const scopeName = workspace ? "Workspace · all projects" : (names.get(scope.id) ?? scope.name);
 
-  const [selectedId, select] = useSelection(host, route);
+  const [selectedId, select] = useSelection(route, navigate);
   const [lastSelected, setLastSelected] = useState<string | null>(null);
   const [picked, setPicked] = useState<PickedTab | null>(null);
   const [collapsed, setCollapsed] = useState<ReadonlySet<SessionStatus>>(new Set());
@@ -148,7 +153,7 @@ export function SessionsTab({ host, route }: { host: HostClient; route: string }
           now={now}
           names={names}
           projects={projects}
-          workspaceRoot={workspaceRoot}
+          workspaceRoots={workspaceRoots}
           byId={copy.byId}
           inTab={(id) => {
             const session = copy.byId.get(id);

@@ -24,6 +24,8 @@ export interface Seed {
 interface Fixtures {
   /** Writes into the sandbox before the backend starts (`test.use({ seed: { into } })`); none by default. */
   seed: Seed | null;
+  /** Pomade names the sandbox's workspace through a symlink (`test.use({ workspaceLink: true })`). */
+  workspaceLink: boolean;
   manifest: AppManifest;
   sandbox: Sandbox;
   pomade: FakePomade;
@@ -46,11 +48,12 @@ export function shellOf(page: Page): Shell {
 
 export const test = base.extend<Fixtures>({
   seed: [null, { option: true }],
+  workspaceLink: [false, { option: true }],
   manifest: async ({}, use) => {
     await use(readManifest());
   },
-  sandbox: async ({ manifest }, use) => {
-    const sandbox = await createSandbox(manifest.id);
+  sandbox: async ({ manifest, workspaceLink }, use) => {
+    const sandbox = await createSandbox(manifest.id, { workspaceLink });
     await use(sandbox);
     await sandbox.cleanup();
   },

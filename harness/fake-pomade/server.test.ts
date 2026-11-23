@@ -57,6 +57,7 @@ describe("the backend against the fake Pomade", { timeout: 20_000 }, () => {
       version: manifest.version,
       startedAt: expect.any(String) as string,
       workspace: sandbox.workspace,
+      workspaceReal: sandbox.workspace,
       dataDir: `${sandbox.workspace}/Apps/${manifest.id}`,
       stateDir,
     });

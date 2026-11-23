@@ -33,8 +33,8 @@ export interface DetailPanelProps {
   /** Project names by id. */
   names: ReadonlyMap<string, string>;
   projects: ReadonlyMap<string, ProjectRef>;
-  /** The workspace's absolute root; `null` until the backend has said it. */
-  workspaceRoot: string | null;
+  /** The workspace's root with symlinks resolved and as Pomade names it; empty while not known. */
+  workspaceRoots: readonly string[];
   /** Every session the UI holds, by id: a fork's parent may be outside the scope. */
   byId: ReadonlyMap<string, Session>;
   /** True for a session this tab lists. */
@@ -182,9 +182,9 @@ function StatusButtons({ session, change }: Pick<DetailPanelProps, "session" | "
   );
 }
 
-function Facts({ session, now, names, projects, workspaceRoot }: Pick<DetailPanelProps, "session" | "now" | "names" | "projects" | "workspaceRoot">): ReactElement {
+function Facts({ session, now, names, projects, workspaceRoots }: Pick<DetailPanelProps, "session" | "now" | "names" | "projects" | "workspaceRoots">): ReactElement {
   const { summary } = session;
-  const folder = startedIn(session, projects, workspaceRoot);
+  const folder = startedIn(session, projects, workspaceRoots);
   const status = statusOf(session);
   return (
     <dl className={styles.facts} data-testid="facts">
@@ -289,7 +289,7 @@ export function DetailPanel(props: DetailPanelProps): ReactElement {
           <StatusButtons session={session} change={props.change} />
           <NoteField session={session} change={props.change} onDraftNote={props.onDraftNote} />
           {failure !== null && failure.session === session.id && (
-            <p className={styles.failure} role="alert" data-testid="change-failure">
+            <p className={styles.failure} role="alert" title={failure.reason} data-testid="change-failure">
               <WarningIcon size={14} />
               <span>{failure.text}</span>
             </p>

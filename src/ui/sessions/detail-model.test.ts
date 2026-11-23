@@ -83,23 +83,30 @@ describe("started in", () => {
   });
 
   it("is the folder relative to the session's project, with the branch", () => {
-    expect(startedIn(inProject("/ws/Projects/alpha/docs", ["alpha"], "main"), PROJECTS, "/ws")).toEqual({ folder: "docs/", root: null, branch: "main" });
-    expect(startedIn(inProject("/ws/Projects/alpha"), PROJECTS, "/ws/")).toEqual({ folder: "./", root: "project root", branch: null });
+    expect(startedIn(inProject("/ws/Projects/alpha/docs", ["alpha"], "main"), PROJECTS, ["/ws"])).toEqual({ folder: "docs/", root: null, branch: "main" });
+    expect(startedIn(inProject("/ws/Projects/alpha"), PROJECTS, ["/ws/"])).toEqual({ folder: "./", root: "project root", branch: null });
   });
 
   it("is relative to the workspace for the Workspace bucket, or when the project's folder does not hold it", () => {
-    expect(startedIn(inProject("/ws/notes", []), PROJECTS, "/ws")).toEqual({ folder: "notes/", root: null, branch: null });
-    expect(startedIn(inProject("/ws", []), PROJECTS, "/ws")).toEqual({ folder: "./", root: "workspace root", branch: null });
-    expect(startedIn(inProject("/ws/Projects/beta/src", ["alpha"]), PROJECTS, "/ws")).toEqual({ folder: "Projects/beta/src/", root: null, branch: null });
+    expect(startedIn(inProject("/ws/notes", []), PROJECTS, ["/ws"])).toEqual({ folder: "notes/", root: null, branch: null });
+    expect(startedIn(inProject("/ws", []), PROJECTS, ["/ws"])).toEqual({ folder: "./", root: "workspace root", branch: null });
+    expect(startedIn(inProject("/ws/Projects/beta/src", ["alpha"]), PROJECTS, ["/ws"])).toEqual({ folder: "Projects/beta/src/", root: null, branch: null });
+  });
+
+  it("is relative to the project also through a symlinked workspace, whichever way the transcript records the folder", () => {
+    const roots = ["/private/ws", "/ws"];
+    expect(startedIn(inProject("/private/ws/Projects/alpha/docs"), PROJECTS, roots)).toEqual({ folder: "docs/", root: null, branch: null });
+    expect(startedIn(inProject("/ws/Projects/alpha"), PROJECTS, roots)).toEqual({ folder: "./", root: "project root", branch: null });
+    expect(startedIn(inProject("/private/ws/notes", []), PROJECTS, roots)).toEqual({ folder: "notes/", root: null, branch: null });
   });
 
   it("is the folder as recorded outside the workspace, or before the workspace is known", () => {
-    expect(startedIn(inProject("/elsewhere/x", []), PROJECTS, "/ws")).toEqual({ folder: "/elsewhere/x", root: null, branch: null });
-    expect(startedIn(inProject("/ws/Projects/alpha/docs"), PROJECTS, null)).toEqual({ folder: "/ws/Projects/alpha/docs", root: null, branch: null });
+    expect(startedIn(inProject("/elsewhere/x", []), PROJECTS, ["/ws"])).toEqual({ folder: "/elsewhere/x", root: null, branch: null });
+    expect(startedIn(inProject("/ws/Projects/alpha/docs"), PROJECTS, [])).toEqual({ folder: "/ws/Projects/alpha/docs", root: null, branch: null });
   });
 
   it("is nothing when the transcript records no folder", () => {
-    expect(startedIn(inProject(null), PROJECTS, "/ws")).toBeNull();
+    expect(startedIn(inProject(null), PROJECTS, ["/ws"])).toBeNull();
   });
 });
 
@@ -152,11 +159,20 @@ describe("the note", () => {
 });
 
 describe("a failed change", () => {
-  it("says what was not done and the backend's reason", () => {
-    expect(failureText("status", new HostError("io-error", "The record of session \"s\" cannot be used: not a mapping. Fix or delete the file."))).toBe(
-      "The status was not changed: The record of session \"s\" cannot be used: not a mapping. Fix or delete the file.",
-    );
-    expect(failureText("note", new HostError("not-ready", "No workspace is open"))).toBe("The note was not saved: No workspace is open.");
-    expect(failureText("status", new Error(""))).toBe("The status was not changed.");
+  it("says what was not done and why in plain words; the backend's reason is kept for the hover", () => {
+    const unwritable = new HostError("io-error", "/ws/Apps/pomade-agents/sessions/s.yaml could not be written (EACCES: permission denied)");
+    expect(failureText("status", unwritable)).toEqual({
+      text: "The status was not changed. The record file could not be written.",
+      reason: "/ws/Apps/pomade-agents/sessions/s.yaml could not be written (EACCES: permission denied)",
+    });
+    expect(failureText("note", new HostError("not-ready", "No workspace is open in Pomade, so session records are not kept."))).toEqual({
+      text: "The note was not saved. Session records are not kept right now.",
+      reason: "No workspace is open in Pomade, so session records are not kept.",
+    });
+    expect(failureText("status", new HostError("not-found", 'No session "s"')).text).toBe("The status was not changed. The session is no longer there.");
+    expect(failureText("status", new HostError("app-not-responding", "no answer in 5000 ms")).text).toBe("The status was not changed. The app's backend did not answer in time.");
+    expect(failureText("status", new HostError("app-absent", "pomade-agents is not served")).text).toBe("The status was not changed. The app's backend is not running.");
+    expect(failureText("status", new Error("the backend's answer was malformed"))).toEqual({ text: "The status was not changed. Something went wrong.", reason: "the backend's answer was malformed" });
+    expect(failureText("note", new Error(""))).toEqual({ text: "The note was not saved. Something went wrong.", reason: "Something went wrong." });
   });
 });

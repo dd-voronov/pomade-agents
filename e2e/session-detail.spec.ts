@@ -1,9 +1,10 @@
 // The session detail through the built backend and the fake Pomade: clicking a session turns the
 // table into the list with the detail panel, whose facts match the transcript; the status buttons
 // and the note field write the record file through `sessions.setStatus`, and what they set stays
-// after a frame reload and a backend restart; a refused change says so and leaves the row as it
-// was; Esc returns to the table with the row in view; ↑ ↓ move the selection in both layouts; a
-// long answer is clamped with "Show more".
+// after a frame reload and a backend restart; a refused change says so in plain words and leaves
+// the row as it was; Esc returns to the table with the row in view; ↑ ↓ move the selection in both
+// layouts, each written to the tab's route with `tabs.setRoute`; a long answer is clamped with
+// "Show more"; "Started in" is relative to the project through a symlinked workspace.
 
 import { chmod, readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -44,6 +45,16 @@ async function seedDetail(sandbox: Sandbox): Promise<void> {
   );
   await claudeSession(sandbox, ONE, prompt("Check the context bar thresholds", "2026-11-15T09:00:00.000Z", alpha) + answer({ model: "claude-sonnet-5-5", input: 20_000, at: "2026-11-15T09:01:00.000Z", cwd: alpha }));
   await claudeSession(sandbox, BUCKET, prompt("Ad-hoc question about the workspace", "2026-11-14T09:00:00.000Z", "/elsewhere"));
+}
+
+/** Pomade names the workspace through a symlink; the transcripts record their folders with the
+ *  symlink resolved, as an agent started there does. */
+async function seedLinked(sandbox: Sandbox): Promise<void> {
+  await seedIntoProject(sandbox, "alpha");
+  const alpha = join(sandbox.workspaceReal, "Projects", "alpha");
+  await claudeSession(sandbox, DOCS, prompt("Write the sessions doc", "2026-11-16T09:00:00.000Z", join(alpha, "docs"), "feature/docs"));
+  await claudeSession(sandbox, ONE, prompt("Check the context bar thresholds", "2026-11-15T09:00:00.000Z", alpha));
+  await claudeSession(sandbox, BUCKET, prompt("Ad-hoc question about the workspace", "2026-11-14T09:00:00.000Z", join(sandbox.workspaceReal, "Knowledge")));
 }
 
 async function sessions(pomade: FakePomade): Promise<Session[]> {
@@ -236,7 +247,10 @@ test.describe("the session detail", () => {
     await chmod(folder, 0o555);
     try {
       await alpha.getByTestId("status-done").click();
-      await expect(alpha.getByTestId("change-failure")).toContainText("The status was not changed");
+      const failure = alpha.getByTestId("change-failure");
+      await expect(failure).toHaveText("The status was not changed. The record file could not be written.");
+      // The backend's reason is on hover: the record file and the system's words, never a temporary file.
+      await expect(failure).toHaveAttribute("title", `${file} could not be written (EACCES: permission denied)`);
       await expect(alpha.getByTestId("status-active")).toHaveAttribute("aria-pressed", "true");
       await expect(alpha.getByTestId("status-tab-active")).toHaveAttribute("aria-selected", "true");
       await expect(row(alpha, DOCS)).toHaveAttribute("data-status", "active");
@@ -244,7 +258,7 @@ test.describe("the session detail", () => {
 
       await alpha.getByTestId("note-input").fill("Will not stick");
       await alpha.getByTestId("note-input").press("Enter");
-      await expect(alpha.getByTestId("change-failure")).toContainText("The note was not saved");
+      await expect(alpha.getByTestId("change-failure")).toHaveText("The note was not saved. The record file could not be written.");
       await expect(row(alpha, DOCS).getByTestId("session-note")).toHaveCount(0);
       await expect(alpha.getByTestId("note-input")).toHaveValue("Will not stick");
     } finally {
@@ -266,6 +280,9 @@ test.describe("the session detail", () => {
     const alpha = await openSessions(page, openShell, pomade, "alpha");
     const table = alpha.getByTestId("sessions-table");
     await expect(table).toBeVisible();
+    // Selecting writes the tab's route by itself (`tabs.setRoute`): the host opens nothing more.
+    const opened = pomade.fake.openedTabs.length;
+    const tabRoute = (): string | undefined => pomade.fake.appTabs.find((t) => t.projectId === "alpha")?.route;
 
     // In the table (the tab focused, nothing selected), the first ↓ selects the first row.
     await alpha.getByRole("heading", { name: "Sessions", exact: true }).click();
@@ -275,6 +292,7 @@ test.describe("the session detail", () => {
     await expect(alpha.getByTestId("detail-panel")).toHaveAttribute("data-session-id", ONE);
     await page.keyboard.press("ArrowDown");
     await expect(alpha.getByTestId("detail-panel")).toHaveAttribute("data-session-id", ONE);
+    await expect.poll(tabRoute).toBe(`sessions/${ONE}`);
 
     // The last Done row, below the fold of the table: selected from the list's Done tab.
     await alpha.getByTestId("status-tab-done").click();
@@ -295,14 +313,23 @@ test.describe("the session detail", () => {
     expect(await table.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
     expect(await inView(alpha, id)).toBe(true);
 
+    await expect.poll(tabRoute).toBe("sessions");
+
     // ↑ goes on from that row.
     await page.keyboard.press("ArrowUp");
     await expect(alpha.getByTestId("detail-panel")).toHaveAttribute("data-session-id", above);
+    await expect.poll(tabRoute).toBe(`sessions/${above}`);
 
     // × closes as Esc does.
     await alpha.getByTestId("detail-close").click();
     await expect(table).toBeVisible();
     await expect(row(alpha, above)).toHaveAttribute("data-last-selected", "");
+    await expect.poll(tabRoute).toBe("sessions");
+    expect(pomade.fake.openedTabs).toHaveLength(opened);
+
+    // A route Pomade navigates the tab to selects what it names, also the one it last sent.
+    pomade.fake.openAppTab({ projectId: "alpha", route: `sessions/${DOCS}` });
+    await expect(alpha.getByTestId("detail-panel")).toHaveAttribute("data-session-id", DOCS);
     expect(backend.running()).toBe(true);
   });
 
@@ -319,6 +346,27 @@ test.describe("the session detail", () => {
     await expect(workspace.getByTestId("fact-project")).toHaveText("Workspace");
     await expect(workspace.getByTestId("fact-started-in")).toHaveText("/elsewhere");
     await expect(workspace.getByTestId("last-answer")).toHaveText("No answer yet.");
+    expect(backend.running()).toBe(true);
+  });
+});
+
+test.describe("the session detail through a symlinked workspace", () => {
+  test.use({ seed: { into: seedLinked }, workspaceLink: true, viewport: { width: 1280, height: 720 } });
+
+  test("Started in is relative to the project and to the workspace", async ({ page, openShell, pomade, sandbox, backend }) => {
+    expect(sandbox.workspace).not.toBe(sandbox.workspaceReal);
+    await ready(pomade);
+    const alpha = await openSessions(page, openShell, pomade, "alpha");
+    await row(alpha, DOCS).click();
+    await expect(alpha.getByTestId("fact-started-in")).toHaveText("docs/on feature/docs");
+    await row(alpha, ONE).click();
+    await expect(alpha.getByTestId("detail-panel")).toHaveAttribute("data-session-id", ONE);
+    await expect(alpha.getByTestId("fact-started-in")).toHaveText("./project root");
+
+    const workspace = await openSessions(page, openShell, pomade, null);
+    await row(workspace, BUCKET).click();
+    await expect(workspace.getByTestId("fact-project")).toHaveText("Workspace");
+    await expect(workspace.getByTestId("fact-started-in").locator("code")).toHaveText("Knowledge/");
     expect(backend.running()).toBe(true);
   });
 });

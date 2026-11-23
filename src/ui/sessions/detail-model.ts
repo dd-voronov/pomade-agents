@@ -3,7 +3,8 @@
 // start folder relative to the project, the message blocks, the note's save rule and how a failed
 // change reads. Values read as in the table (`table-model.ts`).
 
-import type { ProjectRef } from "pomade-kit/protocol";
+import type { ErrorCode, ProjectRef } from "pomade-kit/protocol";
+import { HostError } from "pomade-kit/sdk";
 
 import type { Session, SessionProvider, TimedText } from "../../shared/sessions.ts";
 import { formatStamp, projectLabel, rowName } from "./table-model.ts";
@@ -67,20 +68,32 @@ export interface StartedIn {
   branch: string | null;
 }
 
+/** The first of `roots` that holds `path`, as `path` relative to it; `null` when none does. */
+function relativeToAny(roots: readonly string[], path: string): string | null {
+  for (const root of roots) {
+    const relative = relativeTo(root, path);
+    if (relative !== null) return relative;
+  }
+  return null;
+}
+
 /** The start folder relative to the session's (first) project, else to the workspace, else as
- *  recorded; `null` when the transcript records none. */
-export function startedIn(session: Session, projects: ReadonlyMap<string, ProjectRef>, workspaceRoot: string | null): StartedIn | null {
+ *  recorded; `null` when the transcript records none. `workspaceRoots` are the workspace's root
+ *  with symlinks resolved and as Pomade names it (`app.info`'s `workspaceReal`, `workspace`): a
+ *  transcript records the folder either way. Empty while the workspace is not known. */
+export function startedIn(session: Session, projects: ReadonlyMap<string, ProjectRef>, workspaceRoots: readonly string[]): StartedIn | null {
   const { cwd, branch } = session.summary;
   if (cwd === null) return null;
   const as = (relative: string, root: "project root" | "workspace root"): StartedIn =>
     relative === "" ? { folder: "./", root, branch } : { folder: `${relative}/`, root: null, branch };
-  if (workspaceRoot !== null) {
-    const project = projects.get(session.attribution.projects[0] ?? "");
-    const inProject = project === undefined ? null : relativeTo(project.root === "" ? workspaceRoot : `${workspaceRoot.replace(/\/+$/, "")}/${project.root}`, cwd);
+  const project = projects.get(session.attribution.projects[0] ?? "");
+  if (project !== undefined) {
+    const projectRoots = workspaceRoots.map((root) => (project.root === "" ? root : `${root.replace(/\/+$/, "")}/${project.root}`));
+    const inProject = relativeToAny(projectRoots, cwd);
     if (inProject !== null) return as(inProject, "project root");
-    const inWorkspace = relativeTo(workspaceRoot, cwd);
-    if (inWorkspace !== null) return as(inWorkspace, "workspace root");
   }
+  const inWorkspace = relativeToAny(workspaceRoots, cwd);
+  if (inWorkspace !== null) return as(inWorkspace, "workspace root");
   return { folder: cwd, root: null, branch };
 }
 
@@ -129,9 +142,26 @@ export function draftNote(draft: string): string | undefined {
 
 export type ChangeKind = "status" | "note";
 
-/** What the panel says when a change fails: what was not done, and the backend's reason. */
-export function failureText(kind: ChangeKind, error: unknown): string {
-  const lead = kind === "status" ? "The status was not changed" : "The note was not saved";
-  const reason = (error instanceof Error ? error.message : String(error)).trim().replace(/\.$/, "");
-  return reason === "" ? `${lead}.` : `${lead}: ${reason}.`;
+/** A failed change as the panel shows it: `text` in plain words, `reason` (the backend's own
+ *  words, paths included) on hover. */
+export interface FailureText {
+  text: string;
+  reason: string;
+}
+
+/** What went wrong, by the error's Host API code (HOST-API §4 `apps.call`, CONTRACTS "Published API"). */
+const CAUSES: Partial<Record<ErrorCode, string>> = {
+  "io-error": "The record file could not be written.",
+  "not-ready": "Session records are not kept right now.",
+  "not-found": "The session is no longer there.",
+  "app-absent": "The app's backend is not running.",
+  "app-not-responding": "The app's backend did not answer in time.",
+};
+
+/** What the panel says when a change fails: what was not done and, in plain words, why. */
+export function failureText(kind: ChangeKind, error: unknown): FailureText {
+  const lead = kind === "status" ? "The status was not changed." : "The note was not saved.";
+  const cause = (error instanceof HostError ? CAUSES[error.code] : undefined) ?? "Something went wrong.";
+  const reason = (error instanceof Error ? error.message : String(error)).trim();
+  return { text: `${lead} ${cause}`, reason: reason === "" ? cause : reason };
 }

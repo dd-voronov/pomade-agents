@@ -56,10 +56,22 @@ test("the built backend serves app.info to Pomade with every location inside the
       version: manifest.version,
       startedAt: expect.any(String),
       workspace: sandbox.workspace,
+      workspaceReal: sandbox.workspace,
       dataDir: `${sandbox.workspace}/Apps/${manifest.id}`,
       stateDir,
     });
   expect(await readRunRecord(stateDir)).toMatchObject({ pid: backend.pid, version: manifest.version });
+});
+
+test.describe("through a symlinked workspace", () => {
+  test.use({ workspaceLink: true });
+
+  test("app.info names the workspace as Pomade does and with the symlink resolved", async ({ backend, pomade, sandbox }) => {
+    expect(sandbox.workspace).not.toBe(sandbox.workspaceReal);
+    await expect
+      .poll(() => pomade.fake.callApi(APP_INFO_METHOD).catch((err: unknown) => String(err)), { message: backend.output() })
+      .toMatchObject({ workspace: sandbox.workspace, workspaceReal: sandbox.workspaceReal });
+  });
 });
 
 test("the backend stops cleanly on SIGTERM and writes only its state folder (run record, parse index) and its data folder (settings, session records, agent profiles)", async ({ backend, pomade, sandbox, manifest }) => {

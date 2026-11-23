@@ -8,7 +8,7 @@
 // one per kind of store — the built-in Claude Code store, a folder agent's, and Codex's.
 
 import { createHash, randomBytes } from "node:crypto";
-import { cp, mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -31,7 +31,12 @@ export interface Sandbox {
   /** The throwaway folder; everything below is inside it. */
   readonly root: string;
   readonly home: string;
+  /** The workspace as Pomade names it: the copy of the fixture workspace, or a symlink to it
+   *  (`createSandbox`'s `workspaceLink`). */
   readonly workspace: string;
+  /** The workspace with symlinks resolved: where its files are, and how a transcript records a
+   *  folder inside it. */
+  readonly workspaceReal: string;
   readonly userData: string;
   /** `<userData>/run/pomade.sock`. */
   readonly socketPath: string;
@@ -91,10 +96,16 @@ export async function fixtureSnapshots(): Promise<{ home: Record<string, string>
   }
 }
 
-export async function createSandbox(appId: string): Promise<Sandbox> {
+export interface SandboxOptions {
+  /** Pomade names the workspace through a symlink (`<root>/workspace-link` → `<root>/workspace`). */
+  workspaceLink?: boolean;
+}
+
+export async function createSandbox(appId: string, options: SandboxOptions = {}): Promise<Sandbox> {
   const root = await mkdtemp(join(await realpath(tmpdir()), "pa-"));
   const home = join(root, "home");
-  const workspace = join(root, "workspace");
+  const workspaceReal = join(root, "workspace");
+  const workspace = options.workspaceLink === true ? join(root, "workspace-link") : workspaceReal;
   const userData = join(root, "ud");
   const socketPath = join(userData, "run", "pomade.sock");
   const tooLong = socketPathProblem(socketPath);
@@ -103,7 +114,8 @@ export async function createSandbox(appId: string): Promise<Sandbox> {
     throw new Error(`sandbox: ${tooLong}`);
   }
   await cp(join(FIXTURES, "home"), home, { recursive: true });
-  await cp(join(FIXTURES, "workspace"), workspace, { recursive: true });
+  await cp(join(FIXTURES, "workspace"), workspaceReal, { recursive: true });
+  if (workspace !== workspaceReal) await symlink(workspaceReal, workspace);
   await seedTranscripts(root);
   const appKey = randomBytes(16).toString("hex");
   const keyFile = join(userData, "app-keys", appId);
@@ -114,6 +126,7 @@ export async function createSandbox(appId: string): Promise<Sandbox> {
     root,
     home,
     workspace,
+    workspaceReal,
     userData,
     socketPath,
     appKey,

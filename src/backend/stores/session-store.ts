@@ -3,7 +3,8 @@
 //
 // Watching: one recursive `fs.watch` per store root. On macOS that is one FSEvents stream per root
 // — no descriptor per file or folder, so hundreds of transcripts carry no EMFILE risk, and events
-// arrive within milliseconds. An event names a path; the path is stat'ed and read from its parsed
+// arrive within milliseconds. The stream starts on a thread of its own, so a root is walked when
+// its watch starts and once more `STREAM_START_MS` later, for what changed before events flowed. An event names a path; the path is stat'ed and read from its parsed
 // offset, so a coalesced, repeated or missed-detail event only costs a stat. FSEvents may swallow a
 // second change to a path that changed moments before, so a transcript that changed is read once
 // more `RECHECK_MS` later, until a read finds nothing new. A root that does not
@@ -43,6 +44,9 @@ const SAVE_MS = 5000;
 const TICK_MS = 2000;
 /** How long after a transcript changed it is read once more (FSEvents may swallow the next change). */
 const RECHECK_MS = 500;
+/** How long after a root's watch starts it is walked once more: the FSEvents stream starts on its
+ *  own thread, and what changes before it runs reaches no event. */
+const STREAM_START_MS = 1000;
 
 export interface SessionStoreOptions {
   /** The user's home: the built-in stores are under it. `null`: no built-in stores. */
@@ -91,6 +95,8 @@ interface Entry {
 interface WatchedRoot {
   root: StoreRoot;
   watcher: FSWatcher | null;
+  /** The walk once the watch is surely running. */
+  catchUp: ReturnType<typeof setTimeout> | null;
 }
 
 const isInside = (folder: string, path: string): boolean => path === folder || path.startsWith(folder + sep);
@@ -278,6 +284,8 @@ export async function startSessionStore(options: SessionStoreOptions): Promise<S
   const unwatch = (watched: WatchedRoot): void => {
     watched.watcher?.close();
     watched.watcher = null;
+    if (watched.catchUp !== null) clearTimeout(watched.catchUp);
+    watched.catchUp = null;
   };
 
   /** Start watching a root that exists, then walk it. */
@@ -294,6 +302,11 @@ export async function startSessionStore(options: SessionStoreOptions): Promise<S
       unwatch(watched);
     });
     queueFolder(root, root.path);
+    watched.catchUp = setTimeout(() => {
+      watched.catchUp = null;
+      queueFolder(root, root.path);
+      settle();
+    }, STREAM_START_MS);
   };
 
   /** Bring the roots in line with the roster and with what exists on disk. */
@@ -319,7 +332,7 @@ export async function startSessionStore(options: SessionStoreOptions): Promise<S
       roots.delete(path);
       for (const [file, entry] of entries) if (entry.file.root === watched.root) drop(file);
     }
-    for (const root of wanted) if (!roots.has(root.path)) roots.set(root.path, { root, watcher: null });
+    for (const root of wanted) if (!roots.has(root.path)) roots.set(root.path, { root, watcher: null, catchUp: null });
     for (const watched of roots.values()) {
       const present = await exists(watched.root.path);
       if (isStopped()) return;

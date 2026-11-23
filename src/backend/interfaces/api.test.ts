@@ -54,7 +54,7 @@ function api() {
     get: (id) => LISTED.find((s) => s.id === id),
   };
   const live = { entries: () => [] };
-  const info = { version: "0", startedAt: "", workspace: null, dataDir: null, stateDir: "/s" };
+  const info = { version: "0", startedAt: "", workspace: null, workspaceReal: null, dataDir: null, stateDir: "/s" };
   const roster: ApiSources["roster"] = {
     answer: () => ({ epoch: "r", revision: 1, agents: [], profilesOff: null }),
     list: () => LISTED_AGENTS.map((id) => ({ id, name: id, command: id, provider: AGENTS[id]?.profile.provider ?? "claude" })),

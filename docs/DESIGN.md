@@ -518,7 +518,8 @@ pomade-agents show     [--session <id>] [--json]
 | agent tab exited, app-published events, subscriptions | `pomade:E-031` |
 | tab ↔ session bindings, titles both ways, live state, focus / launch / resume, "+" menu + clock icon | `pomade:E-033` |
 | opening a Runner run's attached terminal | `pomade:E-034` |
-| Host API client, fake host | `pomade-kit:E-001` |
+| the tab's own route when it navigates by itself (`tabs.setRoute`: the selection) | `pomade:E-045` |
+| Host API client, fake host (`pomade-kit` v0.14.0) | `pomade-kit:E-001` |
 
 ## 9. Placement
 

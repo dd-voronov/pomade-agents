@@ -6,10 +6,10 @@
 export type FrameId = string;
 
 export type ShellToHost =
-  /** The shell created a frame: attach it to the host before its page loads. A tab frame names
-   *  the project whose tab strip it is in. */
+  /** The shell created a frame: attach it to the host before its page loads. A tab frame shows
+   *  the app tab the host opened (`tab` below). */
   | { type: "open"; frame: FrameId; surface: "panel"; icon: string }
-  | { type: "open"; frame: FrameId; surface: "tab"; route: string; projectId: string }
+  | { type: "open"; frame: FrameId; surface: "tab"; tabId: string }
   /** A message the frame posted to its parent window. */
   | { type: "message"; frame: FrameId; data: unknown };
 
@@ -18,6 +18,10 @@ export type HostToShell =
   | { type: "ready"; app: { id: string; name: string; icon: string | null; strip: { id: string; title: string }[] } }
   /** A message for the frame, to deliver with postMessage. */
   | { type: "post"; frame: FrameId; message: unknown }
-  /** The app asked for its tab in a project (`tabs.openApp`): show that project's tab, creating it
-   *  at `route` when the project has none. An existing tab was already navigated by the host. */
-  | { type: "tab"; projectId: string; route: string };
+  /** The host opened one of the app's tabs (`tabs.openApp`, `fake.openAppTab`): add it to the tab
+   *  strip with a frame showing it, and show it. */
+  | { type: "tab-opened"; tabId: string; projectId: string }
+  /** The host focused an open tab of the app: show it. Its route was already sent to its frames. */
+  | { type: "tab-focused"; tabId: string }
+  /** The tab closed (`tabs.close`, `fake.closeAppTab`): remove it and its frame. */
+  | { type: "tab-closed"; tabId: string };

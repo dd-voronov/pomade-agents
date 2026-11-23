@@ -3,8 +3,9 @@
 // through a WebSocket to the shell page, over postMessage for its frames. One fake host answers
 // both, so a frame's `apps.call` reaches the backend that called `api.serve`, as in Pomade.
 //
-// It also plays the part of Pomade's tab strip the fake host only records: one tab of the app per
-// project, opened at a route or navigated to it (HOST-API §4 `tabs.openApp`).
+// The app's own tabs are the fake host's (HOST-API §4 `tabs.openApp`, `tabs.setRoute`): it opens,
+// focuses, navigates and closes them as Pomade does; the shell page shows each one with a frame
+// attached to it, which follows the tab's route.
 
 import { mkdir, rm } from "node:fs/promises";
 import { createServer, type Server, type Socket } from "node:net";
@@ -132,38 +133,40 @@ export async function startFakePomade(options: FakePomadeOptions): Promise<FakeP
 
   shellServer.on("connection", (ws: WebSocket) => {
     const frames = new Map<FrameId, FrameConnection>();
-    /** The app's tab in each project's tab strip, by project id. */
-    const tabs = new Map<string, FrameConnection>();
+    /** The frames showing each app tab, by tab id. */
+    const tabFrames = new Map<string, FrameId[]>();
     const send = (message: HostToShell): void => {
       if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(message));
     };
-
-    /** Act on the `tabs.openApp` calls a frame of this shell just made, as Pomade's tab strip does. */
-    const followOpenedTabs = (from: number): void => {
-      for (const opened of fake.openedTabs.slice(from)) {
-        if (opened.kind !== "app") continue;
-        tabs.get(opened.projectId)?.navigate(opened.route);
-        send({ type: "tab", projectId: opened.projectId, route: opened.route });
+    const unfollow = fake.onAppTab(({ change, tab }) => {
+      if (change === "open") send({ type: "tab-opened", tabId: tab.tabId, projectId: tab.projectId });
+      else if (change === "focus") send({ type: "tab-focused", tabId: tab.tabId });
+      else if (change === "close") {
+        for (const frame of tabFrames.get(tab.tabId) ?? []) {
+          frames.get(frame)?.detach();
+          frames.delete(frame);
+        }
+        tabFrames.delete(tab.tabId);
+        send({ type: "tab-closed", tabId: tab.tabId });
       }
-    };
+    });
 
     ws.on("message", (raw) => {
       const message = JSON.parse(String(raw)) as ShellToHost;
       if (message.type === "open") {
         const frame = message.frame;
-        const connection = fake.attach(
-          (data) => send({ type: "post", frame, message: data }),
-          message.surface === "panel" ? { surface: "panel", icon: message.icon } : { surface: "tab", route: message.route },
-        );
-        frames.set(frame, connection);
-        if (message.surface === "tab") tabs.set(message.projectId, connection);
+        const post = (data: unknown): void => send({ type: "post", frame, message: data });
+        if (message.surface === "panel") frames.set(frame, fake.attach(post, { surface: "panel", icon: message.icon }));
+        else {
+          frames.set(frame, fake.attach(post, { tabId: message.tabId }));
+          tabFrames.set(message.tabId, [...(tabFrames.get(message.tabId) ?? []), frame]);
+        }
         return;
       }
-      const before = fake.openedTabs.length;
       frames.get(message.frame)?.receive(message.data);
-      followOpenedTabs(before);
     });
     ws.on("close", () => {
+      unfollow();
       for (const connection of frames.values()) connection.detach();
     });
 
@@ -176,6 +179,8 @@ export async function startFakePomade(options: FakePomadeOptions): Promise<FakeP
         strip: (manifest.strip ?? []).filter((icon) => icon.action !== "tab").map(({ id, title }) => ({ id, title })),
       },
     });
+    // Tabs the host opened before this window connected (Pomade restores them at launch).
+    for (const tab of fake.appTabs) send({ type: "tab-opened", tabId: tab.tabId, projectId: tab.projectId });
   });
 
   return {

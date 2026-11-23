@@ -8,14 +8,13 @@ import type { SessionStatus } from "pomade-kit/protocol";
 import type { HostClient } from "pomade-kit/sdk";
 
 import { SESSIONS_SET_STATUS_METHOD, isSessionsUpdated, type Session, type SetStatusParams } from "../../shared/sessions.ts";
-import { failureText, type ChangeKind } from "./detail-model.ts";
+import { failureText, type ChangeKind, type FailureText } from "./detail-model.ts";
 
 const ANSWER_TIMEOUT_MS = 5000;
 
-export interface Failure {
+export interface Failure extends FailureText {
   session: string;
   kind: ChangeKind;
-  text: string;
 }
 
 export interface StatusChange {
@@ -42,7 +41,7 @@ export function useStatusChange(host: HostClient, update: (sessions: readonly Se
           setFailure((f) => (f?.session === session ? null : f));
           return true;
         } catch (err) {
-          setFailure({ session, kind, text: failureText(kind, err) });
+          setFailure({ session, kind, ...failureText(kind, err) });
           return false;
         }
       };

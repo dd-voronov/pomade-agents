@@ -26,7 +26,8 @@ describe("manifest.json", () => {
       strip: [{ id: "agents", title: "Agents", action: "panel", route: "" }],
       backend: { entry: "backend/main.mjs", mode: "with-pomade" },
     });
-    expect(parsed.unsupportedKeys).toEqual(["outsideWorkspace"]);
+    expect(parsed.unsupportedKeys).toEqual([]);
+    expect(parsed.manifest.outsideWorkspace).toEqual(["~/.claude/", "~/.codex/", "~/.zshrc"]);
     // The UI hears the backend's change notices through the app's own published events; other apps
     // hear the session events; the backend follows Pomade's projects and agent tabs, and Runner's
     // runs, for project attribution, live state and event B.
@@ -44,7 +45,7 @@ describe("manifest.json", () => {
   it("declares exactly the API methods the backend serves", () => {
     const api = (raw as { api: string[] }).api;
     expect(api).toEqual([...API_METHODS]);
-    const info = { version: "0", startedAt: "", workspace: null, dataDir: null, stateDir: "/s" };
+    const info = { version: "0", startedAt: "", workspace: null, workspaceReal: null, dataDir: null, stateDir: "/s" };
     const none = (): Promise<never> => Promise.reject(new Error("not called"));
     const sessions = {
       answer: () => ({ epoch: "e", revision: 0, full: true, sessions: [], removed: [], indexing: false, recordsOff: null }),

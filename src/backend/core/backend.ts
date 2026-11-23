@@ -4,6 +4,8 @@
 // (HOST-API §2 "Backends"). Pomade starts it with the app and stops it with SIGTERM; a requested
 // stop publishes the status changes still inside their window first.
 
+import { realpath } from "node:fs/promises";
+
 import type { HostClient } from "pomade-kit/sdk";
 import { stayConnected } from "pomade-kit/node";
 
@@ -52,7 +54,8 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
   const { appId, version, env, pid, log } = options;
   const locations = resolveLocations(env, appId);
   const startedAt = options.now().toISOString();
-  const info: AppInfo = { version, startedAt, ...locations };
+  const workspaceReal = locations.workspace === null ? null : await realpath(locations.workspace).catch(() => locations.workspace);
+  const info: AppInfo = { version, startedAt, ...locations, workspaceReal };
   await writeRunRecord(locations.stateDir, { pid, version, startedAt });
   log(`${appId} ${version} started (pid ${pid}); workspace ${locations.workspace ?? "none"}; state ${locations.stateDir}`);
 

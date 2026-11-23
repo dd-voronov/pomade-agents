@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, readdir, realpath, rm, unlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, readdir, realpath, rm, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -99,6 +99,25 @@ describe("the record store", () => {
     expect(await readFile(fileOf("bad"), "utf8")).toBe("status: [\n");
     expect(s.get("bad")?.problem).toContain("not valid YAML");
     await expect(s.update("none", (r) => r)).rejects.toMatchObject({ kind: "missing" });
+  });
+
+  it("a write refused by the system names the record file and the reason, never the temporary file", async () => {
+    const s = await open();
+    await s.create(record("a"));
+    const folder = join(dataDir, SESSIONS_FOLDER);
+    await chmod(folder, 0o555);
+    try {
+      const refused = await s.update("a", (r) => ({ ...r, status: "done" })).then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(refused).toBeInstanceOf(Error);
+      expect((refused as Error).message).toBe(`${fileOf("a")} could not be written (EACCES: permission denied)`);
+    } finally {
+      await chmod(folder, 0o755);
+    }
+    expect(s.get("a")?.value?.status).toBe("active");
+    expect((await readdir(folder)).filter((n) => n.endsWith(".tmp"))).toEqual([]);
   });
 
   it("runs changes to one record one after another, each from the last one's result", async () => {

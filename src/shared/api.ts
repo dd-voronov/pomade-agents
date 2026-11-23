@@ -41,8 +41,11 @@ export interface AppInfo {
   version: string;
   /** When this backend process started, ISO 8601. */
   startedAt: string;
-  /** The open workspace's root, absolute; `null` when Pomade has no workspace open. */
+  /** The open workspace's root, absolute, as Pomade names it; `null` when Pomade has no workspace open. */
   workspace: string | null;
+  /** The workspace's root with symlinks resolved — how transcripts record start folders inside it;
+   *  `workspace` when it cannot be resolved, `null` without a workspace. */
+  workspaceReal: string | null;
   /** `<workspace>/Apps/pomade-agents`, absolute; `null` without a workspace. */
   dataDir: string | null;
   /** `<userData>/app-state/pomade-agents`, absolute: the app's machine-local state. */
@@ -61,6 +64,7 @@ export function isAppInfo(value: unknown): value is AppInfo {
     typeof v.version === "string" &&
     typeof v.startedAt === "string" &&
     isStringOrNull(v.workspace) &&
+    isStringOrNull(v.workspaceReal) &&
     isStringOrNull(v.dataDir) &&
     typeof v.stateDir === "string"
   );
