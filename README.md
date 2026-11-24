@@ -35,7 +35,7 @@ The gate: `npm run lint && npm run typecheck && npm run build && npm run test:un
 |---|---|
 | `public/` | `manifest.json` — the single source of the app's id, version and API list — and the strip icon |
 | `src/shared/` | what the UI and the backend share: the API's method names and shapes |
-| `src/ui/core/` | the app shell: handshake, routes and surfaces, the tab's view switch, empty and unavailable states, tokens |
+| `src/ui/core/` | the app shell: handshake, routes and surfaces, the tab's view switch, empty and unavailable states, theme |
 | `src/ui/sessions/` · `src/ui/roster/` | the Live now panel and the Sessions view · the Roster view |
 | `src/backend/core/` | the backend process: locations, run record, connection to Pomade |
 | `src/backend/stores/` | the agents' session stores: transcript parsers, the price table, the parse index, watching |

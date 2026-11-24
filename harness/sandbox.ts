@@ -144,6 +144,7 @@ export async function createSandbox(appId: string, options: SandboxOptions = {})
       [POMADE_ENV.socket]: socketPath,
       [POMADE_ENV.keeperSocket]: keeperSocketPath(userData, appId),
       [POMADE_ENV.workspace]: workspace,
+      [POMADE_ENV.appState]: join(userData, "app-state", appId),
     }),
     snapshot: (folder) => {
       if (folder !== root && !folder.startsWith(root + sep)) throw new Error(`sandbox: ${folder} is outside ${root}`);

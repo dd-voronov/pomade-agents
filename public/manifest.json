@@ -29,6 +29,7 @@
       "pomade.ready",
       "project.created",
       "project.renamed",
+      "project.removed",
       "agentTab.changed",
       "agentTab.exited",
       "pomade-runner:run.started",

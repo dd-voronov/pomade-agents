@@ -2,7 +2,7 @@
 // strip icon, the app's tabs the host opens in the tab area — and relays each frame's postMessage traffic to
 // the fake host in Node (`?host=<ws url>`); `?app=<url>` is the app's page.
 
-import "../../src/ui/core/tokens.css";
+import "pomade-kit/tokens.css";
 import "./shell.css";
 import type { FrameId, HostToShell, ShellToHost } from "../fake-pomade/shell-protocol.ts";
 

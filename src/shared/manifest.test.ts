@@ -34,7 +34,7 @@ describe("manifest.json", () => {
     expect(parsed.manifest.capabilities).toEqual(["project.read", "agentTabs.read"]);
     expect(parsed.manifest.events).toEqual({
       publish: ["sessions.changed", ROSTER_CHANGED_EVENT, SESSION_TURN_FINISHED_EVENT, SESSION_CLOSED_EVENT, SESSION_STATUS_CHANGED_EVENT],
-      subscribe: ["pomade-agents:sessions.changed", "pomade-agents:roster.changed", "pomade.ready", "project.created", "project.renamed", "agentTab.changed", "agentTab.exited", RUN_STARTED_EVENT, RUN_FINISHED_EVENT],
+      subscribe: ["pomade-agents:sessions.changed", "pomade-agents:roster.changed", "pomade.ready", "project.created", "project.renamed", "project.removed", "agentTab.changed", "agentTab.exited", RUN_STARTED_EVENT, RUN_FINISHED_EVENT],
     });
   });
 

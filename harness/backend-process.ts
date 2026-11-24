@@ -34,12 +34,14 @@ export interface SpawnBackendOptions {
   nodeArgs?: string[];
   /** Also print its output, prefixed (the dev script). */
   echo?: boolean;
+  /** Changes to the sandbox's backend environment; `undefined` unsets a variable. */
+  env?: Readonly<Record<string, string | undefined>>;
 }
 
 export function spawnBackend(sandbox: Sandbox, options: SpawnBackendOptions): BackendProcess {
   const child = spawn(process.execPath, [...(options.nodeArgs ?? []), options.entry], {
     cwd: dirname(dirname(options.entry)),
-    env: sandbox.backendEnv(),
+    env: { ...sandbox.backendEnv(), ...options.env },
     stdio: ["ignore", "pipe", "pipe"],
   });
   const { pid } = child;

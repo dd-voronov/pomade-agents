@@ -1,5 +1,6 @@
 // What the backend learns from Pomade on each connection (HOST-API §4): the projects — their stable
-// ids and folders (`project.list`, again on `project.created`, `project.renamed` and `pomade.ready`)
+// ids and folders (`project.list`, again on `project.created`, `project.renamed`, `project.removed`
+// and `pomade.ready`)
 // — and the agent tabs: which session each one is bound to, where it runs and what its agent is
 // doing (`agentTabs.list`, again on `pomade.ready`, then every `agentTab.changed`; pomade:E-033) —
 // and every end of an agent process in a tab, with the session bound to it then (`agentTab.exited`).
@@ -80,6 +81,7 @@ export function followPomade(host: HostClient, facts: PlatformFacts, { workspace
     await Promise.all([
       host.events.subscribe("project.created", () => run("list the projects", loadProjects)),
       host.events.subscribe("project.renamed", () => run("list the projects", loadProjects)),
+      host.events.subscribe("project.removed", () => run("list the projects", loadProjects)),
       host.events.subscribe("agentTab.changed", ({ tab, changes }) => {
         bindTab(tab);
         facts.tabChanged(tab, changes.includes("closed"));

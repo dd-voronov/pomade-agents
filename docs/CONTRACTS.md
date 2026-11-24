@@ -23,7 +23,7 @@ and the backend's handlers in step with it.
 | `hostApi` | `0` |
 | `capabilities` | `project.read` (projects, their stable ids, names and folders, their visible agents) · `agentTabs.read` (each agent tab's session, folder and live state) — the backend's project attribution, live state and the project ↔ agent connection; the Sessions tab's project names |
 | `strip` | one icon, `agents` — action `panel` |
-| `events` | publishes `sessions.changed` and `roster.changed` (for its own UI frames) and `session.turnFinished` (declared, never published), `session.closed`, `session.statusChanged` ("Published events" below); subscribes to `pomade-agents:sessions.changed` and `pomade-agents:roster.changed` (its own, for its UI frames), `project.created` and `project.renamed` (the backend, and the UI frames for project names) and, for the backend, `pomade.ready`, `agentTab.changed`, `agentTab.exited` and Runner's `pomade-runner:run.started`, `pomade-runner:run.finished` ("Subscribed events" below) |
+| `events` | publishes `sessions.changed` and `roster.changed` (for its own UI frames) and `session.turnFinished` (declared, never published), `session.closed`, `session.statusChanged` ("Published events" below); subscribes to `pomade-agents:sessions.changed` and `pomade-agents:roster.changed` (its own, for its UI frames), `project.created`, `project.renamed` and `project.removed` (the backend, and the UI frames for project names) and, for the backend, `pomade.ready`, `agentTab.changed`, `agentTab.exited` and Runner's `pomade-runner:run.started`, `pomade-runner:run.finished` ("Subscribed events" below) |
 | `backend` | `backend/main.mjs`, mode `with-pomade` |
 | `api` | the methods of "Published API" below — `sessions.forRepo`, `sessions.liveIn` and `roster.list` among them, which Pomade reads (HOST-API §4, "Platform reads of app APIs") |
 | `outsideWorkspace` | `~/.claude/`, `~/.codex/`, `~/.zshrc` — the paths outside the workspace the backend uses; Pomade shows them at install (HOST-API §1) |
@@ -50,8 +50,8 @@ One UI bundle; `welcome.surface` and the frame's route pick the view (`src/ui/co
   the tab's scope does not hold shows the table.
 - **A tab's scope** is the project it was opened in, `welcome.project`; the tab keeps it and ignores
   `project.changed`. The Workspace project's tab (`"__workspace__"`) shows every session, with a Project
-  column. Project names and roots come from `project.list`, asked again on `project.created` and
-  `project.renamed`; the detail panel's "started in" is the start folder relative to the project's
+  column. Project names and roots come from `project.list`, asked again on `project.created`,
+  `project.renamed` and `project.removed`; the detail panel's "started in" is the start folder relative to the project's
   root under the workspace `app.info` names — with symlinks resolved (`workspaceReal`), else as
   Pomade names it (`workspace`) — else relative to the workspace, else as recorded.
 - **Status and note** are set from the detail panel through `sessions.setStatus` ("Sessions"
@@ -553,9 +553,15 @@ type AgentRunFinished = AgentRunStarted & {
 
 ## Backend
 
-- **Environment** — what Pomade gives a backend (HOST-API §2 "Backends"). The workspace is
-  `POMADE_WORKSPACE`; Pomade's user-data folder is the parent of the folder holding `POMADE_SOCKET`
-  (`<userData>/run/pomade.sock`). The agents' stores are under `HOME`.
+- **Environment** — what Pomade gives a backend (HOST-API §2 "Backends"), and what the backend
+  needs of it:
+  - `POMADE_APP_STATE` — the machine-local state folder, absolute. Required: without it the
+    backend refuses to start (`POMADE_APP_STATE is not set: the backend is started by Pomade`,
+    exit status 1); a relative path is refused the same way.
+  - `POMADE_WORKSPACE` — the open workspace's root, absolute; unset or empty: no workspace open.
+  - `POMADE_SOCKET`, `POMADE_APP_ID`, `POMADE_APP_KEY_FILE`, `POMADE_CLIENT` — the connection to Pomade,
+    taken by the kit's `stayConnected` (`pomade-kit/node`).
+  - `HOME` — where the built-in agents' stores are.
 - **App data** (`src/backend/records/`) — `<workspace>/Apps/pomade-agents/`; session records and
   agent profiles are two sets of files kept by one machinery (`FileSet`), with one set of
   guarantees:
@@ -589,18 +595,20 @@ type AgentRunFinished = AgentRunStarted & {
   - No workspace open: no records and no profiles; `recordsOff` and `profilesOff` say so, the change
     methods are `not-ready`, and the roster answers the built-ins from their first-sight values.
 - **Pomade** (`src/backend/interfaces/platform.ts`) — on each connection the backend lists the
-  projects (again on `project.created`, `project.renamed`, `pomade.ready`) and the agent tabs (again
+  projects (again on `project.created`, `project.renamed`, `project.removed`, `pomade.ready`) and the agent tabs (again
   on `pomade.ready`), and takes every `agentTab.changed`: the first project each session is seen
   bound in is its `launchedFrom`; every tab's state and folder feed the live state. Every
   `agentTab.exited` feeds event B. Runner's `run.started` / `run.finished` come in on the same
   connection ("Subscribed events" above). A rename refreshes `projectRoot` in the records of that project.
+  A removed project leaves the list at once; its sessions fall to their next attribution step
+  (DESIGN §2.6): a project that no longer exists holds no session.
 - **Roster** (`src/backend/roster/`) — the agents (`roster.ts`), their first-sight values
   (`first-sight.ts`: the scan, `.pomade/agents.json`, the role line), default model and effort
   (`provider-config.ts`), launch specs (`launch-spec.ts`) and the connection (`connections.ts`).
   The backend reads the roster once before it connects, so Pomade's first `roster.list` is whole,
   then again on every profile change and every 2 s; each change publishes `roster.changed`.
 - **Locations** (`src/backend/core/locations.ts`) — app data in `<workspace>/Apps/pomade-agents/`,
-  machine-local state in `<userData>/app-state/pomade-agents/`, the built-in agents' stores under
+  machine-local state in `POMADE_APP_STATE` (`<userData>/app-state/pomade-agents/`), the built-in agents' stores under
   `HOME`.
 - **Session stores** (`src/backend/stores/`) — `~/.claude/projects/<encoded-cwd>/*.jsonl`,
   `<workspace>/Agents/<name>/projects/<encoded-cwd>/*.jsonl` for every folder agent (a folder with
@@ -634,8 +642,9 @@ type AgentRunFinished = AgentRunStarted & {
   tabs are the fake host's own (`fake.appTabs`, `fake.onAppTab`): `tabs.openApp` opens, focuses or
   navigates them, `tabs.setRoute` records a tab's route; the shell shows each open tab with a frame
   attached to it (`{ tabId }`), so a frame reload opens at the tab's recorded route.
-- `spawnBackend(sandbox, { entry })` (`harness/backend-process.ts`) — `{ pid, output(), running(),
-  stop() }`.
+- `spawnBackend(sandbox, { entry, env? })` (`harness/backend-process.ts`) — `{ pid, output(), running(),
+  stop() }`; the backend gets `sandbox.backendEnv()` — Pomade's backend environment, with
+  `POMADE_APP_STATE` at `<userData>/app-state/<appId>` — changed by `env` (`undefined` unsets).
 - Playwright fixtures (`e2e/fixtures.ts`): `manifest`, `sandbox`, `pomade`, `backend`, `openShell`, and
   the options `seed` — `test.use({ seed: { into(sandbox) } })` writes into the sandbox before the
   backend starts (`null` by default) — and `workspaceLink` (`false` by default).

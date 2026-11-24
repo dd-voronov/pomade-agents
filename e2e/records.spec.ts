@@ -2,7 +2,8 @@
 // run adopts every session as Done, silently; a later session starts Active; a status and note set
 // through the API are in the record file and survive a restart; a session launched from a tab of one
 // of two projects on one folder shows only there, Move to project moves it, and a project rename
-// keeps it and refreshes its root.
+// keeps it and refreshes its root; a removed project lets its sessions fall to the next step, in the
+// Sessions tab too.
 
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -21,7 +22,7 @@ import {
   type Session,
   type SessionsUpdated,
 } from "../src/shared/sessions.ts";
-import { expect, test } from "./fixtures.ts";
+import { expect, shellOf, shellUrl, test } from "./fixtures.ts";
 import { claudeSession, prompt } from "./transcripts.ts";
 
 /** The ticket's bound for a new transcript to show. */
@@ -136,6 +137,51 @@ test("a session launched from one of two projects on one folder shows only there
     expect((await sessionOf(pomade, NEW_ID))?.attribution).toEqual({ projects: ["twin"], by: "override", sharedFolder: false });
     expect(await readFile(record, "utf8")).toContain("projectRoot: Projects/twin");
     await expect.poll(async () => (await sessionOf(pomade, SECOND_ID))?.attribution).toEqual({ projects: ["alpha"], by: "folder", sharedFolder: false });
+  } finally {
+    await backend.stop();
+    await pomade.close();
+  }
+});
+
+test("a removed project leaves the Sessions tab at once and its sessions fall to their next attribution step", async ({ page, sandbox, manifest }) => {
+  const folder = join(sandbox.workspace, "Projects", "alpha");
+  const pomade = await startFakePomade({
+    manifest,
+    socketPath: sandbox.socketPath,
+    appKey: sandbox.appKey,
+    host: {
+      projects: [...FIXTURE_PROJECTS, { id: "twin", name: "Alpha twin", root: "Projects/alpha" }],
+      activeProject: null,
+      workspaceRoot: sandbox.workspace,
+      agentTabs: [{ tabId: "tab-t", projectId: "twin", agentId: "claude" }],
+    },
+  });
+  const backend = spawnBackend(sandbox, { entry: BUILT_BACKEND });
+  try {
+    await expect.poll(() => pomade.backendCount(), { message: backend.output() }).toBe(1);
+    await expect.poll(async () => Object.keys(await statuses(pomade)).length).toBe(Object.keys(SEEDED_TRANSCRIPTS).length);
+
+    // Twin shares alpha's folder: one session launched from twin's tab, one from a plain terminal there.
+    await claudeSession(sandbox, NEW_ID, prompt("From the twin tab", soon(), folder));
+    pomade.fake.updateAgentTab("tab-t", { sessionId: NEW_ID, cwd: folder, launchedAt: new Date().toISOString() });
+    await claudeSession(sandbox, SECOND_ID, prompt("From a terminal", soon(), folder));
+    await expect.poll(async () => (await sessionOf(pomade, NEW_ID))?.attribution).toEqual({ projects: ["twin"], by: "launched", sharedFolder: false });
+    await expect.poll(async () => (await sessionOf(pomade, SECOND_ID))?.attribution).toEqual({ projects: ["alpha", "twin"], by: "folder", sharedFolder: true });
+
+    await page.goto(shellUrl(pomade));
+    const { panel, tabFrame } = shellOf(page);
+    await panel.getByTestId("open-sessions").click();
+    const tab = tabFrame("__workspace__");
+    const projectCell = (id: string) => tab.locator(`[data-testid="session-row"][data-session-id="${id}"]`).getByTestId("cell-project");
+    await expect(projectCell(NEW_ID)).toHaveText("Alpha twin");
+    await expect(projectCell(SECOND_ID)).toHaveText("Alpha, Alpha twin");
+
+    pomade.fake.removeProject("twin");
+    await expect(projectCell(NEW_ID)).toHaveText("Alpha", { timeout: WITHIN_MS });
+    await expect(projectCell(SECOND_ID)).toHaveText("Alpha");
+    expect((await sessionOf(pomade, NEW_ID))?.attribution).toEqual({ projects: ["alpha"], by: "folder", sharedFolder: false });
+    expect((await sessionOf(pomade, SECOND_ID))?.attribution).toEqual({ projects: ["alpha"], by: "folder", sharedFolder: false });
+    expect(backend.running()).toBe(true);
   } finally {
     await backend.stop();
     await pomade.close();

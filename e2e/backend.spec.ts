@@ -1,3 +1,5 @@
+import { join } from "node:path";
+
 import { readRunRecord } from "../src/backend/core/run-record.ts";
 import { INDEX_FILE } from "../src/backend/stores/index-file.ts";
 import { APP_INFO_METHOD } from "../src/shared/api.ts";
@@ -105,6 +107,24 @@ test("the backend stops cleanly on SIGTERM and writes only its state folder (run
   expect(Object.keys(await sandbox.snapshot(`${sandbox.userData}/app-state`))).toEqual([`${manifest.id}/${INDEX_FILE}`]);
   expect(await sandbox.snapshot(sandbox.home)).toEqual(fixtures.home);
   expect(inSandbox("workspace", await sandbox.snapshot(sandbox.workspace))).toEqual({ ...inSandbox("workspace", fixtures.workspace), ...appData });
+});
+
+test("the backend keeps its state in POMADE_APP_STATE, and refuses to start without it", async ({ pomade, sandbox }) => {
+  const without = spawnBackend(sandbox, { entry: BUILT_BACKEND, env: { POMADE_APP_STATE: undefined } });
+  await expect.poll(() => without.running(), { message: without.output() }).toBe(false);
+  expect((await without.stop()).code).not.toBe(0);
+  expect(without.output()).toContain("POMADE_APP_STATE is not set");
+  expect(pomade.backendCount()).toBe(0);
+
+  const elsewhere = join(sandbox.root, "state-elsewhere");
+  const backend = spawnBackend(sandbox, { entry: BUILT_BACKEND, env: { POMADE_APP_STATE: elsewhere } });
+  try {
+    await expect.poll(() => pomade.backendCount(), { message: backend.output() }).toBe(1);
+    await expect.poll(() => readRunRecord(elsewhere)).toMatchObject({ pid: backend.pid });
+    expect(await sandbox.snapshot(`${sandbox.userData}/app-state`)).toEqual({});
+  } finally {
+    await backend.stop();
+  }
 });
 
 test("a backend survives Pomade going away and reconnects when it is back", async ({ backend, pomade, sandbox, manifest }) => {
