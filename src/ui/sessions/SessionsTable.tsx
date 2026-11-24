@@ -42,6 +42,8 @@ export interface SessionsTableProps {
   menuOf: string | null;
   events: RowEvents;
   drop: StatusDrop;
+  /** The groups hold a search's or filter's matches: every match shows. */
+  filtered: boolean;
 }
 
 function useWidth(): [RefObject<HTMLDivElement>, number | null] {
@@ -121,6 +123,7 @@ export function SessionsTable({
   menuOf,
   events,
   drop,
+  filtered,
 }: SessionsTableProps): ReactElement {
   const [ref, width] = useWidth();
   const revealed = useRef(lastSelected);
@@ -156,6 +159,7 @@ export function SessionsTable({
           onToggleCollapsed={onToggleCollapsed}
           onToggleExpanded={onToggleExpanded}
           drop={drop}
+          filtered={filtered}
           row={(session) => (
             <SessionRow
               key={session.id}

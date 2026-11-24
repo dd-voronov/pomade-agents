@@ -1,5 +1,6 @@
-// A surface with nothing to list: a glyph, a title and one or two plain sentences, centred. Every
-// empty and unavailable state of the app is this one shape.
+// A surface with nothing to list: a glyph, a title, one or two plain sentences and, where the user
+// can do something about it, one button — centred. Every empty and unavailable state of the app is
+// this one shape.
 
 import type { ReactElement, ReactNode } from "react";
 
@@ -13,10 +14,12 @@ export interface StatePageProps {
   tone?: "neutral" | "warning";
   /** `compact` fits the side panel's width. Default `regular`. */
   size?: "regular" | "compact";
+  /** A button under the text, and what it does. */
+  action?: { label: string; run: () => void; testId: string };
   testId: string;
 }
 
-export function StatePage({ icon, title, children, tone = "neutral", size = "regular", testId }: StatePageProps): ReactElement {
+export function StatePage({ icon, title, children, tone = "neutral", size = "regular", action, testId }: StatePageProps): ReactElement {
   return (
     <section className={styles.page} data-size={size} data-testid={testId}>
       <div className={styles.glyph} data-tone={tone}>
@@ -24,6 +27,11 @@ export function StatePage({ icon, title, children, tone = "neutral", size = "reg
       </div>
       <h1 className={styles.title}>{title}</h1>
       <p className={styles.text}>{children}</p>
+      {action !== undefined && (
+        <button type="button" className={styles.action} data-testid={action.testId} onClick={action.run}>
+          {action.label}
+        </button>
+      )}
     </section>
   );
 }

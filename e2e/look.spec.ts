@@ -222,6 +222,65 @@ test.describe("the list with the detail panel", () => {
   });
 });
 
+test.describe("search and filters", () => {
+  test.use({ seed: { into: seedDetailLook } });
+
+  test("a search with snippets, a filter menu, the grouped list, nothing matching, the Workspace's Project menu and the bulk bar", async ({ page, openShell, pomade, backend }) => {
+    const set = (list: string[], status: string, note?: string) => pomade.fake.callApi(SESSIONS_SET_STATUS_METHOD, note === undefined ? { ids: list, status } : { ids: list, status, note });
+    await expect.poll(async () => set([...ALPHA, ...BETA, DETAIL], "done").then(() => true, () => false), { timeout: 10_000 }).toBe(true);
+    await set([ALPHA[0] ?? "", ALPHA[1] ?? "", ALPHA[3] ?? "", SEEDED_CLAUDE, DETAIL], "active");
+    await set([ALPHA[4] ?? ""], "on-hold", "Waiting for my live test of the flaky grey active border");
+
+    const { panel, tabFrame } = await openShell(page);
+    await panel.getByTestId("open-sessions").click();
+    const alpha = tabFrame("alpha");
+    await expect(alpha.getByTestId("sessions-toolbar")).toBeVisible();
+    await page.screenshot({ path: `${ARTIFACTS}/search-toolbar.png` });
+
+    await alpha.getByTestId("search-field").fill("glossary");
+    await expect(alpha.getByTestId("search-snippet").first()).toBeVisible();
+    await page.mouse.move(0, 0);
+    await page.screenshot({ path: `${ARTIFACTS}/search-snippets.png` });
+    await alpha.getByTestId("search-field").fill("flaky");
+    await expect(alpha.getByTestId("session-note").getByTestId("search-match")).toBeVisible();
+    await page.screenshot({ path: `${ARTIFACTS}/search-name-and-note.png` });
+
+    await alpha.getByTestId("filter-agent").click();
+    await expect(alpha.getByTestId("filter-menu")).toBeVisible();
+    await page.screenshot({ path: `${ARTIFACTS}/search-agent-menu.png` });
+    await page.keyboard.press("Escape");
+
+    await alpha.getByTestId("search-field").fill("glossary");
+    await alpha.getByTestId("search-field").press("ArrowDown");
+    await expect(alpha.getByTestId("detail-panel")).toBeVisible();
+    await page.screenshot({ path: `${ARTIFACTS}/search-list-grouped.png` });
+    await alpha.getByTestId("search-field").fill("the");
+    await page.screenshot({ path: `${ARTIFACTS}/search-list-grouped-many.png` });
+    await alpha.getByTestId("search-field").fill("nothing like this");
+    await expect(alpha.getByTestId("sessions-no-match")).toBeVisible();
+    await page.screenshot({ path: `${ARTIFACTS}/search-list-no-match.png` });
+    await alpha.getByTestId("detail-close").click();
+    await expect(alpha.getByTestId("sessions-no-match")).toBeVisible();
+    await page.screenshot({ path: `${ARTIFACTS}/search-no-match.png` });
+    await alpha.getByTestId("no-match-clear").click();
+
+    await alpha.getByTestId("session-row").first().getByTestId("row-check").click();
+    await page.screenshot({ path: `${ARTIFACTS}/search-bulk-bar.png` });
+
+    pomade.fake.setActiveProject(null);
+    await panel.getByTestId("open-sessions").click();
+    const workspace = tabFrame("__workspace__");
+    await workspace.getByTestId("filter-folder").click();
+    await page.screenshot({ path: `${ARTIFACTS}/search-workspace-folder-menu.png` });
+    await page.keyboard.press("Escape");
+    await workspace.getByTestId("filter-project").click();
+    await workspace.getByTestId("menu-item-filter-project-beta").click();
+    await workspace.getByTestId("filter-agent").click();
+    await page.screenshot({ path: `${ARTIFACTS}/search-workspace-filtered.png` });
+    expect(backend.running()).toBe(true);
+  });
+});
+
 test("the panel without a backend, and the no-host state", async ({ page, openShell }) => {
   const { panel } = await openShell(page);
   await expect(panel.getByTestId("backend-status")).toHaveAttribute("data-status", "down");

@@ -1,9 +1,11 @@
 // The list beside the detail panel (DESIGN §2.7 "List with the detail panel"): the four status
 // tabs with their counts, which take rows dropped on them, then the open tab's sessions as two-line rows — a long Done or
 // Done–skip/Failed tab cut to its latest rows with "Show all N", unless the selected session is
-// further down — or its one-line empty text. The selected row is kept in view.
+// further down — or its one-line empty text. While a search or filter is on, no tab is open: the
+// list shows the matches of every status in collapsible groups, or says nothing matches; opening a
+// tab then clears the search and filters. The selected row is kept in view.
 
-import { useLayoutEffect, useRef, type ReactElement } from "react";
+import { useLayoutEffect, useRef, type ReactElement, type ReactNode } from "react";
 import { SESSION_STATUSES, type SessionStatus } from "pomade-kit/protocol";
 
 import type { Session } from "../../shared/sessions.ts";
@@ -12,7 +14,7 @@ import { ListRow } from "./ListRow.tsx";
 import type { RowEvents } from "./row-events.ts";
 import type { Groups } from "./selection-model.ts";
 import { listRows } from "./selection-model.ts";
-import { StatusMark } from "./StatusGroup.tsx";
+import { StatusGroup, StatusMark } from "./StatusGroup.tsx";
 import { EMPTY_GROUP_TEXT, LATEST_SHOWN, STATUS_LABELS, STATUS_SHORT_LABELS, forkTooltip } from "./table-model.ts";
 import styles from "./SessionsList.module.css";
 import type { StatusDrop } from "./useStatusDrag.ts";
@@ -36,6 +38,13 @@ export interface SessionsListProps {
   now: Date;
   /** The note a row shows, for the session whose note is being typed. */
   noteOf: (session: Session) => string | undefined;
+  /** `groups` hold a search's or filter's matches. */
+  filtered: boolean;
+  /** Collapsed groups while `filtered`. */
+  collapsed: ReadonlySet<SessionStatus>;
+  onToggleCollapsed: (status: SessionStatus) => void;
+  /** What the list shows while `filtered` and nothing matches. */
+  noMatches: ReactNode;
 }
 
 export function SessionsList({
@@ -54,15 +63,33 @@ export function SessionsList({
   byId,
   now,
   noteOf,
+  filtered,
+  collapsed,
+  onToggleCollapsed,
+  noMatches,
 }: SessionsListProps): ReactElement {
   const list = useRef<HTMLDivElement>(null);
   const sessions = groups[tab];
   const shown = listRows(tab, sessions, expanded.has(tab), selected);
+  const row = (session: Session): ReactElement => (
+    <ListRow
+      key={session.id}
+      session={session}
+      workspace={workspace}
+      names={names}
+      fork={forkTooltip(session, byId)}
+      now={now}
+      selected={session.id === selected}
+      marks={{ checked: checked.has(session.id), menu: session.id === menuOf }}
+      events={events}
+      note={noteOf(session)}
+    />
+  );
 
   useLayoutEffect(() => {
     const row = list.current?.querySelector(`[data-session-id="${CSS.escape(selected)}"]`);
     row?.scrollIntoView({ block: "nearest" });
-  }, [selected, tab]);
+  }, [selected, tab, filtered]);
 
   return (
     <div className={styles.pane} data-testid="sessions-list">
@@ -73,7 +100,7 @@ export function SessionsList({
             type="button"
             role="tab"
             className={styles.tab}
-            aria-selected={status === tab}
+            aria-selected={!filtered && status === tab}
             title={STATUS_LABELS[status]}
             data-testid={`status-tab-${status}`}
             data-drop={drop.over === status ? "" : undefined}
@@ -90,45 +117,53 @@ export function SessionsList({
           </button>
         ))}
       </div>
-      <div ref={list} className={styles.list} role="listbox" aria-label={STATUS_LABELS[tab]} data-testid={`list-${tab}`}>
-        {shown.rows.map((session) => (
-          <ListRow
-            key={session.id}
-            session={session}
-            workspace={workspace}
-            names={names}
-            fork={forkTooltip(session, byId)}
-            now={now}
-            selected={session.id === selected}
-            marks={{ checked: checked.has(session.id), menu: session.id === menuOf }}
-            events={events}
-            note={noteOf(session)}
-          />
-        ))}
-        {shown.long && (
-          <div className={styles.more} data-testid={`list-more-${tab}`}>
-            {expanded.has(tab) ? (
-              <button type="button" className={styles.link} onClick={() => onToggleExpanded(tab)}>
-                Show the latest {LATEST_SHOWN} only
-              </button>
-            ) : shown.expanded ? (
-              `Showing all ${sessions.length}: the selected session is past the latest ${LATEST_SHOWN}`
-            ) : (
-              <>
-                Showing {LATEST_SHOWN} of {sessions.length} ·{" "}
+      {filtered ? (
+        <div ref={list} className={`${styles.list} ${styles.grouped}`} role="listbox" aria-label="Matches" data-testid="list-matches">
+          {SESSION_STATUSES.every((status) => groups[status].length === 0)
+            ? noMatches
+            : SESSION_STATUSES.map((status) => (
+                <StatusGroup
+                  key={status}
+                  status={status}
+                  sessions={groups[status]}
+                  collapsed={collapsed.has(status)}
+                  expanded
+                  onToggleCollapsed={onToggleCollapsed}
+                  onToggleExpanded={onToggleExpanded}
+                  drop={drop}
+                  filtered
+                  row={row}
+                />
+              ))}
+        </div>
+      ) : (
+        <div ref={list} className={styles.list} role="listbox" aria-label={STATUS_LABELS[tab]} data-testid={`list-${tab}`}>
+          {shown.rows.map(row)}
+          {shown.long && (
+            <div className={styles.more} data-testid={`list-more-${tab}`}>
+              {expanded.has(tab) ? (
                 <button type="button" className={styles.link} onClick={() => onToggleExpanded(tab)}>
-                  Show all {sessions.length}
+                  Show the latest {LATEST_SHOWN} only
                 </button>
-              </>
-            )}
-          </div>
-        )}
-        {sessions.length === 0 && (
-          <div className={styles.empty} data-testid={`list-empty-${tab}`}>
-            {EMPTY_GROUP_TEXT[tab]}
-          </div>
-        )}
-      </div>
+              ) : shown.expanded ? (
+                `Showing all ${sessions.length}: the selected session is past the latest ${LATEST_SHOWN}`
+              ) : (
+                <>
+                  Showing {LATEST_SHOWN} of {sessions.length} ·{" "}
+                  <button type="button" className={styles.link} onClick={() => onToggleExpanded(tab)}>
+                    Show all {sessions.length}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+          {sessions.length === 0 && (
+            <div className={styles.empty} data-testid={`list-empty-${tab}`}>
+              {EMPTY_GROUP_TEXT[tab]}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

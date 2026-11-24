@@ -11,6 +11,7 @@ import type { Session } from "../../shared/sessions.ts";
 import { Checkbox } from "./Checkbox.tsx";
 import { rowMeta } from "./detail-model.ts";
 import type { RowEvents, RowMarks } from "./row-events.ts";
+import { Highlighted, SearchSnippet } from "./Highlight.tsx";
 import { SessionName } from "./SessionName.tsx";
 import { formatAgo, formatMoney, formatStamp, liveTitle, statusOf } from "./table-model.ts";
 import { ContextMeter, Unknown } from "./Values.tsx";
@@ -84,9 +85,12 @@ export function ListRow({ session, workspace, names, fork, now, selected, marks,
         {note !== undefined && (
           <div className={styles.note} data-testid="session-note">
             <NoteIcon size={12} />
-            <span title={note}>{note}</span>
+            <span title={note}>
+              <Highlighted text={note} />
+            </span>
           </div>
         )}
+        <SearchSnippet session={session} className={styles.note} />
       </div>
     </div>
   );

@@ -1,21 +1,26 @@
-// The Sessions tab: the header (the scope, its session count and ~$ sum), the bulk bar while rows
-// are checked, then — while no session is selected — the table of the scope's sessions, or — once
-// one is — the list with the detail panel (DESIGN §2.7). A state page shows while the stores are
-// read, or when the scope has none. The scope is the project the tab was opened in
+// The Sessions tab: the header (the scope, its session count and ~$ sum), the toolbar (search and
+// filters) or, while rows are checked, the bulk bar in its row, then — while no session is
+// selected — the table of the scope's sessions, or — once one is — the list with the detail panel
+// (DESIGN §2.7). A state page shows while the stores are read, when the scope has none, or in the
+// table when nothing matches the search and filters. The scope is the project the tab was opened in
 // (`welcome.project`); a tab keeps it. The selection is the tab's route (`useSelection`); the
-// checked rows, the menus (a row's, Move to project) and the toast are the tab's own. A session
-// moved out of the scope leaves the rows, and the panel closes.
+// search, the filters, the checked rows, the menus (a row's, Move to project, a filter's) and the
+// toast are the tab's own. A session moved out of the scope leaves the rows, and the panel closes.
+//
+// While a search or filter is on, the rows are its matches, each group showing all of them, and the
+// list shows them grouped instead of one status tab; only matches stay checked.
 //
 // Keys: ↑ ↓ move the selection in both layouts; Shift+↑↓ check a range from the selected row (the
 // list) or the marked one (the table); Space checks that row; Cmd+A checks every row shown; F2
-// renames that row in the panel; Esc clears the checks, then closes the panel.
+// renames that row in the panel; `/` focuses the search; Esc clears the checks, then closes the
+// panel.
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
-import { WORKSPACE_PROJECT_ID, type ProjectRef, type SessionStatus } from "pomade-kit/protocol";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
+import { SESSION_STATUSES, WORKSPACE_PROJECT_ID, type ProjectRef, type SessionStatus } from "pomade-kit/protocol";
 import type { HostClient } from "pomade-kit/sdk";
 
-import { SessionsIcon } from "../core/icons.tsx";
-import { Menu, type MenuAnchor } from "../core/Menu.tsx";
+import { SearchIcon, SessionsIcon } from "../core/icons.tsx";
+import { Menu, type MenuAnchor, type MenuEntry } from "../core/Menu.tsx";
 import { StatePage } from "../core/StatePage.tsx";
 import { useBackendInfo } from "../core/useBackendInfo.ts";
 import { useNow } from "../core/useNow.ts";
@@ -25,13 +30,16 @@ import { BulkBar } from "./BulkBar.tsx";
 import { NONE_CHECKED, extended, headerClick, headerState, pruned, targetsOf, toggled as toggledCheck, withAll, withRange, type Checked } from "./check-model.ts";
 import { draftNote } from "./detail-model.ts";
 import { DetailPanel } from "./DetailPanel.tsx";
-import { moveTargets, nameToSave } from "./edit-model.ts";
+import { WORKSPACE_TARGET, moveTargets, nameToSave } from "./edit-model.ts";
+import { SearchPattern } from "./Highlight.tsx";
 import type { RowEvents } from "./row-events.ts";
 import { moveMenuEntries, rowMenuEntries } from "./row-menu.tsx";
 import { listRows, openTab, revealInTable, step, tableOrder, type PickedTab } from "./selection-model.ts";
 import { SessionsList } from "./SessionsList.tsx";
 import { SessionsTable } from "./SessionsTable.tsx";
+import { NO_FILTERS, filterMenu, folderLabel, folderOf, isFiltering, matches, searchPattern, type Criteria, type FilterKind, type Filters } from "./search-model.ts";
 import { formatHeaderSum, groupByStatus, inScope, statusOf, totalCost } from "./table-model.ts";
+import { Toolbar } from "./Toolbar.tsx";
 import { Toast } from "./Toast.tsx";
 import styles from "./SessionsTab.module.css";
 import { useSelection } from "./useSelection.ts";
@@ -47,6 +55,12 @@ const CLOCK_MS = 30_000;
 
 const NO_PROJECTS: ReadonlyMap<string, ProjectRef> = new Map();
 const NO_ROOTS: readonly string[] = [];
+const NO_SESSIONS: readonly Session[] = [];
+/** Every group shows all its rows: a search's or filter's matches are never cut to the latest. */
+const EVERY_STATUS: ReadonlySet<SessionStatus> = new Set(SESSION_STATUSES);
+
+const ALL_LABELS: Record<FilterKind, string> = { project: "All projects", agent: "All agents", folder: "All folders" };
+const FILTER_MENU_LABELS: Record<FilterKind, string> = { project: "Project filter", agent: "Agent filter", folder: "Folder filter" };
 
 const toggled = (set: ReadonlySet<SessionStatus>, status: SessionStatus): Set<SessionStatus> => {
   const next = new Set(set);
@@ -67,12 +81,9 @@ function modifiers(event: KeyboardEvent): "none" | "shift" | "command" | "other"
   return event.shiftKey ? "shift" : "none";
 }
 
-/** The menu open now: a row's, or Move to project under the detail panel's button. */
-interface OpenMenu {
-  kind: "row" | "move";
-  session: string;
-  anchor: MenuAnchor;
-}
+/** The menu open now: a row's, Move to project under the detail panel's button, or a filter's
+ *  under its button. */
+type OpenMenu = { kind: "row" | "move"; session: string; anchor: MenuAnchor } | { kind: "filter"; filter: FilterKind; anchor: MenuAnchor };
 
 export function SessionsTab({ host, route, navigate }: { host: HostClient; route: string; navigate: (route: string) => void }): ReactElement {
   const { copy, update } = useSessions(host);
@@ -109,20 +120,47 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
   const { move } = useStatusMoves(change, dismiss, copy?.byId, toasts);
   const edits = useSessionEdits(host, update, toasts);
 
-  const groups = groupByStatus(copy?.byId.values() ?? [], scope.id);
-  const count = groups.active.length + groups["on-hold"].length + groups.done.length + groups["done-skip"].length;
+  const [query, setQuery] = useState("");
+  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const pattern = useMemo(() => searchPattern(query), [query]);
+  // Typing stays quick over thousands of sessions: the rows follow the field when React has time.
+  const rowsPattern = useDeferredValue(pattern);
+
+  const scoped = useMemo(() => (copy === null ? NO_SESSIONS : [...copy.byId.values()].filter((session) => inScope(session, scope.id))), [copy, scope.id]);
+  const groups = groupByStatus(scoped, scope.id);
+  const count = scoped.length;
+  const criteria: Criteria = useMemo(
+    () => ({ pattern: rowsPattern, filters, folder: (session) => folderOf(session, workspace, workspaceRoots) }),
+    [rowsPattern, filters, workspace, workspaceRoots],
+  );
+  const filtering = isFiltering(criteria);
+  /** The rows the tab shows: the scope's sessions, or a search's or filter's matches. */
+  const shown = useMemo(
+    () => (isFiltering(criteria) ? groupByStatus(scoped.filter((session) => matches(session, criteria)), scope.id) : null),
+    [scoped, criteria, scope.id],
+  ) ?? groups;
+  const matchTotal = shown.active.length + shown["on-hold"].length + shown.done.length + shown["done-skip"].length;
+  const shownExpanded = filtering ? EVERY_STATUS : expanded;
   const candidate = selectedId === null ? undefined : copy?.byId.get(selectedId);
   const selected = candidate !== undefined && inScope(candidate, scope.id) ? candidate : null;
   const tab = selected === null ? null : openTab(selected, picked);
   // Only sessions the tab lists stay checked.
   const checked = pruned(checkedSet, (id) => {
     const session = copy?.byId.get(id);
-    return session !== undefined && inScope(session, scope.id);
+    return session !== undefined && inScope(session, scope.id) && (!filtering || matches(session, criteria));
   });
 
-  /** The rows shown, top to bottom: the table's, or the open status tab's. */
+  /** The rows shown, top to bottom: the table's, the matches in the list, or the open status tab's. */
   const shownOrder = (): string[] =>
-    selected === null || tab === null ? tableOrder(groups, collapsed, expanded) : listRows(tab, groups[tab], expanded.has(tab), selected.id).rows.map((s) => s.id);
+    selected === null || tab === null || filtering
+      ? tableOrder(shown, collapsed, shownExpanded)
+      : listRows(tab, shown[tab], expanded.has(tab), selected.id).rows.map((s) => s.id);
+
+  const clearSearchAndFilters = (): void => {
+    setQuery("");
+    setFilters(NO_FILTERS);
+  };
 
   const onSelect = (id: string): void => {
     if (failure !== null && !failure.sessions.includes(id)) dismiss();
@@ -147,9 +185,9 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
   const close = (): void => {
     if (selected === null) return;
     setLastSelected(selected.id);
-    const revealed = revealInTable(groups, selected.id, collapsed, expanded);
+    const revealed = revealInTable(shown, selected.id, collapsed, shownExpanded);
     setCollapsed(revealed.collapsed);
-    setExpanded(revealed.expanded);
+    if (!filtering) setExpanded(revealed.expanded);
     dismiss();
     setRenaming(null);
     select(null);
@@ -224,6 +262,12 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
         event.preventDefault();
         return;
       }
+      if (event.key === "/" && keys === "none") {
+        event.preventDefault();
+        searchRef.current?.focus();
+        searchRef.current?.select();
+        return;
+      }
       if (event.key === "F2" && keys === "none") {
         const row = keyRow();
         if (row === null) return;
@@ -271,7 +315,39 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
   const noteOf = (session: Session): string | undefined =>
     noteDraft !== null && noteDraft.session === session.id ? draftNote(noteDraft.text) : session.record?.note;
 
-  const menuSession = menu === null ? undefined : copy?.byId.get(menu.session);
+  const menuSession = menu === null || menu.kind === "filter" ? undefined : copy?.byId.get(menu.session);
+
+  /** A filter's menu: "All …", then every value the tab's sessions hold, each with its count. */
+  const filterEntries = (kind: FilterKind): MenuEntry[] => {
+    const { all, options } = filterMenu(kind, scoped, criteria, names);
+    const set = (value: string | null) => () => setFilters((on) => ({ ...on, [kind]: value }));
+    return [
+      { kind: "item", id: `filter-${kind}-all`, label: ALL_LABELS[kind], checked: filters[kind] === null, trail: String(all), run: set(null) },
+      { kind: "separator" },
+      ...options.map(
+        (option): MenuEntry => ({ kind: "item", id: `filter-${kind}-${option.key}`, label: option.label, checked: filters[kind] === option.key, trail: String(option.count), run: set(option.key) }),
+      ),
+    ];
+  };
+
+  const filterLabels: Record<FilterKind, string | null> = {
+    agent: filters.agent,
+    folder: filters.folder === null ? null : folderLabel(filters.folder),
+    project: filters.project === null ? null : filters.project === WORKSPACE_PROJECT_ID ? WORKSPACE_TARGET : (names.get(filters.project) ?? filters.project),
+  };
+
+  const noMatches = (
+    <StatePage
+      icon={<SearchIcon size={20} />}
+      title="No sessions match"
+      testId="sessions-no-match"
+      action={{ label: "Clear search and filters", run: clearSearchAndFilters, testId: "no-match-clear" }}
+    >
+      {rowsPattern !== null
+        ? `Nothing in names, messages or notes contains “${query.trim()}”${filters.agent !== null || filters.folder !== null || filters.project !== null ? " with these filters" : ""}.`
+        : "No session has this combination of filters."}
+    </StatePage>
+  );
 
   let body: ReactElement;
   if (copy === null) {
@@ -292,9 +368,12 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
     body = (
       <div className={styles.split} data-testid="sessions-split">
         <SessionsList
-          groups={groups}
+          groups={shown}
           tab={tab}
-          onOpenTab={(status) => setPicked({ status, session: selected.id, sessionStatus: statusOf(selected) })}
+          onOpenTab={(status) => {
+            if (filtering) clearSearchAndFilters();
+            setPicked({ status, session: selected.id, sessionStatus: statusOf(selected) });
+          }}
           selected={selected.id}
           checked={checked}
           menuOf={menu?.kind === "row" ? menu.session : null}
@@ -307,6 +386,10 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
           byId={copy.byId}
           now={now}
           noteOf={noteOf}
+          filtered={filtering}
+          collapsed={collapsed}
+          onToggleCollapsed={(status) => setCollapsed((set) => toggled(set, status))}
+          noMatches={noMatches}
         />
         <DetailPanel
           key={selected.id}
@@ -342,12 +425,14 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
         />
       </div>
     );
+  } else if (filtering && matchTotal === 0) {
+    body = noMatches;
   } else {
-    const order = tableOrder(groups, collapsed, expanded);
+    const order = tableOrder(shown, collapsed, shownExpanded);
     const state = headerState(checked, order);
     body = (
       <SessionsTable
-        groups={groups}
+        groups={shown}
         workspace={workspace}
         names={names}
         byId={copy.byId}
@@ -363,6 +448,7 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
         menuOf={menu?.kind === "row" ? menu.session : null}
         events={events}
         drop={drag.drop}
+        filtered={filtering}
       />
     );
   }
@@ -393,7 +479,7 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
           {copy.recordsOff}
         </p>
       )}
-      {checked.size > 0 && (
+      {checked.size > 0 ? (
         <BulkBar
           count={checked.size}
           onSetStatus={(status) => {
@@ -403,8 +489,27 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
           }}
           onClear={clearChecks}
         />
+      ) : (
+        copy !== null &&
+        count > 0 && (
+          <Toolbar
+            searchRef={searchRef}
+            query={query}
+            onQuery={setQuery}
+            onLeaveDown={() => {
+              const first = shownOrder()[0];
+              if (first !== undefined) onSelect(first);
+            }}
+            workspace={workspace}
+            labels={filterLabels}
+            openFilter={menu?.kind === "filter" ? menu.filter : null}
+            onOpenFilter={(filter, anchor) => setMenu({ kind: "filter", filter, anchor })}
+            matches={filtering ? matchTotal : null}
+            onClear={clearSearchAndFilters}
+          />
+        )
       )}
-      {body}
+      <SearchPattern.Provider value={rowsPattern}>{body}</SearchPattern.Provider>
       {menu?.kind === "row" && menuSession !== undefined && (
         <Menu
           label="Session"
@@ -423,6 +528,7 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
           entries={moveMenuEntries(menuSession, moveTargets(projects.values()), (target) => edits.moveTo(menuSession, target, onMoved))}
         />
       )}
+      {menu?.kind === "filter" && <Menu label={FILTER_MENU_LABELS[menu.filter]} testId="filter-menu" anchor={menu.anchor} onClose={closeMenu} entries={filterEntries(menu.filter)} />}
       {toast !== null && <Toast key={toast.key} toast={toast} />}
     </div>
   );

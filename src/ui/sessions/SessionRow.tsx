@@ -12,6 +12,7 @@ import { LiveMark } from "../core/LiveMark.tsx";
 import type { Session } from "../../shared/sessions.ts";
 import { Checkbox } from "./Checkbox.tsx";
 import type { RowEvents, RowMarks } from "./row-events.ts";
+import { Highlighted, SearchSnippet } from "./Highlight.tsx";
 import { SessionName } from "./SessionName.tsx";
 import { formatAgo, formatMoney, formatStamp, liveTitle, projectLabel, statusOf, type Columns } from "./table-model.ts";
 import { ContextMeter, Unknown } from "./Values.tsx";
@@ -117,9 +118,12 @@ export function SessionRow({ session, columns, names, fork, now, lastSelected, m
       {note !== undefined && (
         <div className={styles.note} data-testid="session-note">
           <NoteIcon size={12} />
-          <span title={note}>{note}</span>
+          <span title={note}>
+            <Highlighted text={note} />
+          </span>
         </div>
       )}
+      <SearchSnippet session={session} className={styles.note} />
     </div>
   );
 }

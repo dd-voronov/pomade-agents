@@ -1,6 +1,7 @@
 // One status's group in the Sessions table: a sticky header (collapse toggle, status mark, label,
 // count, ~$ sum) that takes rows dropped on it, then its rows — the latest 10 of a long Done or
-// Done–skip/Failed group with "Show all N" — or its one-line empty text.
+// Done–skip/Failed group with "Show all N" — or its one-line empty text. Holding a search's or
+// filter's matches, it shows every one of them, and nothing when it has none.
 
 import type { ReactElement, ReactNode } from "react";
 import type { SessionStatus } from "pomade-kit/protocol";
@@ -22,6 +23,8 @@ export interface StatusGroupProps {
   onToggleExpanded: (status: SessionStatus) => void;
   drop: StatusDrop;
   row: (session: Session) => ReactNode;
+  /** The group holds a search's or filter's matches. */
+  filtered?: boolean;
 }
 
 /** The status's mark: a small colored square, so it never reads as a live-state dot. */
@@ -37,10 +40,10 @@ function sumText(status: SessionStatus, sessions: readonly Session[]): string | 
   return parts.length === 0 ? null : parts.join(" · ");
 }
 
-export function StatusGroup({ status, sessions, collapsed, expanded, onToggleCollapsed, onToggleExpanded, drop, row }: StatusGroupProps): ReactElement {
+export function StatusGroup({ status, sessions, collapsed, expanded, onToggleCollapsed, onToggleExpanded, drop, row, filtered = false }: StatusGroupProps): ReactElement {
   const count = sessions.length;
   const sum = sumText(status, sessions);
-  const long = isLong(status, count);
+  const long = !filtered && isLong(status, count);
   return (
     <section className={styles.group} data-testid={`group-${status}`} data-count={count} aria-label={STATUS_LABELS[status]}>
       <div
@@ -76,7 +79,7 @@ export function StatusGroup({ status, sessions, collapsed, expanded, onToggleCol
       </div>
       {!collapsed && (
         <>
-          {shownRows(status, sessions, expanded).map(row)}
+          {(filtered ? sessions : shownRows(status, sessions, expanded)).map(row)}
           {long && (
             <div className={styles.more} data-testid={`group-more-${status}`}>
               {expanded ? (
@@ -93,7 +96,7 @@ export function StatusGroup({ status, sessions, collapsed, expanded, onToggleCol
               )}
             </div>
           )}
-          {count === 0 && (
+          {count === 0 && !filtered && (
             <div className={styles.empty} data-testid={`group-empty-${status}`}>
               {EMPTY_GROUP_TEXT[status]}
             </div>

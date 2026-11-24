@@ -1,0 +1,17 @@
+/* A search match, and the snippet line a row adds for one it does not show. */
+
+.match {
+  border-radius: 2px;
+  background: var(--warning-tint-strong);
+  color: inherit;
+}
+
+div.snippet {
+  color: var(--text-faint);
+}
+
+.label {
+  flex: none;
+  color: var(--text-faint);
+  font-weight: var(--fw-medium);
+}

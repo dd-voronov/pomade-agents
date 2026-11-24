@@ -1,10 +1,12 @@
 // A session's name as its rows show it: the fork mark, the name (the first message in grey when
-// it is unnamed) and its chips — an unattended run, "shared folder", "outside Pomade".
+// it is unnamed) with the search's matches marked, and its chips — an unattended run, "shared
+// folder", "outside Pomade".
 
 import type { ReactElement } from "react";
 
 import { ForkIcon, TimerIcon } from "../core/icons.tsx";
 import type { Session } from "../../shared/sessions.ts";
+import { Highlighted } from "./Highlight.tsx";
 import { chipsOf, rowName } from "./table-model.ts";
 import styles from "./SessionName.module.css";
 
@@ -27,7 +29,7 @@ export function SessionName({ session, names, fork }: SessionNameProps): ReactEl
         </span>
       )}
       <span className={styles.name} data-unnamed={name.unnamed ? "" : undefined} title={name.text} data-testid="session-name">
-        {name.text}
+        <Highlighted text={name.text} />
       </span>
       {chips.length > 0 && (
         <span className={styles.chips}>

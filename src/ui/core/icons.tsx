@@ -189,3 +189,13 @@ export function CaretIcon({ size = 12 }: IconProps): ReactElement {
     </Glyph>
   );
 }
+
+/** A magnifier — search. */
+export function SearchIcon({ size = 16 }: IconProps): ReactElement {
+  return (
+    <Glyph size={size}>
+      <circle cx="7" cy="7" r="4.25" />
+      <path d="M10.2 10.2L13.5 13.5" />
+    </Glyph>
+  );
+}

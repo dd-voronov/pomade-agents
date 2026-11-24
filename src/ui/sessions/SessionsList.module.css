@@ -114,3 +114,12 @@
   color: var(--text-faint);
   font-size: var(--fs-sm);
 }
+
+/* The matches of every status, in the table's status groups: their headers stick to the top, their
+   labels line up with the rows' names. */
+.grouped {
+  --columns-height: 0px;
+  --name-indent: 28px;
+
+  padding-top: 0;
+}

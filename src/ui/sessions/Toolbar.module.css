@@ -1,0 +1,163 @@
+/* The toolbar row: the search field, the filter buttons, Clear and the match count. The bulk bar
+   takes the same 44 px row. */
+
+.bar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  height: 44px;
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.search {
+  position: relative;
+  display: flex;
+  flex: 1 1 200px;
+  align-items: center;
+  min-width: 120px;
+  max-width: 320px;
+}
+
+.glyph {
+  position: absolute;
+  left: 8px;
+  display: inline-flex;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+
+.field {
+  width: 100%;
+  height: 28px;
+  padding: 0 26px 0 30px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--panel-raised);
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
+}
+
+.field::placeholder {
+  color: var(--text-faint);
+}
+
+.field:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.clearSearch {
+  position: absolute;
+  right: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.clearSearch:hover {
+  background: var(--active-bg);
+  color: var(--text);
+}
+
+.button {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  height: 28px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--panel-raised);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+}
+
+.button:hover {
+  background: linear-gradient(var(--hover-bg), var(--hover-bg)), var(--panel-raised);
+}
+
+.button[aria-expanded="true"],
+.button[data-on] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--badge-fg);
+}
+
+.button > svg {
+  flex: none;
+}
+
+.buttonLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.caret {
+  display: inline-flex;
+  flex: none;
+  margin-right: -4px;
+  color: var(--text-faint);
+}
+
+.button[aria-expanded="true"] .caret,
+.button[data-on] .caret {
+  color: inherit;
+}
+
+.link {
+  flex: none;
+  margin-left: var(--space-1);
+  padding: 0;
+  border: none;
+  border-radius: 2px;
+  background: none;
+  color: var(--badge-fg);
+  font-size: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.count {
+  flex: none;
+  color: var(--text-faint);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}

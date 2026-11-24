@@ -5,6 +5,7 @@
 
 import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactElement } from "react";
 
+import { Highlighted } from "./Highlight.tsx";
 import styles from "./DetailPanel.module.css";
 
 export interface ClampedTextProps {
@@ -34,7 +35,7 @@ export function ClampedText({ text, lines, from, testId }: ClampedTextProps): Re
     <>
       <div className={styles.message} data-from={from}>
         <p ref={ref} className={styles.text} data-clamped={expanded ? undefined : ""} style={{ "--lines": lines } as CSSProperties} data-testid={testId}>
-          {text}
+          <Highlighted text={text} />
         </p>
       </div>
       {(overflows || expanded) && (
