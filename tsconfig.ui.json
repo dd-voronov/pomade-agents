@@ -5,6 +5,6 @@
     "jsx": "react-jsx",
     "types": ["vite/client"]
   },
-  "include": ["src/ui", "src/shared", "harness/shell", "harness/fake-pomade/shell-protocol.ts"],
+  "include": ["src/ui", "src/shared", "harness/shell"],
   "exclude": ["**/*.test.ts", "harness/shell/vite.config.ts"]
 }
