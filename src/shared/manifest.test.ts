@@ -32,7 +32,7 @@ describe("manifest.json", () => {
     // The UI hears the backend's change notices through the app's own published events; other apps
     // hear the session events; the backend follows Pomade's projects and agent tabs, and Runner's
     // runs, for project attribution, live state and event B; Live now focuses agent tabs.
-    expect(parsed.manifest.capabilities).toEqual(["project.read", "agentTabs.read", "tabs.open"]);
+    expect(parsed.manifest.capabilities).toEqual(["project.read", "agentTabs.read", "agentTabs.write", "tabs.open"]);
     expect(parsed.manifest.events).toEqual({
       publish: ["sessions.changed", ROSTER_CHANGED_EVENT, LIVE_NOW_CHANGED_EVENT, SESSION_TURN_FINISHED_EVENT, SESSION_CLOSED_EVENT, SESSION_STATUS_CHANGED_EVENT],
       subscribe: ["pomade-agents:sessions.changed", "pomade-agents:roster.changed", `pomade-agents:${LIVE_NOW_CHANGED_EVENT}`, "pomade.ready", "project.created", "project.renamed", "project.removed", "agentTab.changed", "agentTab.exited", RUN_STARTED_EVENT, RUN_FINISHED_EVENT],

@@ -183,7 +183,7 @@ describe("the session data", () => {
     expect(marked).toContain("startedByRunner:\n  job: Nightly\n");
   });
 
-  it("sets statuses and notes in bulk, renames and moves, writing the records", async () => {
+  it("sets statuses and notes in bulk, renames (telling the name listeners) and moves, writing the records", async () => {
     await mkdir(dataDir, { recursive: true });
     await writeFile(join(dataDir, SETTINGS_FILE), `adoptedAt: ${FIRST_RUN}\n`);
     const source = fakeSource();
@@ -201,8 +201,14 @@ describe("the session data", () => {
     expect((await d.changeStatus(["a"], "active"))[0]?.record?.note).toBe("waiting for review");
     expect((await d.changeStatus(["a"], "done", null))[0]?.record?.note).toBeUndefined();
 
+    const named: [string, string | null][] = [];
+    d.onNameChange((id, name) => named.push([id, name]));
     expect((await d.rename("a", " Grill ")).record?.name).toBe("Grill");
     expect((await d.rename("a", null)).record?.name).toBeUndefined();
+    expect(named).toEqual([
+      ["a", "Grill"],
+      ["a", null],
+    ]);
 
     expect((await d.moveToProject("c", "beta")).attribution).toEqual({ projects: ["beta"], by: "override", sharedFolder: false });
     expect(await readFile(fileOf("c"), "utf8")).toMatch(/project: beta\nprojectRoot: Projects\/beta\n(.*\n)*projectOverride: true\n/);

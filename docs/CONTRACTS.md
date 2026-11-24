@@ -21,7 +21,7 @@ and the backend's handlers in step with it.
 |---|---|
 | `id` · `name` | `pomade-agents` · Agents |
 | `hostApi` | `0` |
-| `capabilities` | `project.read` (projects, their stable ids, names and folders, their visible agents) · `agentTabs.read` (each agent tab's session, folder and live state) — the backend's project attribution, live state and the project ↔ agent connection; the Sessions tab's and Live now's project names · `tabs.open` — Live now focuses agent tabs (`agentTabs.focus`) |
+| `capabilities` | `project.read` (projects, their stable ids, names and folders, their visible agents) · `agentTabs.read` (each agent tab's session, folder, title and live state) · `agentTabs.write` (an agent tab's title, the unnamed mark) — the backend's project attribution, live state, tab titles and the project ↔ agent connection; the Sessions tab's and Live now's project names · `tabs.open` — Live now focuses agent tabs (`agentTabs.focus`) |
 | `strip` | one icon, `agents` — action `panel` |
 | `events` | publishes `sessions.changed`, `roster.changed` and `liveNow.changed` (for its own UI frames) and `session.turnFinished` (declared, never published), `session.closed`, `session.statusChanged` ("Published events" below); subscribes to `pomade-agents:sessions.changed`, `pomade-agents:roster.changed` and `pomade-agents:liveNow.changed` (its own, for its UI frames), `project.created`, `project.renamed` and `project.removed` (the backend, and the UI frames for project names) and, for the backend, `pomade.ready`, `agentTab.changed`, `agentTab.exited` and Runner's `pomade-runner:run.started`, `pomade-runner:run.finished` ("Subscribed events" below) |
 | `backend` | `backend/main.mjs`, mode `with-pomade` |
@@ -205,8 +205,8 @@ exist stands as it is. The record keeps the start folder as recorded (`cwd`). A 
 **Changes.** `sessions.setStatus` sets one status on every id (all are checked first: an unknown id
 is `not-found`); `note` — a string sets it (trimmed, one line, at most 500 characters), `null` or
 empty removes it, omitted keeps it. `sessions.rename` — a name (trimmed, one line, at most 200
-characters, the tab title's limit), `null` or empty for unnamed; it changes the record only (tab
-titles are E-002). `sessions.moveToProject` — a project id, `"__workspace__"` for the Workspace
+characters, the tab title's limit), `null` or empty for unnamed; the record changes, then every
+agent tab bound to the session is retitled ("Tab titles" below). `sessions.moveToProject` — a project id, `"__workspace__"` for the Workspace
 bucket, or `null` for the automatic project again; an unknown project is `not-found`. Errors:
 `invalid-params` for malformed params, `not-ready` without a workspace or before the session has a
 record, `io-error` when its record file cannot be used. Every status change goes through
@@ -217,6 +217,22 @@ record, `io-error` when its record file cannot be used. Every status change goes
 own event in `events.subscribe`) and, when behind it, ask `sessions.list` with their `since`.
 Events are not replayed, so a frame asks once its subscription stands, and again every second
 while the backend does not answer; a restarted backend is another epoch and answers whole.
+
+**Tab titles** (`src/backend/sessions/tab-titles.ts`) — a session's name is its agent tab's title,
+both ways (DESIGN §2.5). The backend keeps every agent tab as Pomade last listed or changed it:
+
+- **A rename** (`SessionData.rename` — the UI, the API, the command) calls
+  `agentTabs.setTitle(tabId, name)` for every tab bound to the session; `null` for an unnamed one
+  (Pomade shows the agent's name in italics with the unnamed dot).
+- **The user renaming a tab** (`agentTab.changed` with `titleSource: "user"`) renames its session.
+- **A tab bound to a session** — its first session, a new one after `/clear` or `/fork`, the one an
+  in-session `/resume` adopts, a tab a resume opens, and every listed tab the backend did not know
+  (the tabs Pomade restored) — gets the session's name, or the unnamed mark. The user's title
+  names the session instead when the user titled the tab before its first session, or when a listed
+  tab carries a title of the user's and its session is unnamed.
+- A tab waits for its session's record before either way applies; a tab already showing the name
+  (or the mark) is left alone; the tabs are forgotten when the connection ends, and listed afresh
+  on the next one.
 
 **Live state** (`src/backend/sessions/live-state.ts`) — detected, never set. The backend keeps one
 entry per live thing, each from its live source. Two sources:
@@ -658,7 +674,8 @@ type AgentRunFinished = AgentRunStarted & {
 - **Pomade** (`src/backend/interfaces/platform.ts`) — on each connection the backend lists the
   projects (again on `project.created`, `project.renamed`, `project.removed`, `pomade.ready`) and the agent tabs (again
   on `pomade.ready`), and takes every `agentTab.changed`: the first project each session is seen
-  bound in is its `launchedFrom`; every tab's state and folder feed the live state. Every
+  bound in is its `launchedFrom`; every tab's state and folder feed the live state; its session and
+  title feed the tab titles ("Tab titles" above), retitled through `agentTabs.setTitle`. Every
   `agentTab.exited` feeds event B. Runner's `run.started` / `run.finished` come in on the same
   connection ("Subscribed events" above). A rename refreshes `projectRoot` in the records of that project.
   A removed project leaves the list at once; its sessions fall to their next attribution step

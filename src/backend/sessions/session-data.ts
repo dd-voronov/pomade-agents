@@ -13,7 +13,7 @@
 //   is there and holds it.
 // - **Changes in.** Status, note, name and Move to project go to the record file and nowhere else;
 //   every status change goes through `changeStatus`, which tells its listeners each session whose
-//   status it changed.
+//   status it changed, and every name change through `rename`, which tells its listeners the name.
 // - **Changes out.** Each session carries a revision; the API answers the changes since a
 //   caller's revision, and a change notice goes out at most every `NOTIFY_MS`.
 //
@@ -95,6 +95,8 @@ export interface SessionData {
   onStatusChange(listener: (change: StatusChange) => void): () => void;
   /** Name a session; `null`: unnamed. */
   rename(id: string, name: string | null): Promise<Session>;
+  /** Called after `rename` wrote a session's name (`null`: unnamed); returns an unsubscribe function. */
+  onNameChange(listener: (id: string, name: string | null) => void): () => void;
   /** Move a session to a project, to the Workspace (`"__workspace__"`), or back to its automatic project (`null`). */
   moveToProject(id: string, project: string | null): Promise<Session>;
   stop(): void;
@@ -135,6 +137,7 @@ export function startSessionData(options: SessionDataOptions): SessionData {
   let flushTimer: NodeJS.Timeout | null = null;
   const listeners = new Set<(changed: SessionsChanged) => void>();
   const statusListeners = new Set<(change: StatusChange) => void>();
+  const nameListeners = new Set<(id: string, name: string | null) => void>();
   let notifyTimer: NodeJS.Timeout | null = null;
 
   // ── Changes out ──────────────────────────────────────────────────────────
@@ -464,7 +467,15 @@ export function startSessionData(options: SessionDataOptions): SessionData {
 
     async rename(id, name) {
       requireRecord(id);
-      return change(id, (record) => withText(record, "name", name));
+      const session = await change(id, (record) => withText(record, "name", name));
+      const named = session.record?.name ?? null;
+      for (const listener of nameListeners) listener(id, named);
+      return session;
+    },
+
+    onNameChange(listener) {
+      nameListeners.add(listener);
+      return () => nameListeners.delete(listener);
     },
 
     async moveToProject(id, project) {

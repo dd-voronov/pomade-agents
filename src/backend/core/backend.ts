@@ -1,6 +1,6 @@
 // The backend process's life: record the run, index the agents' session stores, keep the session
-// records and the roster, stay connected to Pomade over its socket — following its projects, its agent tabs and
-// Runner's agent runs, which are what runs now — serve the app's API on every connection and publish its session events
+// records and the roster, stay connected to Pomade over its socket — following its projects, its agent tabs
+// (what runs now, and their titles, which are the sessions' names) and Runner's agent runs — serve the app's API on every connection and publish its session events
 // (HOST-API §2 "Backends"). Pomade starts it with the app and stops it with SIGTERM; a requested
 // stop publishes the status changes still inside their window first.
 
@@ -24,6 +24,7 @@ import { createLiveState, followTabs } from "../sessions/live-state.ts";
 import { startRunnerRuns } from "../sessions/runner-runs.ts";
 import { startSessionData } from "../sessions/session-data.ts";
 import { startSessionEvents } from "../sessions/session-events.ts";
+import { startTabTitles } from "../sessions/tab-titles.ts";
 import { startSessionStore } from "../stores/session-store.ts";
 import { resolveHome, resolveLocations, type Env } from "./locations.ts";
 import { createRealPaths } from "./real-paths.ts";
@@ -117,6 +118,7 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
     log,
   });
   const runs = startRunnerRuns({ live, sessions, events, realPath, log });
+  const titles = startTabTitles({ sessions, log });
 
   const connection = stayConnected(
     { env, role: "backend" },
@@ -124,6 +126,7 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
       onConnect(connected) {
         host = connected;
         log(`connected to Pomade ${connected.welcome.pomadeVersion}`);
+        titles.connect((tabId, title) => connected.agentTabs.setTitle(tabId, title));
         connected.api.serve(createApi({ info, sessions, live, liveNow, realPath, roster, projects: projectReads(connected) })).then(
           ({ methods }) => log(`serving ${methods.join(", ")}`),
           (err: unknown) => log(`could not serve the API: ${message(err)}`),
@@ -134,8 +137,14 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
           {
             setProjects: (projects) => sessions.setProjects(projects),
             bind: (sessionId, projectId) => sessions.bind(sessionId, projectId),
-            listTabs: (list) => tabs.list(list),
-            tabChanged: (tab, closed) => tabs.changed(tab, closed),
+            listTabs: (list) => {
+              tabs.list(list);
+              titles.list(list);
+            },
+            tabChanged: (tab, changes) => {
+              tabs.changed(tab, changes.includes("closed"));
+              titles.changed(tab, changes);
+            },
             tabExited: (exited) => events.tabExited(exited),
             runStarted: (payload) => runs.started(payload),
             runFinished: (payload) => runs.finished(payload),
@@ -150,6 +159,7 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
         // Pomade's agents end with it; a Pomade that comes back lists its tabs again. Runner's run
         // finished is not heard while the connection is down, so no run is held across it.
         tabs.list([]);
+        titles.connect(null);
         runs.drop();
         log("Pomade went away; reconnecting");
       },
@@ -162,6 +172,7 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
   return {
     async stop() {
       runs.stop();
+      titles.stop();
       badge.stop();
       liveNow.stop();
       await events.stop();

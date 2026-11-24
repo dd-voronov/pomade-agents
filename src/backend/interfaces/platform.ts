@@ -2,7 +2,8 @@
 // ids and folders (`project.list`, again on `project.created`, `project.renamed`, `project.removed`
 // and `pomade.ready`)
 // — and the agent tabs: which session each one is bound to, where it runs and what its agent is
-// doing (`agentTabs.list`, again on `pomade.ready`, then every `agentTab.changed`; pomade:E-033) —
+// doing and its title (`agentTabs.list`, again on `pomade.ready`, then every `agentTab.changed`;
+// pomade:E-033) —
 // and every end of an agent process in a tab, with the session bound to it then (`agentTab.exited`).
 // Runner's run started / run finished (`pomade-runner:run.started`, `pomade-runner:run.finished`)
 // come through the same bus, as Runner publishes them; the app never calls Runner.
@@ -11,7 +12,7 @@
 import { realpath } from "node:fs/promises";
 import { join } from "node:path";
 
-import type { AgentTabExitedPayload, AgentTabInfo, ProjectInfo } from "pomade-kit/protocol";
+import type { AgentTabChange, AgentTabExitedPayload, AgentTabInfo, ProjectInfo } from "pomade-kit/protocol";
 import type { HostClient } from "pomade-kit/sdk";
 
 import { RUN_FINISHED_EVENT, RUN_STARTED_EVENT } from "../../shared/runner-events.ts";
@@ -23,8 +24,8 @@ export interface PlatformFacts {
   bind(sessionId: string, projectId: string): void;
   /** Every agent tab, as Pomade lists them now. */
   listTabs(tabs: readonly AgentTabInfo[]): void;
-  /** One agent tab as it is now; `closed`: it left the list. */
-  tabChanged(tab: AgentTabInfo, closed: boolean): void;
+  /** One agent tab as it is now, and what changed (`closed`: it left the list). */
+  tabChanged(tab: AgentTabInfo, changes: readonly AgentTabChange[]): void;
   /** An agent process in a tab ended. */
   tabExited(exited: AgentTabExitedPayload): void;
   /** Runner's run started, its payload as it crossed the bus. */
@@ -86,7 +87,7 @@ export function followPomade(host: HostClient, facts: PlatformFacts, { workspace
       host.events.subscribe("project.removed", () => run("list the projects", loadProjects)),
       host.events.subscribe("agentTab.changed", ({ tab, changes }) => {
         bindTab(tab);
-        facts.tabChanged(tab, changes.includes("closed"));
+        facts.tabChanged(tab, changes);
       }),
       host.events.subscribe("agentTab.exited", (exited) => facts.tabExited(exited)),
       host.events.subscribe(RUN_STARTED_EVENT, (payload) => facts.runStarted(payload)),
