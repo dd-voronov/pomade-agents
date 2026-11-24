@@ -1,5 +1,5 @@
 // The sessions the app answers for (DESIGN §2.4, §2.6, §4): each session the stores know joined
-// with its record, the project(s) it shows in and its live state, kept current as the transcripts,
+// with its record, the project(s) it shows in, its live state and its agent tab, kept current as the transcripts,
 // the records on disk, Pomade's projects and tabs and what runs now change.
 //
 // - **First sight.** A session without a record gets one (`rules.ts`). The first run waits for the
@@ -37,6 +37,7 @@ import { RecordError, type RecordStore } from "../records/record-store.ts";
 import type { SummariesAnswer } from "../stores/session-store.ts";
 import type { RealPath } from "../core/real-paths.ts";
 import { attribute, folderInProject, type ProjectPlace } from "./attribution.ts";
+import type { BoundTabs } from "./bound-tabs.ts";
 import { hiddenReason } from "./hidden.ts";
 import type { LiveState } from "./live-state.ts";
 import { isRecordId, latestSummary, newRecord, refreshRecord, sameRecord, type RecordContext } from "./rules.ts";
@@ -58,6 +59,8 @@ export interface SessionDataOptions {
   noRecords: string;
   /** What runs now: each session's live state. */
   live: Pick<LiveState, "ofSession" | "onChange">;
+  /** The agent tab each session is bound to. */
+  tabs: Pick<BoundTabs, "ofSession" | "onChange">;
   /** Folders with symlinks resolved: start folders are compared with project folders that way. */
   realPath: RealPath;
   now: () => Date;
@@ -113,7 +116,7 @@ interface Entry {
 }
 
 export function startSessionData(options: SessionDataOptions): SessionData {
-  const { summaries: source, records, noRecords, live, realPath, now, log } = options;
+  const { summaries: source, records, noRecords, live, tabs, realPath, now, log } = options;
   const epoch = randomUUID();
   let revision = 0;
   let stopped = false;
@@ -262,7 +265,7 @@ export function startSessionData(options: SessionDataOptions): SessionData {
     }
     const cwd = realCwd ?? summary.cwd;
     const attribution = attribute({ cwd, record, projects });
-    put(id, { id, summary, record, recordProblem: problem, attribution, folderInProject: folderInProject(cwd, attribution.projects[0], projects), ...live.ofSession(id), hidden: hiddenReason(summary) });
+    put(id, { id, summary, record, recordProblem: problem, attribution, folderInProject: folderInProject(cwd, attribution.projects[0], projects), ...live.ofSession(id), tab: tabs.ofSession(id), hidden: hiddenReason(summary) });
   };
 
   const flush = (): void => {
@@ -387,6 +390,9 @@ export function startSessionData(options: SessionDataOptions): SessionData {
   const unsubscribeLive = live.onChange((ids) => {
     for (const id of ids) mark(id);
   });
+  const unsubscribeTabs = tabs.onChange((ids) => {
+    for (const id of ids) mark(id);
+  });
   const unsubscribeRecords = records?.onChange((id) => {
     if (id !== null) {
       mark(id);
@@ -500,6 +506,7 @@ export function startSessionData(options: SessionDataOptions): SessionData {
       stopped = true;
       unsubscribeSource();
       unsubscribeLive();
+      unsubscribeTabs();
       unsubscribeRecords?.();
       for (const timer of [flushTimer, notifyTimer]) if (timer) clearTimeout(timer);
     },

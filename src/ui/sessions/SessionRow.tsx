@@ -1,9 +1,9 @@
 // One session in the Sessions table: a 28 px line of columns, and its note under it. Clicking it
-// selects the session; the row selected before the detail panel closed is marked, as where ↑ ↓
-// go on from. Its checkbox sits before the name, under the group header's chevron, and its live
-// mark between them, under the status mark; ⋯ at the end
-// opens its menu. Both show on hover; the checkbox also while any row is checked. The row drags
-// onto a group header.
+// selects the session, a double-click opens or resumes it; the row selected before the detail
+// panel closed is marked, as where ↑ ↓ go on from. Its checkbox sits before the name, under the
+// group header's chevron, and its live mark between them, under the status mark; at the end,
+// Open / Resume and ⋯, which opens its menu. They show on hover; the checkbox also while any row
+// is checked. The row drags onto a group header.
 
 import type { ReactElement } from "react";
 
@@ -11,6 +11,8 @@ import { MoreIcon, NoteIcon } from "../core/icons.tsx";
 import { LiveMark } from "../core/LiveMark.tsx";
 import type { Session } from "../../shared/sessions.ts";
 import { Checkbox } from "./Checkbox.tsx";
+import { OPEN_LABELS, openKind } from "./open-model.ts";
+import { OpenGlyph } from "./OpenGlyph.tsx";
 import type { RowEvents, RowMarks } from "./row-events.ts";
 import { Highlighted, SearchSnippet } from "./Highlight.tsx";
 import { SessionName } from "./SessionName.tsx";
@@ -37,6 +39,7 @@ export function SessionRow({ session, columns, names, fork, now, lastSelected, m
   const note = session.record?.note;
   const project = columns.project ? projectLabel(session, names) : "";
   const model = summary.model;
+  const open = openKind(session);
   const live = liveTitle(session, now);
   return (
     <div
@@ -97,6 +100,22 @@ export function SessionRow({ session, columns, names, fork, now, lastSelected, m
           {formatAgo(summary.lastActiveAt, now)}
         </div>
         <div className={styles.actions}>
+          <button
+            type="button"
+            className={styles.more}
+            title={OPEN_LABELS[open]}
+            aria-label={OPEN_LABELS[open]}
+            tabIndex={-1}
+            draggable={false}
+            data-testid="row-open"
+            data-open={open}
+            onClick={(event) => {
+              event.stopPropagation();
+              events.onOpen(session.id);
+            }}
+          >
+            <OpenGlyph kind={open} />
+          </button>
           <button
             type="button"
             className={styles.more}

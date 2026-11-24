@@ -1,14 +1,17 @@
 // A real, built Pomade for the smoke spec: which checkout it is, and how it is launched so it
 // touches nothing of the user's — its user data, workspace and HOME are the sandbox's, and
 // `NODE_ENV=test` keeps Pomade's own home folder and shell-profile line off (HOST-API §2
-// "Testing hook"). The checkout is only read: its built `out/` and its Electron binary.
+// "Testing hook"). The checkout is only read: its built `out/` and its Electron binary. Also what
+// the smoke specs share: Pomade's own client, and a stand-in for a Claude-shaped agent.
 
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { _electron as electron, type ElectronApplication, type Page } from "@playwright/test";
+import { connectSocket } from "pomade-kit/node";
+import type { HostClient } from "pomade-kit/sdk";
 
 import type { Sandbox } from "../../harness/sandbox.ts";
 
@@ -58,3 +61,39 @@ export async function launchPomade(sandbox: Sandbox, devApps: string[] = []): Pr
 export function pomadeApps(sandbox: Sandbox, ...args: string[]): string {
   return execFileSync(POMADE_BIN, ["apps", ...args], { env: isolatedEnv(sandbox, {}), encoding: "utf8" });
 }
+
+/** Pomade's own client (the platform key) on the sandbox's Pomade: it calls the app's API. */
+export async function platformClient(sandbox: Sandbox): Promise<HostClient> {
+  const connected = await connectSocket({
+    socketPath: sandbox.socketPath,
+    appId: "pomade",
+    keyFile: join(sandbox.userData, "app-keys", "pomade"),
+    role: "command",
+    env: {},
+  });
+  if (connected.status !== "connected") throw new Error(`could not reach Pomade as its platform client: ${connected.status}`);
+  return connected.host;
+}
+
+/** A Claude-shaped stand-in agent writing into the store `store`: ready at once; started with
+ *  `--resume <id>` it says `AGENT_RESUMED <id>` and goes on in that session; otherwise its first
+ *  prompt starts a session. Every prompt it gets is echoed as `AGENT_GOT: <prompt>`. */
+export const STAND_IN_AGENT = (store: string): string => `#!/bin/zsh
+current=""
+dir="${store}/projects/\${\${PWD:A}//[^a-zA-Z0-9]/-}"
+printf '\\e]0;✳ Claude\\a'
+if [[ "$1" == "--resume" ]]; then
+  current="$2"
+  echo "AGENT_RESUMED $current"
+fi
+echo AGENT_READY
+while IFS= read -r line; do
+  if [[ "$line" == "/exit" ]]; then exit 0; fi
+  if [[ -z "$current" ]]; then
+    current="$(uuidgen | tr A-Z a-z)"
+    mkdir -p "$dir"
+    print -r -- "{\\"type\\":\\"user\\",\\"message\\":{\\"role\\":\\"user\\",\\"content\\":\\"$line\\"},\\"origin\\":{\\"kind\\":\\"human\\"},\\"promptSource\\":\\"typed\\",\\"timestamp\\":\\"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)\\",\\"cwd\\":\\"\${PWD:A}\\",\\"sessionId\\":\\"$current\\"}" >> "$dir/$current.jsonl"
+  fi
+  echo "AGENT_GOT: $line"
+done
+`;

@@ -116,8 +116,8 @@ export const COLUMN_WIDTH = {
   context: 82,
   cost: 74,
   last: 84,
-  /** The row's hover actions: ⋯. */
-  actions: 32,
+  /** The row's hover actions: Open / Resume and ⋯. */
+  actions: 56,
 } as const;
 
 /** The name column never gets narrower than this (its cell padding included). */

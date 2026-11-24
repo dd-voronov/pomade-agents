@@ -59,6 +59,6 @@ describe("manifest.json", () => {
     const live = { entries: () => [] };
     const roster = { answer: () => ({ epoch: "e", revision: 0, agents: [], profilesOff: null }), list: () => [], agent: () => undefined };
     const projects = { projects: none, visibleAgents: none };
-    expect(Object.keys(createApi({ info, sessions, live, liveNow: { answer: () => ({ epoch: "l", revision: 0, rows: [] }) }, realPath: (p: string) => Promise.resolve(p), roster, projects }))).toEqual(api);
+    expect(Object.keys(createApi({ info, sessions, live, liveNow: { answer: () => ({ epoch: "l", revision: 0, rows: [] }) }, realPath: (p: string) => Promise.resolve(p), roster, projects, open: none }))).toEqual(api);
   });
 });

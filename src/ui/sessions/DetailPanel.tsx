@@ -1,5 +1,5 @@
 // The detail panel (DESIGN §2.7 "List with the detail panel"): one session's name — renamed in
-// place — its live state and since when (Closed: when it was last active), Rename and Move to project, its marker notes, its status as four buttons with the one-line note under them, the
+// place — its live state and since when (Closed: when it was last active), Open tab / Resume (with its hint), Rename and Move to project, its marker notes, its status as four buttons with the one-line note under them, the
 // facts, and its first message, last message and last agent answer. A refused change says so
 // under the note.
 
@@ -10,6 +10,8 @@ import { CaretIcon, CloseIcon, FolderIcon, ForkIcon, InfoIcon, MoveIcon, PencilI
 import { LiveMark } from "../core/LiveMark.tsx";
 import { SESSION_NAME_MAX, SESSION_NOTE_MAX, type Session } from "../../shared/sessions.ts";
 import { ClampedText } from "./ClampedText.tsx";
+import { OPEN_LABELS, OPEN_TOOLTIPS, openHint, openKind } from "./open-model.ts";
+import { OpenGlyph } from "./OpenGlyph.tsx";
 import {
   CLAMP_LINES,
   PROVIDER_LABELS,
@@ -60,6 +62,8 @@ export interface DetailPanelProps {
   askMove: boolean;
   /** Open Move to project under `anchor`, the button's box. */
   onOpenMove: (anchor: DOMRect) => void;
+  /** Open the session's tab, or resume it. */
+  onOpen: () => void;
 }
 
 function LiveLine({ session, now }: { session: Session; now: Date }): ReactElement {
@@ -121,7 +125,7 @@ function MarkerNotes({ notes, onSelect }: { notes: MarkerNote[]; onSelect: (id: 
           case "outside-pomade":
             return (
               <Note key={note.kind} kind={note.kind} icon={<InfoIcon />}>
-                Started outside Pomade. No tab is bound to it, so its live state is always Closed.
+                Started outside Pomade. No tab is bound to it, so its live state is always Closed. Resume opens it in a Pomade tab.
               </Note>
             );
         }
@@ -170,7 +174,7 @@ function NameField({ session, onSaveName, onCancelRename }: Pick<DetailPanelProp
   );
 }
 
-function Actions({ moveOpen, askMove, onStartRename, onOpenMove }: Pick<DetailPanelProps, "moveOpen" | "askMove" | "onStartRename" | "onOpenMove">): ReactElement {
+function Actions({ session, moveOpen, askMove, onStartRename, onOpenMove, onOpen }: Pick<DetailPanelProps, "session" | "moveOpen" | "askMove" | "onStartRename" | "onOpenMove" | "onOpen">): ReactElement {
   const moveButton = useRef<HTMLButtonElement>(null);
 
   useLayoutEffect(() => {
@@ -178,8 +182,13 @@ function Actions({ moveOpen, askMove, onStartRename, onOpenMove }: Pick<DetailPa
     if (askMove && button !== null) onOpenMove(button.getBoundingClientRect());
   }, [askMove, onOpenMove]);
 
+  const open = openKind(session);
   return (
     <div className={styles.actions}>
+      <button type="button" className={`${styles.action} ${styles.primary}`} title={OPEN_TOOLTIPS[open]} data-testid="detail-open" data-open={open} onClick={onOpen}>
+        <OpenGlyph kind={open} />
+        {OPEN_LABELS[open]}
+      </button>
       <button type="button" className={styles.action} title="Rename the session — its tab takes the name (F2)" data-testid="detail-rename" onClick={onStartRename}>
         <PencilIcon />
         Rename
@@ -370,6 +379,7 @@ export function DetailPanel(props: DetailPanelProps): ReactElement {
   const { session, now, names, byId, inTab, onSelect, onClose, failure } = props;
   const name = detailName(session);
   const notes = markerNotes(session, byId, names, inTab);
+  const hint = openHint(session);
   return (
     <aside className={styles.panel} aria-label="Session details" data-testid="detail-panel" data-session-id={session.id}>
       <div className={styles.inner}>
@@ -386,7 +396,12 @@ export function DetailPanel(props: DetailPanelProps): ReactElement {
           </button>
         </div>
         <LiveLine session={session} now={now} />
-        <Actions moveOpen={props.moveOpen} askMove={props.askMove} onStartRename={props.onStartRename} onOpenMove={props.onOpenMove} />
+        <Actions session={session} moveOpen={props.moveOpen} askMove={props.askMove} onStartRename={props.onStartRename} onOpenMove={props.onOpenMove} onOpen={props.onOpen} />
+        {hint !== null && (
+          <p className={styles.hint} data-testid="detail-open-hint">
+            {hint}
+          </p>
+        )}
         <MarkerNotes notes={notes} onSelect={onSelect} />
         <section className={styles.section}>
           <h3 className={styles.label}>Status</h3>

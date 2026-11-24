@@ -172,9 +172,9 @@ describe("columns by width", () => {
   });
 
   it("builds the row's grid: the name takes the rest", () => {
-    expect(columnTemplate(columnsFor(10_000, true))).toBe("minmax(0, 1fr) 132px 108px 204px 82px 74px 84px 32px");
-    expect(columnTemplate(columnsFor(full - 1, false))).toBe("minmax(0, 1fr) 108px 140px 82px 74px 84px 32px");
-    expect(columnTemplate(columnsFor(0, false))).toBe("minmax(0, 1fr) 84px 32px");
+    expect(columnTemplate(columnsFor(10_000, true))).toBe("minmax(0, 1fr) 132px 108px 204px 82px 74px 84px 56px");
+    expect(columnTemplate(columnsFor(full - 1, false))).toBe("minmax(0, 1fr) 108px 140px 82px 74px 84px 56px");
+    expect(columnTemplate(columnsFor(0, false))).toBe("minmax(0, 1fr) 84px 56px");
   });
 });
 

@@ -190,6 +190,26 @@ export function CaretIcon({ size = 12 }: IconProps): ReactElement {
   );
 }
 
+/** A box with an arrow out of it — open the session's tab. */
+export function OpenIcon({ size = 16 }: IconProps): ReactElement {
+  return (
+    <Glyph size={size}>
+      <path d="M6 3.5H3.5v9h9V10" />
+      <path d="M9 3.5h3.5V7" />
+      <path d="M12.5 3.5L7.5 8.5" />
+    </Glyph>
+  );
+}
+
+/** A play mark — resume the session. */
+export function ResumeIcon({ size = 16 }: IconProps): ReactElement {
+  return (
+    <Glyph size={size}>
+      <path d="M5.5 3.5v9l7-4.5z" />
+    </Glyph>
+  );
+}
+
 /** A magnifier — search. */
 export function SearchIcon({ size = 16 }: IconProps): ReactElement {
   return (

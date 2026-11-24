@@ -55,6 +55,7 @@
     "sessions.get",
     "sessions.lastMessage",
     "sessions.find",
+    "sessions.open",
     "liveNow.list",
     "roster.list",
     "roster.launchSpec",

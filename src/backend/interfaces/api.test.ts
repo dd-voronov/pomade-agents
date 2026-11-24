@@ -67,7 +67,10 @@ function api() {
       return visible === undefined ? Promise.reject(new HostError("not-found", `No project ${id}`)) : Promise.resolve(visible);
     },
   };
-  return { handlers: createApi({ info, sessions, live, liveNow: { answer: () => ({ epoch: "l", revision: 0, rows: [] }) }, realPath: (p) => Promise.resolve(p), roster, projects }), calls };
+  return { handlers: createApi({ info, sessions, live, liveNow: { answer: () => ({ epoch: "l", revision: 0, rows: [] }) }, realPath: (p) => Promise.resolve(p), roster, projects, open: (id) => {
+    calls.push(["open", id]);
+    return Promise.resolve({ opened: "resumed", tabId: "t1", session: testSession({ id }) });
+  } }), calls };
 }
 
 const call = (method: string, params: unknown): unknown => {
@@ -86,6 +89,7 @@ describe("the API's params", () => {
     await handlers["sessions.setStatus"]?.({ ids: ["a"], status: "done", note: null }, ctx);
     expect(await handlers["sessions.rename"]?.({ id: "a", name: null }, ctx)).toMatchObject({ sessions: [{ id: "a" }] });
     await handlers["sessions.moveToProject"]?.({ id: "a", project: "__workspace__" }, ctx);
+    expect(await handlers["sessions.open"]?.({ id: "a" }, ctx)).toMatchObject({ opened: "resumed", tabId: "t1", session: { id: "a" } });
     await handlers["sessions.list"]?.({ since: { epoch: "e", revision: 3 } }, ctx);
     await handlers["sessions.list"]?.({ since: { epoch: "e", revision: -1 } }, ctx);
     expect(calls).toEqual([
@@ -94,6 +98,7 @@ describe("the API's params", () => {
       ["changeStatus", ["a"], "done", null],
       ["rename", "a", null],
       ["moveToProject", "a", "__workspace__"],
+      ["open", "a"],
       ["answer", { epoch: "e", revision: 3 }],
       ["answer", undefined],
     ]);
@@ -107,6 +112,8 @@ describe("the API's params", () => {
     ["sessions.setStatus", { ids: ["a"], status: "done", note: "two\nlines" }],
     ["sessions.setStatus", { ids: ["a"], status: "done", note: "x".repeat(501) }],
     ["sessions.rename", { id: "a" }],
+    ["sessions.open", { id: "" }],
+    ["sessions.open", null],
     ["sessions.rename", { id: "", name: "x" }],
     ["sessions.rename", { id: "a", name: "x".repeat(201) }],
     ["sessions.moveToProject", { id: "a" }],

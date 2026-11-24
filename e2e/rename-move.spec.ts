@@ -102,7 +102,7 @@ test.describe("renaming and moving", () => {
     await page.keyboard.press("Escape");
     await expect(alpha.getByTestId("detail-panel")).toHaveCount(0);
     await row(alpha, id(1)).click({ button: "right" });
-    await expect(alpha.getByTestId("row-menu").getByTestId("menu-item-rename")).toBeFocused();
+    await expect(alpha.getByTestId("row-menu").getByTestId("menu-item-open")).toBeFocused();
     await alpha.getByTestId("menu-item-rename").click();
     await expect(alpha.getByTestId("detail-panel")).toHaveAttribute("data-session-id", id(1));
     await expect(field).toBeFocused();

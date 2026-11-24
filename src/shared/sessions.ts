@@ -28,6 +28,10 @@ export const SESSIONS_LAST_MESSAGE_METHOD = "sessions.lastMessage";
 /** The sessions started in a folder within a time window; answers `SessionsFindResult`. */
 export const SESSIONS_FIND_METHOD = "sessions.find";
 
+/** Brings the user back into a session: focuses its agent tab, opens its Runner run's terminal, or
+ *  resumes it in a new agent tab; answers `SessionsOpenResult`. */
+export const SESSIONS_OPEN_METHOD = "sessions.open";
+
 /** Published by the backend, unqualified, whenever sessions change; payload `SessionsChanged`. */
 export const SESSIONS_CHANGED_EVENT = "sessions.changed";
 
@@ -133,12 +137,20 @@ export type Attribution = {
   sharedFolder: boolean;
 };
 
+/** The Pomade agent tab a session is bound to. */
+export type SessionTab = {
+  /** The tab's lasting id (`AgentTabInfo.tabId`). */
+  tabId: string;
+  /** The tab's project; `"__workspace__"` for the Workspace project. */
+  projectId: string;
+};
+
 /** Why the Sessions tab leaves a session out (DESIGN §2.7): `empty` — its transcript holds no
  *  message of the user's and no answer, as a file that holds only a `/clear`. */
 export type HiddenReason = "empty";
 
-/** One session: what its transcript says, its record, where it shows, what it is doing now, and
- *  why the Sessions tab hides it. */
+/** One session: what its transcript says, its record, where it shows, what it is doing now, the
+ *  agent tab bound to it, and why the Sessions tab hides it. */
 export type Session = {
   id: string;
   /** The session's latest transcript. */
@@ -155,6 +167,8 @@ export type Session = {
   live: SessionLiveState;
   /** When the backend saw it enter `live` (ISO 8601); `null`: Closed, and not seen live since the backend started. */
   liveSince: string | null;
+  /** The agent tab Pomade lists bound to it — a live one first; `null` when none is. */
+  tab: SessionTab | null;
   /** Why the Sessions tab hides it; `null`: shown. Every read lists it all the same. */
   hidden: HiddenReason | null;
 };
@@ -213,6 +227,20 @@ export type SessionsUpdated = {
 export type SessionsChanged = {
   epoch: string;
   revision: number;
+};
+
+export type SessionsOpenParams = {
+  id: string;
+};
+
+export type SessionsOpenResult = {
+  /** What was done: its bound tab focused (`tab`), its Runner run's terminal opened (`run`), or
+   *  it resumed in a new agent tab (`resumed`). */
+  opened: "tab" | "run" | "resumed";
+  /** The agent tab in front now; `null` for a run's terminal. */
+  tabId: string | null;
+  /** The session as it is now: a resumed one Active. */
+  session: Session;
 };
 
 export type SessionsGetParams = {
@@ -384,6 +412,7 @@ export function isSession(value: unknown): value is Session {
     isStringOrNull(v.folderInProject) &&
     (SESSION_LIVE_STATES as readonly unknown[]).includes(v.live) &&
     isStringOrNull(v.liveSince) &&
+    (v.tab === null || (isObject(v.tab) && isText(v.tab.tabId) && isText(v.tab.projectId))) &&
     (v.hidden === null || v.hidden === "empty")
   );
 }
@@ -408,6 +437,13 @@ export function isSessionsAnswer(value: unknown): value is SessionsAnswer {
 /** True for a well-formed `sessions.changed` payload. */
 export function isSessionsChanged(value: unknown): value is SessionsChanged {
   return isObject(value) && typeof value.epoch === "string" && isCount(value.revision);
+}
+
+const OPENED: readonly unknown[] = ["tab", "run", "resumed"] satisfies SessionsOpenResult["opened"][];
+
+/** True for a well-formed `sessions.open` answer. */
+export function isSessionsOpenResult(value: unknown): value is SessionsOpenResult {
+  return isObject(value) && OPENED.includes(value.opened) && isStringOrNull(value.tabId) && isSession(value.session);
 }
 
 /** True for a well-formed answer of a change method (`SessionsUpdated`). */

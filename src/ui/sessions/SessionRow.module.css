@@ -121,9 +121,11 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  gap: 2px;
   padding-left: var(--space-1);
 }
 
+/* Open / Resume and ⋯: icon buttons that show on hover. */
 .more {
   display: inline-flex;
   flex: none;

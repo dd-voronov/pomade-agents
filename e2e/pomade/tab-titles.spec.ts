@@ -8,50 +8,19 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { expect, test, type ElectronApplication, type Page } from "@playwright/test";
-import { connectSocket } from "pomade-kit/node";
 import type { HostClient } from "pomade-kit/sdk";
 
 import { BUILD_DIR, readManifest } from "../../harness/app.ts";
 import { createSandbox, type Sandbox } from "../../harness/sandbox.ts";
 import { ROSTER_AGENTS_METHOD, isRosterAgentsAnswer } from "../../src/shared/roster.ts";
 import { SESSIONS_LIST_METHOD, SESSIONS_RENAME_METHOD, isSessionsAnswer, type Session } from "../../src/shared/sessions.ts";
-import { launchPomade, requireBuiltPomade } from "./pomade.ts";
+import { STAND_IN_AGENT, launchPomade, platformClient, requireBuiltPomade } from "./pomade.ts";
 
 const manifest = readManifest();
 const AGENT = "claude-libra";
 const PROMPT = "Grill the G4 agents design";
 /** Screenshots for review land here. */
 const ARTIFACTS = new URL("../artifacts", import.meta.url).pathname;
-
-/** A Claude-shaped stand-in: ready at once; the first prompt starts a session in the folder agent's store. */
-const FAKE_AGENT = (store: string): string => `#!/bin/zsh
-current=""
-dir="${store}/projects/\${\${PWD:A}//[^a-zA-Z0-9]/-}"
-printf '\\e]0;✳ Claude\\a'
-echo AGENT_READY
-while IFS= read -r line; do
-  if [[ "$line" == "/exit" ]]; then exit 0; fi
-  if [[ -z "$current" ]]; then
-    current="$(uuidgen | tr A-Z a-z)"
-    mkdir -p "$dir"
-    print -r -- "{\\"type\\":\\"user\\",\\"message\\":{\\"role\\":\\"user\\",\\"content\\":\\"$line\\"},\\"origin\\":{\\"kind\\":\\"human\\"},\\"promptSource\\":\\"typed\\",\\"timestamp\\":\\"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)\\",\\"cwd\\":\\"\${PWD:A}\\",\\"sessionId\\":\\"$current\\"}" >> "$dir/$current.jsonl"
-  fi
-  echo "AGENT_GOT: $line"
-done
-`;
-
-/** Pomade's own client (the platform key) on the sandbox's Pomade: it calls the app's API. */
-async function platformClient(sandbox: Sandbox): Promise<HostClient> {
-  const connected = await connectSocket({
-    socketPath: sandbox.socketPath,
-    appId: "pomade",
-    keyFile: join(sandbox.userData, "app-keys", "pomade"),
-    role: "command",
-    env: {},
-  });
-  if (connected.status !== "connected") throw new Error(`could not reach Pomade as its platform client: ${connected.status}`);
-  return connected.host;
-}
 
 /** The session whose first message is `text`. */
 async function sessionWith(host: HostClient, text: string): Promise<Session | undefined> {
@@ -72,7 +41,7 @@ test.describe("names are tab names in Pomade", () => {
     requireBuiltPomade();
     sandbox = await createSandbox(manifest.id);
     const script = join(sandbox.workspace, "fake-claude.sh");
-    await writeFile(script, FAKE_AGENT(join(sandbox.workspace, "Agents", AGENT)), { mode: 0o755 });
+    await writeFile(script, STAND_IN_AGENT(join(sandbox.workspace, "Agents", AGENT)), { mode: 0o755 });
     await mkdir(join(sandbox.workspace, ".pomade"), { recursive: true });
     await writeFile(join(sandbox.workspace, ".pomade", "agents.json"), JSON.stringify({ commands: { [AGENT]: script }, hidden: [] }));
     ({ app, page } = await launchPomade(sandbox, [BUILD_DIR]));

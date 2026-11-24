@@ -23,8 +23,8 @@ describe("the name a rename saves", () => {
 });
 
 describe("the rename toast", () => {
-  const live = testSession({ live: "working" });
-  it("says the tab title follows only while an agent tab runs the session", () => {
+  const live = testSession({ live: "working", tab: { tabId: "t1", projectId: "alpha" } });
+  it("says the tab title follows only while an agent tab is bound to the session", () => {
     expect(renamedText(live, "Port the bulk bar")).toBe("Renamed — the tab title follows: “Port the bulk bar”");
     expect(renamedText(testSession(), "Port the bulk bar")).toBe("Renamed to “Port the bulk bar”");
   });
@@ -33,9 +33,10 @@ describe("the rename toast", () => {
     expect(inAgentTab(run)).toBe(false);
     expect(renamedText(run, "Nightly")).toBe("Renamed to “Nightly”");
   });
-  it("counts Idle and Needs you as running in a tab", () => {
-    expect(inAgentTab(testSession({ live: "idle" }))).toBe(true);
-    expect(inAgentTab(testSession({ live: "needs-you" }))).toBe(true);
+  it("counts a bound tab whatever its agent is doing, an exited one too", () => {
+    expect(inAgentTab(testSession({ live: "idle", tab: { tabId: "t1", projectId: "alpha" } }))).toBe(true);
+    expect(inAgentTab(testSession({ live: "closed", tab: { tabId: "t1", projectId: "alpha" } }))).toBe(true);
+    expect(inAgentTab(testSession({ live: "needs-you" }))).toBe(false);
   });
   it("says the session is unnamed again for a removed name", () => {
     expect(renamedText(live, null)).toBe("Name removed — the session is unnamed again");

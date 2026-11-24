@@ -33,6 +33,7 @@ import {
   SESSIONS_LAST_MESSAGE_METHOD,
   SESSIONS_LIST_METHOD,
   SESSIONS_MOVE_METHOD,
+  SESSIONS_OPEN_METHOD,
   SESSION_NAME_MAX,
   SESSIONS_RENAME_METHOD,
   SESSIONS_SET_STATUS_METHOD,
@@ -43,6 +44,7 @@ import {
   type SessionsFindResult,
   type SessionsGetResult,
   type SessionsLastMessageResult,
+  type SessionsOpenResult,
   type SessionsSince,
   type SessionsUpdated,
 } from "../../shared/sessions.ts";
@@ -65,6 +67,8 @@ export interface ApiSources {
   roster: Pick<Roster, "answer" | "list" | "agent">;
   /** Pomade's projects, through the connection the API is served on. */
   projects: ProjectReads;
+  /** Open / Resume the session, through the connection the API is served on (`open.ts`). */
+  open: (id: string) => Promise<SessionsOpenResult>;
 }
 
 type Params = Record<string, unknown>;
@@ -173,7 +177,7 @@ function launchSpecParams(raw: unknown): LaunchSpecParams {
 /** The kit's contract shapes are interfaces, which TypeScript does not take for JSON values; they hold only JSON. */
 const json = (value: SessionsForRepoResult | SessionsLiveInResult): JsonValue => value as unknown as JsonValue;
 
-export function createApi({ info, sessions, live, liveNow, realPath, roster, projects }: ApiSources): Record<string, ApiHandler> {
+export function createApi({ info, sessions, live, liveNow, realPath, roster, projects, open }: ApiSources): Record<string, ApiHandler> {
   const updated = async (changed: Promise<SessionsUpdated["sessions"]>): Promise<SessionsUpdated> => ({ sessions: await changed });
   /** The session `{ id }` names; `not-found` when no transcript of it is known. */
   const sessionOf = (raw: unknown): Session => {
@@ -218,6 +222,7 @@ export function createApi({ info, sessions, live, liveNow, realPath, roster, pro
     [SESSIONS_GET_METHOD]: (raw): SessionsGetResult => ({ session: sessionOf(raw) }),
     [SESSIONS_LAST_MESSAGE_METHOD]: (raw): SessionsLastMessageResult => ({ message: sessionOf(raw).summary.lastAnswer }),
     [SESSIONS_FIND_METHOD]: async (raw): Promise<SessionsFindResult> => ({ sessions: await foundSessions(sessions.list(), findParams(raw), realPath) }),
+    [SESSIONS_OPEN_METHOD]: (raw) => open(idOf(paramsOf(raw).id, "id")),
     [LIVE_NOW_LIST_METHOD]: () => liveNow.answer(),
     [ROSTER_LIST_METHOD]: () => ({ agents: roster.list() }) as unknown as JsonValue,
     [ROSTER_LAUNCH_SPEC_METHOD]: (raw): LaunchSpec => {

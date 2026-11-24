@@ -15,11 +15,11 @@
 // groups, dimmed, until clicked again. The header's count and sum never take them.
 //
 // Keys: ↑ ↓ move the selection in both layouts; Shift+↑↓ check a range from the selected row (the
-// list) or the marked one (the table); Space checks that row; Cmd+A checks every row shown; F2
-// renames that row in the panel; `/` focuses the search; Esc clears the checks, then closes the
-// panel.
+// list) or the marked one (the table); Space checks that row; Enter opens or resumes it; Cmd+A
+// checks every row shown; F2 renames that row in the panel; `/` focuses the search; Esc clears the
+// checks, then closes the panel.
 
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactElement } from "react";
 import { SESSION_STATUSES, WORKSPACE_PROJECT_ID, type ProjectRef, type SessionStatus } from "pomade-kit/protocol";
 import type { HostClient } from "pomade-kit/sdk";
 
@@ -36,7 +36,7 @@ import { draftNote } from "./detail-model.ts";
 import { DetailPanel } from "./DetailPanel.tsx";
 import { WORKSPACE_TARGET, moveTargets, nameToSave } from "./edit-model.ts";
 import { SearchPattern } from "./Highlight.tsx";
-import type { RowEvents } from "./row-events.ts";
+import { isDoubleClick, type RowEvents } from "./row-events.ts";
 import { moveMenuEntries, rowMenuEntries } from "./row-menu.tsx";
 import { listRows, openTab, revealInTable, step, tableOrder, type PickedTab } from "./selection-model.ts";
 import { SessionsList } from "./SessionsList.tsx";
@@ -47,6 +47,7 @@ import { Toolbar } from "./Toolbar.tsx";
 import { Toast } from "./Toast.tsx";
 import styles from "./SessionsTab.module.css";
 import { useSelection } from "./useSelection.ts";
+import { useOpenSession } from "./useOpenSession.ts";
 import { useSessionEdits } from "./useSessionEdits.ts";
 import { useSessions } from "./useSessions.ts";
 import { useStatusChange } from "./useStatusChange.ts";
@@ -123,6 +124,11 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
   const { change, failure, dismiss } = useStatusChange(host, update);
   const { move } = useStatusMoves(change, dismiss, copy?.byId, toasts);
   const edits = useSessionEdits(host, update, toasts);
+  const openSession = useOpenSession(host, update, names, toasts);
+  const openById = (id: string): void => {
+    const session = copy?.byId.get(id);
+    if (session !== undefined) openSession(session);
+  };
 
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
@@ -236,8 +242,26 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
   /** The row a key acts on: the selected one in the list, the marked one in the table. */
   const keyRow = (): string | null => selected?.id ?? lastSelected;
 
+  /** The row the last single click was on: what a double-click opens (`onTabClick`). */
+  const clicked = useRef<string | null>(null);
+
+  /** A double-click opens the row its first click was on. The first click turns the table into the
+   *  list, so the second may land on another row, or beside the list. */
+  const onTabClick = (event: MouseEvent<HTMLElement>): void => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (event.detail <= 1) {
+      if (target?.closest('[data-testid="session-row"]') == null) clicked.current = null;
+      return;
+    }
+    if (!isDoubleClick(event) || clicked.current === null || target?.closest("button, input, textarea, a") != null) return;
+    openById(clicked.current);
+  };
+
   const events: RowEvents = {
     onClick: (id, event) => {
+      if (event.detail <= 1) clicked.current = id;
+      // The second click of a double-click: `onTabClick` opens the session.
+      if (isDoubleClick(event)) return;
       if (event.metaKey || event.ctrlKey) {
         setChecked(toggledCheck(checked, id));
         setAnchor(id);
@@ -258,6 +282,7 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
       }
     },
     onMenu: (id, at) => setMenu({ kind: "row", session: id, anchor: at }),
+    onOpen: openById,
     ...drag.row,
   };
 
@@ -283,6 +308,14 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
         if (row === null) return;
         event.preventDefault();
         startRename(row);
+        return;
+      }
+      // Enter on a focused button presses it.
+      if (event.key === "Enter" && keys === "none" && !(event.target instanceof HTMLButtonElement)) {
+        const row = keyRow();
+        if (row === null) return;
+        event.preventDefault();
+        openById(row);
         return;
       }
       if (event.key === "a" && keys === "command") {
@@ -432,6 +465,7 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
           moveOpen={menu?.kind === "move" && menu.session === selected.id}
           askMove={moveAsked === selected.id}
           onOpenMove={(anchor) => openMove(selected.id, anchor)}
+          onOpen={() => openSession(selected)}
         />
       </div>
     );
@@ -464,7 +498,7 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
   }
 
   return (
-    <div className={styles.tab} data-checking={checked.size > 0 ? "" : undefined}>
+    <div className={styles.tab} data-checking={checked.size > 0 ? "" : undefined} onClick={onTabClick}>
       <header className={styles.head}>
         <h1 className={styles.title}>Sessions</h1>
         <span className={styles.scope} data-testid="sessions-scope">
@@ -541,7 +575,7 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
           testId="row-menu"
           anchor={menu.anchor}
           onClose={closeMenu}
-          entries={rowMenuEntries(menuSession, targetsOf(menuSession.id, checked), { setStatus: setStatusOf, rename: startRename, move: askMove })}
+          entries={rowMenuEntries(menuSession, targetsOf(menuSession.id, checked), { open: openSession, setStatus: setStatusOf, rename: startRename, move: askMove })}
         />
       )}
       {menu?.kind === "move" && menuSession !== undefined && (

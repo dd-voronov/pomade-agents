@@ -10,14 +10,12 @@ import { fileURLToPath } from "node:url";
 
 import { expect, test, type ElectronApplication, type Page } from "@playwright/test";
 import { SESSIONS_APP_ID, SESSIONS_FOR_REPO_METHOD, SESSIONS_LIVE_IN_METHOD, checkLiveIn, checkRepoSessions } from "pomade-kit/protocol";
-import { connectSocket } from "pomade-kit/node";
-import type { HostClient } from "pomade-kit/sdk";
 
 import { BUILD_DIR, FIXTURE_AGENTS, readManifest } from "../../harness/app.ts";
 import { SEEDED_TRANSCRIPTS, createSandbox, fixtureSnapshots, type Sandbox } from "../../harness/sandbox.ts";
 import { readRunRecord } from "../../src/backend/core/run-record.ts";
 import { ROSTER_AGENTS_METHOD, isRosterAgentsAnswer } from "../../src/shared/roster.ts";
-import { launchPomade, pomadeApps, requireBuiltPomade } from "./pomade.ts";
+import { launchPomade, platformClient, pomadeApps, requireBuiltPomade } from "./pomade.ts";
 
 const manifest = readManifest();
 const STRIP_ICON = `strip-app-${manifest.id}-agents`;
@@ -33,19 +31,6 @@ function alive(pid: number): boolean {
   } catch {
     return false;
   }
-}
-
-/** Pomade's own client (`pomade-git`'s identity: the platform key) on the sandbox's Pomade. */
-async function platformClient(sandbox: Sandbox): Promise<HostClient> {
-  const connected = await connectSocket({
-    socketPath: sandbox.socketPath,
-    appId: "pomade",
-    keyFile: join(sandbox.userData, "app-keys", "pomade"),
-    role: "command",
-    env: {},
-  });
-  if (connected.status !== "connected") throw new Error(`could not reach Pomade as its platform client: ${connected.status}`);
-  return connected.host;
 }
 
 test.describe.configure({ mode: "serial" });

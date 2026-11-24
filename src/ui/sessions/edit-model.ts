@@ -17,15 +17,14 @@ export function nameToSave(text: string, saved: string | undefined): string | nu
   return name === "" ? null : name;
 }
 
-/** True while an agent tab runs the session, so a new name becomes that tab's title: it is live,
- *  and not as a Runner run (a run has no agent tab; a session Runner started may be resumed in a
- *  tab later, which this cannot tell apart, so its toast stays silent about tabs). */
+/** True while an agent tab is bound to the session (`Session.tab`), so a new name becomes that
+ *  tab's title. A Runner run has no agent tab. */
 export function inAgentTab(session: Session): boolean {
-  return session.live !== "closed" && session.record?.startedByRunner === undefined;
+  return session.tab !== null;
 }
 
 /** What the toast says once `session` was renamed to `name` (`null`: unnamed again). It mentions
- *  the tab only when an agent tab runs the session now. */
+ *  the tab only when an agent tab is bound to the session now. */
 export function renamedText(session: Session, name: string | null): string {
   if (name === null) return "Name removed — the session is unnamed again";
   const quoted = `“${cutForToast(name)}”`;

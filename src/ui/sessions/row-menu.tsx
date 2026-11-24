@@ -1,5 +1,5 @@
-// A session row's menu (DESIGN §2.7): Rename and Move to project for the one session it was
-// opened on, then Set status. Rename and Move to project show only when the menu acts on that
+// A session row's menu (DESIGN §2.7): Open / Resume, Rename and Move to project for the one session
+// it was opened on, then Set status. Those three show only when the menu acts on that
 // session alone; Set status acts on every checked session when the row is one of several checked.
 // Also the Move to project menu itself, which the detail panel's button opens.
 
@@ -10,10 +10,14 @@ import { MoveIcon, PencilIcon } from "../core/icons.tsx";
 import type { MenuEntry } from "../core/Menu.tsx";
 import type { Session } from "../../shared/sessions.ts";
 import { currentTarget, type MoveTarget } from "./edit-model.ts";
+import { OPEN_LABELS, openKind } from "./open-model.ts";
+import { OpenGlyph } from "./OpenGlyph.tsx";
 import { StatusMark } from "./StatusGroup.tsx";
 import { STATUS_LABELS, statusOf } from "./table-model.ts";
 
 export interface RowMenuActions {
+  /** Open the session's tab, or resume it. */
+  open: (session: Session) => void;
   setStatus: (ids: readonly string[], status: SessionStatus) => void;
   /** Select the session and rename it in the detail panel. */
   rename: (id: string) => void;
@@ -27,7 +31,9 @@ export function rowMenuEntries(session: Session, targets: readonly string[], act
   const current = statusOf(session);
   const entries: MenuEntry[] = [];
   if (!many) {
+    const kind = openKind(session);
     entries.push(
+      { kind: "item", id: "open", label: OPEN_LABELS[kind], glyph: <OpenGlyph kind={kind} size={14} />, run: () => actions.open(session) },
       { kind: "item", id: "rename", label: "Rename", glyph: <PencilIcon size={14} />, trail: "F2", run: () => actions.rename(session.id) },
       { kind: "item", id: "move", label: "Move to project…", glyph: <MoveIcon size={14} />, run: () => actions.move(session.id) },
       { kind: "separator" },

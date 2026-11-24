@@ -1,6 +1,6 @@
 // The backend process's life: record the run, index the agents' session stores, keep the session
 // records and the roster, stay connected to Pomade over its socket — following its projects, its agent tabs
-// (what runs now, and their titles, which are the sessions' names) and Runner's agent runs — serve the app's API on every connection and publish its session events
+// (what runs now, which session each is bound to, and their titles, which are the sessions' names) and Runner's agent runs — serve the app's API on every connection and publish its session events
 // (HOST-API §2 "Backends"). Pomade starts it with the app and stops it with SIGTERM; a requested
 // stop publishes the status changes still inside their window first.
 
@@ -20,7 +20,9 @@ import { openRecordStore, type RecordStore } from "../records/record-store.ts";
 import type { ProjectReads } from "../roster/connections.ts";
 import { startRoster } from "../roster/roster.ts";
 import { keepBadge, startLiveNow } from "../sessions/live-now.ts";
+import { createBoundTabs } from "../sessions/bound-tabs.ts";
 import { createLiveState, followTabs } from "../sessions/live-state.ts";
+import { openSession } from "../sessions/open.ts";
 import { startRunnerRuns } from "../sessions/runner-runs.ts";
 import { startSessionData } from "../sessions/session-data.ts";
 import { startSessionEvents } from "../sessions/session-events.ts";
@@ -87,8 +89,9 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
   await roster.refresh();
   const live = createLiveState(options.now);
   const tabs = followTabs(live);
+  const bound = createBoundTabs();
   const realPath = createRealPaths();
-  const sessions = startSessionData({ summaries: store, records, noRecords, live, realPath, now: options.now, log });
+  const sessions = startSessionData({ summaries: store, records, noRecords, live, tabs: bound, realPath, now: options.now, log });
   const liveNow = startLiveNow({ live, sessions, roster });
   const badge = keepBadge(liveNow, log);
 
@@ -127,7 +130,17 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
         host = connected;
         log(`connected to Pomade ${connected.welcome.pomadeVersion}`);
         titles.connect((tabId, title) => connected.agentTabs.setTitle(tabId, title));
-        connected.api.serve(createApi({ info, sessions, live, liveNow, realPath, roster, projects: projectReads(connected) })).then(
+        const open = (id: string) =>
+          openSession(
+            id,
+            {
+              focus: (tabId) => connected.agentTabs.focus(tabId),
+              resume: (params) => connected.agentTabs.resume(params),
+              openAttached: (params) => connected.tabs.openAttached(params),
+            },
+            { sessions, live, roster, workspace: info.workspace, workspaceReal: info.workspaceReal, realPath, log },
+          );
+        connected.api.serve(createApi({ info, sessions, live, liveNow, realPath, roster, projects: projectReads(connected), open })).then(
           ({ methods }) => log(`serving ${methods.join(", ")}`),
           (err: unknown) => log(`could not serve the API: ${message(err)}`),
         );
@@ -139,10 +152,12 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
             bind: (sessionId, projectId) => sessions.bind(sessionId, projectId),
             listTabs: (list) => {
               tabs.list(list);
+              bound.list(list);
               titles.list(list);
             },
             tabChanged: (tab, changes) => {
               tabs.changed(tab, changes.includes("closed"));
+              bound.changed(tab, changes.includes("closed"));
               titles.changed(tab, changes);
             },
             tabExited: (exited) => events.tabExited(exited),
@@ -159,6 +174,7 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
         // Pomade's agents end with it; a Pomade that comes back lists its tabs again. Runner's run
         // finished is not heard while the connection is down, so no run is held across it.
         tabs.list([]);
+        bound.list([]);
         titles.connect(null);
         runs.drop();
         log("Pomade went away; reconnecting");

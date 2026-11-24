@@ -1,7 +1,8 @@
 // One session in the list beside the detail panel: its checkbox, its live mark, then two lines — the name with
 // its marks and chips, and last active; then project (Workspace scope) · agent · model · effort,
 // with context % and ~$ est. on the right. Its note sits under them. The checkbox shows on hover
-// and while any row is checked; the row drags onto a status tab.
+// and while any row is checked; a double-click opens or resumes the session; the row drags onto a
+// status tab.
 
 import type { ReactElement } from "react";
 

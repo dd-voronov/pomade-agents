@@ -146,6 +146,25 @@
   color: var(--badge-fg);
 }
 
+/* Open tab / Resume: the panel's one primary action. */
+.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.primary:hover {
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
+}
+
+.hint {
+  margin: 6px 0 0;
+  padding: 0 var(--space-4);
+  color: var(--text-faint);
+  font-size: var(--fs-xs);
+}
+
 /* The caret after a label that opens a menu. */
 .action svg:last-child:not(:first-child) {
   margin-right: -4px;

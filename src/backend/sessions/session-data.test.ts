@@ -11,6 +11,7 @@ import { createRealPaths } from "../core/real-paths.ts";
 import { SESSIONS_FOLDER, SETTINGS_FILE, openRecordStore, type RecordStore } from "../records/record-store.ts";
 import type { SummariesAnswer } from "../stores/session-store.ts";
 import type { ProjectPlace } from "./attribution.ts";
+import { createBoundTabs, type BoundTabs } from "./bound-tabs.ts";
 import { createLiveState, followTabs, type LiveState } from "./live-state.ts";
 import { startSessionData, type SessionData, type SummarySource } from "./session-data.ts";
 
@@ -55,6 +56,7 @@ describe("the session data", () => {
   let records: RecordStore | null = null;
   let data: SessionData | null = null;
   let live: LiveState = createLiveState(() => clock);
+  let tabs: BoundTabs = createBoundTabs();
   let clock = new Date(FIRST_RUN);
   const lines: string[] = [];
 
@@ -70,7 +72,8 @@ describe("the session data", () => {
   async function start(source: SummarySource, withRecords = true): Promise<SessionData> {
     records = withRecords ? await openRecordStore({ dataDir, now: () => clock, log: (l) => lines.push(l) }) : null;
     live = createLiveState(() => clock);
-    data = startSessionData({ summaries: source, records, noRecords: "No workspace is open", live, realPath: createRealPaths(), now: () => clock, log: (l) => lines.push(l) });
+    tabs = createBoundTabs();
+    data = startSessionData({ summaries: source, records, noRecords: "No workspace is open", live, tabs, realPath: createRealPaths(), now: () => clock, log: (l) => lines.push(l) });
     return data;
   }
 
@@ -349,15 +352,35 @@ describe("the session data", () => {
     const before = d.answer();
 
     clock = new Date("2026-11-17T12:30:00.000Z");
-    const tabs = followTabs(live);
-    tabs.list([{ tabId: "t", projectId: "beta", agentId: "claude", cwd: `${ws}/Projects/beta`, launchedAt: null, sessionId: "a", title: "Claude", titleSource: "default", unnamed: false, state: "working" }]);
+    const followed = followTabs(live);
+    followed.list([{ tabId: "t", projectId: "beta", agentId: "claude", cwd: `${ws}/Projects/beta`, launchedAt: null, sessionId: "a", title: "Claude", titleSource: "default", unnamed: false, state: "working" }]);
     const delta = d.answer({ epoch: before.epoch, revision: before.revision });
     expect(delta.sessions.map((s) => [s.id, s.live, s.liveSince])).toEqual([["a", "working", "2026-11-17T12:30:00.000Z"]]);
     await expect.poll(() => notices.at(-1)?.revision, SOON).toBe(d.answer().revision);
 
-    tabs.list([]);
+    followed.list([]);
     expect(session("a")).toMatchObject({ live: "closed", liveSince: "2026-11-17T12:30:00.000Z" });
     expect(d.list().map((s) => s.id).sort()).toEqual(["a", "b"]);
+  });
+
+  it("answers the agent tab each session is bound to, and a change of it as a change since a revision", async () => {
+    const source = fakeSource();
+    source.put(summary("a"), summary("b"));
+    source.indexed();
+    const d = await start(source, false);
+    expect(session("a")?.tab).toBeNull();
+    const before = d.answer();
+
+    const tab = { tabId: "t", projectId: "beta", agentId: "claude", cwd: `${ws}/Projects/beta`, launchedAt: null, sessionId: "a", title: "Claude", titleSource: "default", unnamed: false, state: "exited" } as const;
+    tabs.list([tab]);
+    const delta = d.answer({ epoch: before.epoch, revision: before.revision });
+    expect(delta.sessions.map((s) => [s.id, s.tab])).toEqual([["a", { tabId: "t", projectId: "beta" }]]);
+
+    tabs.changed({ ...tab, projectId: "alpha" }, false);
+    expect(session("a")?.tab).toEqual({ tabId: "t", projectId: "alpha" });
+    tabs.changed(tab, true);
+    expect(session("a")?.tab).toBeNull();
+    expect(session("b")?.tab).toBeNull();
   });
 
   it("marks a session without messages hidden as empty and lists it, and shows it from its first message as a change since a revision", async () => {
