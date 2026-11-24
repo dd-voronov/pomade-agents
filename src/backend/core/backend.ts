@@ -71,13 +71,6 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
   log(`${appId} ${version} started (pid ${pid}); workspace ${locations.workspace ?? "none"}; state ${locations.stateDir}`);
 
   const home = resolveHome(env);
-  const store = await startSessionStore({
-    home,
-    workspace: locations.workspace,
-    stateDir: locations.stateDir,
-    log,
-  });
-
   let records: RecordStore | null = null;
   let noRecords = "No workspace is open in Pomade, so session records are not kept.";
   let noProfiles = "No workspace is open in Pomade, so agent profiles are not kept.";
@@ -95,6 +88,14 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
   const roster = startRoster({ home, workspace: locations.workspace, profiles: records?.profiles ?? null, noProfiles, log });
   // Pomade asks for the roster the moment the backend serves: it answers whole from the start.
   await roster.refresh();
+  // A session's agent is the agent whose profile holds its store: the roster says which, and when that changes.
+  const store = await startSessionStore({
+    home,
+    workspace: locations.workspace,
+    stateDir: locations.stateDir,
+    agents: { agentOf: (root) => roster.storeAgent(root), onChange: (listener) => roster.onChange(() => listener()) },
+    log,
+  });
   const live = createLiveState(options.now);
   const tabs = followTabs(live);
   const bound = createBoundTabs();

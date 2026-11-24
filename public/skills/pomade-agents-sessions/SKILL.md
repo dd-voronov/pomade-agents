@@ -60,7 +60,7 @@ updated: 2026-11-09T14:32:00.000Z
 |---|---|---|---|
 | `id` | yes | the session id; equals the file name without `.yaml` | — |
 | `provider` | yes | `claude-code` or `codex` | — |
-| `agent` | yes | the roster id of the agent that ran it: `claude`, `codex`, or a folder agent's name (`Agents/<name>/`) | — |
+| `agent` | yes | the roster id of the agent whose profile holds the session's transcript store: `claude`, `codex`, or a folder agent's id — the name of its folder under `Agents/`, unless its profile was re-linked to a renamed folder; the app keeps it current | — |
 | `name` | no | the session's name, one line (also its Pomade tab's title) | unnamed |
 | `status` | yes | `active`, `on-hold`, `done` or `done-skip` (below) | — |
 | `note` | no | a one-line note the user attached to the status | no note |

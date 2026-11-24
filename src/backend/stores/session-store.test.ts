@@ -6,7 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SessionsChanged } from "../../shared/sessions.ts";
 import { INDEX_FILE } from "./index-file.ts";
-import { startSessionStore, type SessionStore } from "./session-store.ts";
+import type { StoreRoot } from "./roots.ts";
+import { startSessionStore, type SessionStore, type StoreAgents } from "./session-store.ts";
 import { fixture, fixtureLines } from "./test-helpers.ts";
 
 const CODEX_ID = "019a7c3e-5b2d-7f10-8c4e-1d2f3a4b5c6d";
@@ -21,6 +22,22 @@ describe("the session store", () => {
   let stateDir: string;
   let store: SessionStore | null = null;
   const lines: string[] = [];
+  /** The agents a test names for a config folder; a folder it does not name answers for itself. */
+  const owners = new Map<string, string>();
+  const ownerListeners = new Set<() => void>();
+  const agents: StoreAgents = {
+    agentOf: (root: StoreRoot) => owners.get(root.configDir) ?? root.folderAgent,
+    onChange(listener) {
+      ownerListeners.add(listener);
+      return () => ownerListeners.delete(listener);
+    },
+  };
+  /** A profile names `configDir` (or none does, `null`), and the roster says so. */
+  const own = (configDir: string, agent: string | null): void => {
+    if (agent === null) owners.delete(configDir);
+    else owners.set(configDir, agent);
+    for (const listener of ownerListeners) listener();
+  };
 
   const claudeFile = (): string => join(home, ".claude", "projects", "-work-alpha", "5b0e8f52.jsonl");
   const libraFile = (): string => join(workspace, "Agents", "claude-libra", "projects", "-work-alpha", "c41f7e2a.jsonl");
@@ -32,7 +49,7 @@ describe("the session store", () => {
   }
 
   async function start(): Promise<SessionStore> {
-    store = await startSessionStore({ home, workspace, stateDir, log: (line) => lines.push(line) });
+    store = await startSessionStore({ home, workspace, stateDir, agents, log: (line) => lines.push(line) });
     return store;
   }
 
@@ -44,6 +61,8 @@ describe("the session store", () => {
     workspace = join(dir, "ws");
     stateDir = join(dir, "ud", "app-state", "pomade-agents");
     lines.length = 0;
+    owners.clear();
+    ownerListeners.clear();
     await put(claudeFile(), fixture("claude-session.jsonl"));
     await put(join(dirname(claudeFile()), "5b0e8f52", "subagents", "agent-1.jsonl"), fixture("claude-no-origin.jsonl"));
     await put(join(dirname(claudeFile()), "memory", "notes.jsonl"), "{}\n");
@@ -135,6 +154,38 @@ describe("the session store", () => {
     expect(s.answer().summaries.find((x) => x.id === "0d6a3b9e")?.agent).toBe("claude-pm");
   });
 
+  it("gives a store's sessions to the agent whose profile names its folder, and back, at once — each a change", async () => {
+    const s = await start();
+    await s.indexed;
+    const agentOf = (id: string): string | undefined => s.answer().summaries.find((x) => x.id === id)?.agent;
+    expect(agentOf("c41f7e2a")).toBe("claude-libra");
+    const notices: SessionsChanged[] = [];
+    s.onChange((changed) => notices.push(changed));
+    const before = s.answer();
+
+    own(join(workspace, "Agents", "claude-libra"), "claude-writer");
+    expect(agentOf("c41f7e2a")).toBe("claude-writer");
+    const delta = s.answer({ epoch: before.epoch, revision: before.revision });
+    expect(delta.summaries.map((x) => [x.id, x.agent])).toEqual([["c41f7e2a", "claude-writer"]]);
+    await vi.waitFor(() => expect(notices.at(-1)?.revision).toBe(delta.revision), SOON);
+    // The other stores' sessions are untouched.
+    expect(agentOf("5b0e8f52")).toBe("claude");
+    expect(agentOf(CODEX_ID)).toBe("codex");
+
+    // A transcript that grows keeps the agent its store belongs to.
+    const extra = fixtureLines("claude-after-clear.jsonl").at(-1) ?? "";
+    await appendFile(libraFile(), extra);
+    await vi.waitFor(() => expect(s.answer({ epoch: delta.epoch, revision: delta.revision }).summaries.map((x) => x.id)).toContain("c41f7e2a"), SOON);
+    expect(agentOf("c41f7e2a")).toBe("claude-writer");
+
+    own(join(workspace, "Agents", "claude-libra"), null);
+    expect(agentOf("c41f7e2a")).toBe("claude-libra");
+    // Nothing changed for a notice that changes no agent.
+    const settled = s.answer().revision;
+    own(join(home, ".claude"), "claude");
+    expect(s.answer().revision).toBe(settled);
+  });
+
   it("drops the sessions of a store that went away", async () => {
     const s = await start();
     await s.indexed;
@@ -170,7 +221,7 @@ describe("the session store", () => {
   });
 
   it("runs with no home and no workspace: nothing to index", async () => {
-    store = await startSessionStore({ home: null, workspace: null, stateDir, log: () => undefined });
+    store = await startSessionStore({ home: null, workspace: null, stateDir, agents, log: () => undefined });
     await store.indexed;
     expect(store.answer()).toMatchObject({ summaries: [], indexing: false });
   });

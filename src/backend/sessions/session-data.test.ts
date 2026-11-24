@@ -266,6 +266,25 @@ describe("the session data", () => {
     expect(await readFile(fileOf("s"), "utf8")).toContain("projectRoot: Projects/gamma");
   });
 
+  it("follows the agent its store belongs to — a re-link, then its Undo — in the session, the change notices and the record", async () => {
+    await mkdir(dataDir, { recursive: true });
+    await writeFile(join(dataDir, SETTINGS_FILE), `adoptedAt: ${FIRST_RUN}\n`);
+    const source = fakeSource();
+    source.put(summary("s", { agent: "claude-writer-v2" }));
+    const d = await start(source);
+    d.setProjects(PROJECTS());
+    await expect.poll(() => readFile(fileOf("s"), "utf8").catch(() => ""), SOON).toContain("agent: claude-writer-v2\n");
+    const before = d.answer();
+    source.put(summary("s", { agent: "claude-writer" }));
+    const delta = d.answer({ epoch: before.epoch, revision: before.revision });
+    expect(delta.sessions.map((s) => [s.id, s.summary.agent])).toEqual([["s", "claude-writer"]]);
+    await expect.poll(() => readFile(fileOf("s"), "utf8"), SOON).toContain("agent: claude-writer\n");
+    await expect.poll(() => session("s")?.record?.agent, SOON).toBe("claude-writer");
+    source.put(summary("s", { agent: "claude-writer-v2" }));
+    await expect.poll(() => readFile(fileOf("s"), "utf8"), SOON).toContain("agent: claude-writer-v2\n");
+    expect(session("s")?.summary.agent).toBe("claude-writer-v2");
+  });
+
   it("places a session started through a symlinked folder in the project the folder is in, keeping the folder as recorded", async () => {
     await mkdir(join(ws, "Projects", "beta", "src"), { recursive: true });
     await symlink(join(ws, "Projects", "beta"), join(dir, "beta-link"));

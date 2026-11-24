@@ -1,6 +1,6 @@
 // The Live now panel's rows and the Agents icon's badge (DESIGN §2.8; docs/CONTRACTS.md "Live
 // now"), from the live state the backend already keeps: one row per live agent tab, with its
-// session's name and first message and the agent's roster name, and one per Runner agent run while
+// session's name and first message and its agent (the session's, once known) with the roster's name, and one per Runner agent run while
 // it runs, with its job and its attached terminal (`runner-runs.ts`). The backend keeps the badge — the
 // number of Needs you rows — because it runs from Pomade's start, while the panel's frame exists
 // only once its icon was shown.
@@ -43,7 +43,10 @@ export function startLiveNow({ live, sessions, roster }: LiveNowOptions): LiveNo
   const listeners = new Set<(changed: LiveNowChanged) => void>();
 
   const rowOf = (entry: LiveEntry, names: ReadonlyMap<string, string>): LiveRow => {
-    const agentName = names.get(entry.agent) ?? entry.agent;
+    const session = entry.sessionId === null ? undefined : sessions.get(entry.sessionId);
+    // A known session's agent is the one its store belongs to; the tab or run names its own until then.
+    const agent = session?.summary.agent ?? entry.agent;
+    const agentName = names.get(agent) ?? agent;
     if (entry.source === "run") {
       return {
         kind: "run",
@@ -51,21 +54,20 @@ export function startLiveNow({ live, sessions, roster }: LiveNowOptions): LiveNo
         name: entry.job ?? "",
         project: entry.projectId,
         sessionId: entry.sessionId,
-        agent: entry.agent,
+        agent,
         agentName,
         state: "working",
         since: entry.since,
         terminal: entry.terminal,
       };
     }
-    const session = entry.sessionId === null ? undefined : sessions.get(entry.sessionId);
     const first = session?.summary.firstMessage?.text;
     return {
       kind: "tab",
       tabId: entry.key,
       project: entry.projectId,
       sessionId: entry.sessionId,
-      agent: entry.agent,
+      agent,
       agentName,
       state: entry.state,
       since: entry.since,

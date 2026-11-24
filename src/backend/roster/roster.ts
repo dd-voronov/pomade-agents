@@ -18,7 +18,7 @@
 
 import { randomUUID } from "node:crypto";
 import { stat } from "node:fs/promises";
-import { isAbsolute, join } from "node:path";
+import { isAbsolute, join, resolve as resolvePath } from "node:path";
 
 import { providerModes, type RosterAgent } from "pomade-kit/protocol";
 import { HostError } from "pomade-kit/sdk";
@@ -38,7 +38,7 @@ import {
 } from "../../shared/roster.ts";
 import { RecordError, type FileSet } from "../records/record-store.ts";
 import { isRecordId } from "../sessions/rules.ts";
-import { AGENTS_FOLDER, folderAgentNames } from "../stores/roots.ts";
+import { AGENTS_FOLDER, folderAgentNames, storeAgent, type StoreRoot } from "../stores/roots.ts";
 import { readMemory, readPermissions } from "./agent-files.ts";
 import { editedProfile, type ProfileEdit } from "./profile-edit.ts";
 import { BUILTIN_IDS, NO_OVERRIDES, agentName, builtinProfile, folderProfile, readPomadeOverrides } from "./first-sight.ts";
@@ -76,6 +76,9 @@ export interface Roster {
   list(): RosterAgent[];
   /** The agent `id`, when the roster has an answering profile for it. */
   agent(id: string): RosterAgentFacts | undefined;
+  /** The agent a session store's sessions belong to (`storeAgent`): the agent whose answering profile
+   *  names the store's config folder, else the agent the folder itself names. */
+  storeAgent(store: Pick<StoreRoot, "configDir" | "folderAgent">): string;
   /** Apply `edit` to the agent's `agent.yaml` (only the keys it names change) and answer the profile as written.
    *  Rejects with `HostError`: `not-ready` (no profiles are kept), `not-found` (no such agent, or an orphan),
    *  `io-error` (the file cannot be used or written). */
@@ -123,12 +126,12 @@ async function isFolder(path: string): Promise<boolean> {
   }
 }
 
-/** A profile's `configDir`, absolute: `~/…` under the home folder, a relative one under the workspace. */
+/** A profile's `configDir`, absolute and normalized (no `.` or `..`, no trailing separator): `~/…`
+ *  under the home folder, a relative one under the workspace. */
 export function resolveConfigDir(configDir: string, home: string | null, workspace: string | null): string | null {
-  if (configDir === "~") return home;
-  if (configDir.startsWith("~/")) return home === null ? null : join(home, configDir.slice(2));
-  if (isAbsolute(configDir)) return configDir;
-  return workspace === null ? null : join(workspace, configDir);
+  const base = configDir === "~" || configDir.startsWith("~/") ? home : isAbsolute(configDir) ? "/" : workspace;
+  if (base === null) return null;
+  return resolvePath(base, configDir === "~" ? "." : configDir.startsWith("~/") ? configDir.slice(2) : configDir);
 }
 
 /** A profile as first sight would write it again: the keys that tell an untouched profile from an edited one. */
@@ -147,13 +150,15 @@ interface Built {
   entries: RosterEntry[];
   /** The profile answering for each agent that has one, and whether it is an orphan. */
   facts: Map<string, RosterAgentFacts>;
+  /** The agents whose answering profile names each config folder (absolute, normalized), in roster order. */
+  namers: Map<string, string[]>;
 }
 
 export function startRoster(options: RosterOptions): Roster {
   const { home, workspace, profiles, noProfiles, log } = options;
   const epoch = randomUUID();
   let revision = 0;
-  let built: Built = { entries: [], facts: new Map() };
+  let built: Built = { entries: [], facts: new Map(), namers: new Map() };
   let last = "";
   const listeners = new Set<(changed: RosterChanged) => void>();
   /** First-sight writes in flight, by agent id. */
@@ -202,6 +207,7 @@ export function startRoster(options: RosterOptions): Roster {
     const ids = [...new Set([...seen.keys(), ...(profiles?.ids() ?? [])])].sort(order);
     const entries: RosterEntry[] = [];
     const facts = new Map<string, RosterAgentFacts>();
+    const namers = new Map<string, string[]>();
     for (const id of ids) {
       const held = profiles?.get(id);
       const profile = held?.value ?? null;
@@ -222,8 +228,9 @@ export function startRoster(options: RosterOptions): Roster {
         hidden: answering?.hidden ?? false,
       });
       if (answering !== null) facts.set(id, { profile: answering, orphan });
+      if (configDir !== null) namers.set(configDir, [...(namers.get(configDir) ?? []), id]);
     }
-    return { entries, facts };
+    return { entries, facts, namers };
   };
 
   /** The agent `id`'s facts as the roster reads them now, when it is an orphan whose profile can be written. */
@@ -336,6 +343,8 @@ export function startRoster(options: RosterOptions): Roster {
     },
 
     agent: (id) => built.facts.get(id),
+
+    storeAgent: ({ configDir, folderAgent }) => storeAgent(built.namers.get(configDir) ?? [], folderAgent),
 
     async updateProfile(id, edit) {
       if (profiles === null) throw new HostError("not-ready", noProfiles);

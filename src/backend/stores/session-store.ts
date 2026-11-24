@@ -12,6 +12,9 @@
 // for roots that went away or roster changes (a folder agent added or removed). The Codex date tree
 // is walked once when its root is first watched, then followed by its events.
 //
+// A summary's agent is the agent its store belongs to (`StoreAgents`, the roster's `storeAgent`):
+// when that changes — a re-link, its Undo — every summary of the store changes with it, at once.
+//
 // Reads run a few at a time, each opening and closing its file. Summaries carry a revision; the
 // API answers the changes since a caller's revision, and a change notice goes out at most every
 // `NOTIFY_MS`. The parse index is saved at most every `SAVE_MS` while things change, and on stop.
@@ -48,6 +51,14 @@ const RECHECK_MS = 500;
  *  own thread, and what changes before it runs reaches no event. */
 const STREAM_START_MS = 1000;
 
+/** Which agent each store's sessions belong to. */
+export interface StoreAgents {
+  /** The agent the sessions in `root` belong to. */
+  agentOf(root: StoreRoot): string;
+  /** Called after the answer of `agentOf` may have changed; returns an unsubscribe function. */
+  onChange(listener: () => void): () => void;
+}
+
 export interface SessionStoreOptions {
   /** The user's home: the built-in stores are under it. `null`: no built-in stores. */
   home: string | null;
@@ -55,6 +66,7 @@ export interface SessionStoreOptions {
   workspace: string | null;
   /** Machine-local state: the parse index. */
   stateDir: string;
+  agents: StoreAgents;
   log: (line: string) => void;
 }
 
@@ -110,7 +122,7 @@ async function exists(path: string): Promise<boolean> {
 }
 
 export async function startSessionStore(options: SessionStoreOptions): Promise<SessionStore> {
-  const { home, workspace, stateDir, log } = options;
+  const { home, workspace, stateDir, agents, log } = options;
   const epoch = randomUUID();
   let revision = 0;
   let stopped = false;
@@ -212,9 +224,21 @@ export async function startSessionStore(options: SessionStoreOptions): Promise<S
       state,
       summary: state.excluded
         ? null
-        : summarize(state, { fileId: file.fileId, provider: file.root.provider, agent: file.root.agent, transcript: file.path }),
+        : summarize(state, { fileId: file.fileId, provider: file.root.provider, agent: agents.agentOf(file.root), transcript: file.path }),
       revision,
     });
+  };
+
+  /** Give every summary the agent its store belongs to now. */
+  const reassign = (): void => {
+    for (const entry of entries.values()) {
+      if (entry.summary === null) continue;
+      const agent = agents.agentOf(entry.file.root);
+      if (entry.summary.agent === agent) continue;
+      changed();
+      entry.summary = { ...entry.summary, agent };
+      entry.revision = revision;
+    }
   };
 
   const rescan = async (root: StoreRoot, folder: string): Promise<void> => {
@@ -345,6 +369,7 @@ export async function startSessionStore(options: SessionStoreOptions): Promise<S
   };
 
   const started = Date.now();
+  const unsubscribeAgents = agents.onChange(reassign);
   await reconcile();
   const tick = setInterval(() => void reconcile(), TICK_MS);
   void indexed.then(() => {
@@ -377,6 +402,7 @@ export async function startSessionStore(options: SessionStoreOptions): Promise<S
       if (stopped) return;
       stopped = true;
       clearInterval(tick);
+      unsubscribeAgents();
       for (const timer of [settleTimer, notifyTimer, ...rechecks.values()]) if (timer) clearTimeout(timer);
       for (const watched of roots.values()) unwatch(watched);
       await save();

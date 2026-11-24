@@ -72,7 +72,7 @@ describe("Live now", () => {
   it("answers one row per live agent tab: its project, session, state since when, and what the panel shows of the session", () => {
     const { tabs, liveNow, putSession } = setup();
     putSession(testSession({ id: "s1", record: { id: "s1", provider: "claude-code", agent: "claude", status: "active", name: "G4 tickets" } }));
-    putSession(testSession({ id: "s2", summary: testSummary({ id: "s2", firstMessage: { text: "  why does the\n panel flicker ", at: null } }), record: null }));
+    putSession(testSession({ id: "s2", summary: testSummary({ id: "s2", agent: "claude-pm", firstMessage: { text: "  why does the\n panel flicker ", at: null } }), record: null }));
     tabs.list([
       tab({ tabId: "t1", sessionId: "s1", state: "needs-you" }),
       tab({ tabId: "t2", sessionId: "s2", projectId: "beta", agentId: "claude-pm", state: "working" }),
@@ -100,6 +100,18 @@ describe("Live now", () => {
     live.put("run", "j\0r2", null);
     expect(liveNow.answer().rows.map((row) => row.kind === "run" && row.run)).toEqual(["r1"]);
     expect(revisions.length).toBe(before + 1);
+  });
+
+  it("names a row's agent by its session once known — the agent its store belongs to, which a re-link changes — else by the tab or run", () => {
+    const { live, tabs, liveNow, putSession, setAgents } = setup();
+    setAgents([entry("claude", "Claude Code"), entry("claude-writer", "claude-writer"), entry("claude-writer-v2", "claude-writer-v2")]);
+    tabs.list([tab({ tabId: "t1", sessionId: "s1", agentId: "claude-writer-v2" }), tab({ tabId: "t2", sessionId: "unknown", agentId: "claude-writer-v2" })]);
+    live.put("run", "j\0r1", { sessionId: "s1", agent: "claude-writer-v2", cwd: "/w", projectId: "alpha", state: "working", job: "Nightly", terminal: null });
+    const agents = (): [string, string][] => liveNow.answer().rows.map((row) => [row.kind === "run" ? row.run : row.tabId, row.agent]);
+    expect(agents()).toEqual([["r1", "claude-writer-v2"], ["t1", "claude-writer-v2"], ["t2", "claude-writer-v2"]]);
+    putSession(testSession({ id: "s1", summary: testSummary({ id: "s1", agent: "claude-writer" }) }));
+    expect(agents()).toEqual([["r1", "claude-writer"], ["t1", "claude-writer"], ["t2", "claude-writer-v2"]]);
+    expect(liveNow.answer().rows.find((row) => row.agent === "claude-writer")?.agentName).toBe("claude-writer");
   });
 
   it("is a new revision whenever the answer changes — a tab, a session's name, the roster — and only then", () => {

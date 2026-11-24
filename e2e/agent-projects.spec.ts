@@ -290,6 +290,8 @@ test("an agent whose folder is gone cannot be connected; the table still reads",
 test("a long project name is cut at every width, the table never scrolls sideways, and hovering moves nothing", async ({ page, openShell, pomade, backend }) => {
   const frame = await openPage(page, openShell, pomade, LONG_ID);
   await expect(frame.getByTestId("projects-connected"), backend.output()).toContainText("Connected2");
+  // The page at rest is the page once the counts are in: the agent has no sessions, so its Needs login notice shows then.
+  await expect(frame.getByTestId("agent-needs-login")).toBeVisible();
   for (const [tab, name] of [
     [1316, "wide"],
     [720, "medium"],

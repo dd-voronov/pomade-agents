@@ -304,6 +304,23 @@ describe("the roster", () => {
       await expect(r.undoRelink(undo)).rejects.toMatchObject({ code: "invalid-params" });
     });
 
+    it("owns the renamed folder's store from the re-link, and gives it back to the folder's own agent with its Undo", async () => {
+      const r = await start();
+      const store = (name: string) => ({ configDir: join(workspace, "Agents", name), folderAgent: name });
+      expect(r.storeAgent(store("claude-libra"))).toBe("claude-libra");
+      expect(r.storeAgent({ configDir: join(home, ".claude"), folderAgent: "claude" })).toBe("claude");
+      expect(r.storeAgent({ configDir: join(home, ".codex"), folderAgent: "codex" })).toBe("codex");
+      await renamed(r);
+      await expect.poll(() => r.storeAgent(store("claude-librarian")), SOON).toBe("claude-librarian");
+      const { undo } = await r.relink("claude-libra", "claude-librarian");
+      // The roster's change notice goes out with the store already the profile's.
+      expect(r.storeAgent(store("claude-librarian"))).toBe("claude-libra");
+      await r.undoRelink(undo);
+      expect(r.storeAgent(store("claude-librarian"))).toBe("claude-librarian");
+      // A folder no profile names answers for itself.
+      expect(r.storeAgent(store("nobody"))).toBe("nobody");
+    });
+
     it("takes nothing back from a text that is not the folder's profile: the re-link stands", async () => {
       const r = await start();
       await renamed(r);
@@ -350,5 +367,8 @@ describe("the roster", () => {
     expect(resolveConfigDir("Agents/x", "/h", "/w")).toBe("/w/Agents/x");
     expect(resolveConfigDir("/abs/x", null, null)).toBe("/abs/x");
     expect(resolveConfigDir("Agents/x", "/h", null)).toBeNull();
+    expect(resolveConfigDir("~", "/h/", "/w")).toBe("/h");
+    expect(resolveConfigDir("Agents/x/", "/h", "/w/")).toBe("/w/Agents/x");
+    expect(resolveConfigDir("./Agents/y/../x", "/h", "/w")).toBe("/w/Agents/x");
   });
 });

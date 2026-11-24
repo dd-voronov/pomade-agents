@@ -50,11 +50,12 @@ export function newRecord(context: RecordContext, adoptedAt: string | null): Ses
   return refreshRecord(record, context);
 }
 
-/** The record with the fields the app keeps current: the transcript and start folder, the first
- *  binding to a tab, the Runner job that started it, and the effective project with its root as
- *  Pomade names it now. Everything else — name, status, note, a Move to project — stays as it is. */
+/** The record with the fields the app keeps current: the agent its store belongs to, the transcript
+ *  and start folder, the first binding to a tab, the Runner job that started it, and the effective
+ *  project with its root as Pomade names it now. Everything else — name, status, note, a Move to
+ *  project — stays as it is. */
 export function refreshRecord(record: SessionRecord, { summary, realCwd, boundIn, projects, runnerJob }: RecordContext): SessionRecord {
-  const next: SessionRecord = { ...record, transcript: summary.transcript };
+  const next: SessionRecord = { ...record, agent: summary.agent, transcript: summary.transcript };
   if (summary.cwd !== null) next.cwd = summary.cwd;
   if (runnerJob !== null) next.startedByRunner = { job: runnerJob };
   if (boundIn !== null) {

@@ -80,6 +80,12 @@ describe("keeping a record current", () => {
     expect(refreshRecord(record, context({}, { transcript: "/t/new.jsonl" }))).toEqual({ ...record, transcript: "/t/new.jsonl" });
   });
 
+  it("follows the agent its store belongs to: a re-link, and its Undo, rename the agent in the record", () => {
+    const relinked = refreshRecord({ ...record, agent: "claude-writer-v2" }, context({}, { agent: "claude-writer", transcript: "/t/old.jsonl" }));
+    expect(relinked).toEqual({ ...record, agent: "claude-writer" });
+    expect(refreshRecord(relinked, context({}, { agent: "claude-writer-v2", transcript: "/t/old.jsonl" })).agent).toBe("claude-writer-v2");
+  });
+
   it("records the first binding: no longer outside Pomade, launched from that project, which places it", () => {
     const bound = refreshRecord(record, context({ boundIn: "alpha" }));
     expect(bound).toMatchObject({ launchedFrom: "alpha", project: "alpha", projectRoot: "Projects/alpha" });

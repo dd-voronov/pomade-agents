@@ -189,6 +189,8 @@ test("the role line and the tags are edited on a card into agent.yaml; hovering 
     start: await card.getByTestId("agent-start-claude-pm").boundingBox(),
     next: await tab.getByTestId("agent-card-claude-writer").boundingBox(),
   });
+  // The card at rest is the card once the counts are in: an agent with no sessions shows Needs login then.
+  await expect(card.getByTestId("chip-needs-login-claude-pm")).toBeVisible();
   const resting = await layout();
 
   await role.hover();

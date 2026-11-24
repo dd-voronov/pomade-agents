@@ -89,7 +89,7 @@ smoke spec.
 
 | Field | Source |
 |---|---|
-| agent | the store it lives in: built-in store → `claude` / `codex`; `Agents/<name>/` → that folder agent |
+| agent | the store it lives in: the agent whose profile names the store's folder as its `configDir` (§3.2) — a re-linked agent keeps its sessions; while no profile names it, built-in store → `claude` / `codex`, `Agents/<name>/` → that folder agent |
 | provider | Claude Code or Codex |
 | model + effort | the latest turn. Claude: `message.model` + `effort`. Codex: `turn_context.model` + `effort`. A mid-session `/model` switch shows |
 | context % | the last turn's input-side tokens ÷ the model's context window. Claude: `input + cache_read + cache_creation` of the last assistant usage, window from the price table. Codex: `last_token_usage` ÷ the rollout's `model_context_window` (shown even for a model missing from the price table) |

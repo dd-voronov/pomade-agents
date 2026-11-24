@@ -18,8 +18,11 @@ export interface StoreRoot {
   /** Absolute folder the store's session files live under. */
   path: string;
   provider: SessionProvider;
-  /** Roster id of the agent whose store it is. */
-  agent: string;
+  /** The config folder the store is in, absolute: what a profile's `configDir` names. */
+  configDir: string;
+  /** The agent the folder itself names: the built-in's id, or the folder agent's name. Its sessions'
+   *  agent only while no profile names `configDir` (`storeAgent`). */
+  folderAgent: string;
 }
 
 export interface SessionFile {
@@ -43,8 +46,8 @@ const CODEX_FILE_RE = /^rollout-.*?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]
 
 export function builtinRoots(home: string): StoreRoot[] {
   return [
-    { path: join(home, ".claude", "projects"), provider: "claude-code", agent: BUILTIN_CLAUDE },
-    { path: join(home, ".codex", "sessions"), provider: "codex", agent: BUILTIN_CODEX },
+    { path: join(home, ".claude", "projects"), provider: "claude-code", configDir: join(home, ".claude"), folderAgent: BUILTIN_CLAUDE },
+    { path: join(home, ".codex", "sessions"), provider: "codex", configDir: join(home, ".codex"), folderAgent: BUILTIN_CODEX },
   ];
 }
 
@@ -79,7 +82,17 @@ export async function folderAgentNames(workspace: string): Promise<string[]> {
 
 /** One store per folder agent. */
 export async function folderAgentRoots(workspace: string): Promise<StoreRoot[]> {
-  return (await folderAgentNames(workspace)).map((name) => ({ path: join(workspace, AGENTS_FOLDER, name, "projects"), provider: "claude-code", agent: name }));
+  return (await folderAgentNames(workspace)).map((name) => {
+    const configDir = join(workspace, AGENTS_FOLDER, name);
+    return { path: join(configDir, "projects"), provider: "claude-code", configDir, folderAgent: name };
+  });
+}
+
+/** The agent a store's sessions belong to: the agent whose profile names the store's config folder
+ *  (`namers`, in roster order) — the folder's own agent when its profile is among them, else the
+ *  first; the folder's own agent while no profile names it. */
+export function storeAgent(namers: readonly string[], folderAgent: string): string {
+  return namers.includes(folderAgent) ? folderAgent : (namers[0] ?? folderAgent);
 }
 
 /** The session a path names, when it is a session file's place in `root`; else `null`. */

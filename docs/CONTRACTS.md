@@ -264,7 +264,7 @@ doing now (its live state).
 type SessionSummary = {
   id: string;                         // the provider's session id
   provider: "claude-code" | "codex";
-  agent: string;                      // roster id: claude, codex, or the folder agent's name
+  agent: string;                      // roster id: the agent its store belongs to ("A session's agent" below)
   transcript: string;                 // absolute path; unique per summary
   cwd: string | null;                 // start folder: the first recorded working folder
   branch: string | null;              // recorded at the start; null when none recorded
@@ -329,6 +329,18 @@ type SessionsOpenResult = {
 ```
 
 - `since` omitted, from another epoch, or ahead of the backend → a full answer.
+- **A session's agent** (`summary.agent`; `storeAgent`, `src/backend/stores/roots.ts`) is the
+  agent whose profile holds the session's transcript store: the agent whose answering profile
+  ("Roster" below) names, as its `configDir`, the config folder the store is in — `~/.claude`,
+  `~/.codex`, `<workspace>/Agents/<name>`, compared absolute and normalized. When several do,
+  the folder's own agent among them, else the first in roster order. The folder's own agent — the
+  built-in `claude` or `codex`, or `<name>` — answers only while no profile names the folder. So
+  a re-linked agent keeps its sessions under its id, and every read that names a session's agent
+  says the same id: `sessions.list` and `sessions.get`, the record's `agent` (kept current like
+  the transcript), `sessions.find`, `sessions.agentCounts`, Live now's rows, the published events
+  and `pomade-agents show`. The roster's change moves them at once (`roster.relink`,
+  `roster.undoRelink`, a profile edited on disk): each session whose agent changed is a session
+  change — a new revision, `sessions.changed`, its record rewritten — with no restart.
 - A session is listed while a transcript of it exists. Its record stays on disk when the
   transcripts are gone, and joins again if one comes back.
 - Message texts are trimmed and capped at 4000 characters (a longer one ends in "…").
@@ -453,7 +465,7 @@ type LiveTabRow = {
   tabId: string;              // the agent tab: what a click focuses (agentTabs.focus)
   project: string;            // the tab's project id; "__workspace__" for the Workspace
   sessionId: string | null;   // null before the tab's first prompt
-  agent: string;              // roster id
+  agent: string;              // roster id: its session's agent ("Sessions" above) once the session is known, else the tab's agentId
   agentName: string;          // the roster's name for it (roster.agents); its id when the roster has none
   state: "working" | "needs-you" | "idle";
   since: string;              // ISO 8601: when the backend saw the tab enter `state`
@@ -467,7 +479,7 @@ type LiveRunRow = {
   name: string;               // the job's name: the row's title
   project: string;            // the job's project id; "__workspace__" for a workspace job
   sessionId: string | null;   // the session it runs; null while not known
-  agent: string;              // roster id
+  agent: string;              // roster id: as LiveTabRow's — its session's agent once known, else the run's
   agentName: string;          // as LiveTabRow's
   state: "working";           // a run is Working from its run started to its run finished
   since: string;              // ISO 8601: when the backend heard it start
@@ -539,13 +551,13 @@ type SessionsFindParams = {
   cwd: string;          // absolute
   startedFrom: string;  // ISO 8601 date and time with a zone (Z or ±hh:mm)
   startedTo: string;
-  agent?: string;       // roster id
+  agent?: string;       // roster id: matches the session's agent ("Sessions" above)
 };
 
 type FoundSession = {
   id: string;
   provider: "claude-code" | "codex";
-  agent: string;
+  agent: string;        // roster id: the session's agent ("Sessions" above)
   cwd: string;          // the start folder, absolute, symlinks resolved
   startedAt: string;    // ISO 8601, as the transcript records it
   lastActiveAt: string;
@@ -553,6 +565,11 @@ type FoundSession = {
 type SessionsFindResult = { sessions: FoundSession[] };  // earliest start first
 ```
 
+- **The agent** — `Session.summary.agent`, `FoundSession.agent` and `find`'s `agent` are the
+  session's agent ("Sessions" above): the roster id of the agent whose profile holds the session's
+  store — the id Runner launched it as, a re-linked agent's included, never the name of a folder
+  its profile was re-linked to. A re-link or its Undo changes it for the agent's sessions at once,
+  `sessions.changed` says so.
 - `Session` carries `hidden` ("Sessions" above): a hidden session is answered like any other.
 - `Session` carries `work` ("Sessions" above): `true` for a work session — one that counts. A
   reader that counts or sums sessions takes only those.
@@ -868,13 +885,14 @@ type RemoveOrphanResult = { agent: string };
   each call; none without a workspace.
 - **`roster.relink`** points the orphan's profile at the folder (`configDir: Agents/<folder>`,
   every other key kept), then removes the folder's own first-sight profile, and reads the roster
-  again before it answers: the agent is in `roster.list` again under its id. `undo` holds the
+  again before it answers: the agent is in `roster.list` again under its id, and the folder's
+  sessions are its sessions ("A session's agent", "Sessions" above). `undo` holds the
   agent's profile and the removed one as their files held them (`profileText: null`: none). Errors: `not-ready`
   (no workspace); `not-found` (no such agent); `invalid-params` (the agent is not an orphan, or the
   folder is not unclaimed); `io-error` (a file cannot be written or removed).
 - **`roster.undoRelink`** takes a re-link back from its `undo`: the agent's profile, then the
   folder's, written back byte for byte (new, or over a file of other text), the roster read again —
-  both files and `roster.agents` as before the re-link. Errors:
+  both files and `roster.agents` as before the re-link, the folder's sessions its own agent's again. Errors:
   `not-ready`; `invalid-params` (the agent has no usable profile or no longer
   names the folder — taken back already, or changed since; a text over `PROFILE_TEXT_MAX` (65 536)
   or not a usable profile of its id, in which case the re-link stands); `io-error`.
@@ -994,7 +1012,7 @@ type AgentCountsAnswer = {
 };
 
 type AgentCounts = {
-  agent: string;                                      // roster id
+  agent: string;                                      // roster id: the sessions' agent ("Sessions" above)
   lastActiveAt: string | null;                        // its latest work session's last activity
   week: { sessions: number; costUsd: number | null }; // work sessions active in the week; the sum of their
                                                       // known ~$ estimates, null when none has one
@@ -1179,7 +1197,7 @@ Pomade then (the backend logs it).
 type SessionEventBase = {
   sessionId: string;
   provider: "claude-code" | "codex";
-  agent: string;                                // roster id
+  agent: string;                                // roster id: the session's agent ("Sessions" above)
   project: { id: string; root: string } | null; // the project it shows in — the first, on a shared
                                                 // folder; root workspace-relative; null: the Workspace bucket
   cwd: string | null;                           // start folder, absolute, symlinks resolved
