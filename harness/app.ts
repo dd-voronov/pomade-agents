@@ -1,5 +1,5 @@
 // The app as the harness sees it: its manifest (the source one, which every build copies) and
-// where the built backend is.
+// where the built backend and command are.
 
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -8,6 +8,8 @@ const ROOT = fileURLToPath(new URL("..", import.meta.url));
 
 export const BUILD_DIR = `${ROOT}dist`;
 export const BUILT_BACKEND = `${BUILD_DIR}/backend/main.mjs`;
+/** The built `pomade-agents` command: the manifest's `commands[0].entry`. */
+export const BUILT_COMMAND = `${BUILD_DIR}/cli/pomade-agents.mjs`;
 export const SOURCE_BACKEND = `${ROOT}src/backend/main.ts`;
 
 export interface AppManifest {

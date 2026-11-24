@@ -61,7 +61,18 @@
     "roster.launchSpec",
     "roster.projectsFor",
     "roster.agentsFor",
-    "roster.agents"
+    "roster.agents",
+    "sessions.ofTab"
+  ],
+  "commands": [
+    {
+      "name": "pomade-agents",
+      "entry": "cli/pomade-agents.mjs",
+      "title": "A session's name, status, note and numbers, for agents and scripts"
+    }
+  ],
+  "skills": [
+    "skills/pomade-agents-sessions"
   ],
   "outsideWorkspace": [
     "~/.claude/",

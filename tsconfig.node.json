@@ -6,12 +6,14 @@
   },
   "include": [
     "src/backend",
+    "src/command",
     "src/shared",
     "src/**/*.test.ts",
     "harness",
     "scripts",
     "vite.config.ts",
     "vite.backend.config.ts",
+    "vite.command.config.ts",
     "vitest.config.ts"
   ],
   "exclude": ["harness/shell/shell.ts"]

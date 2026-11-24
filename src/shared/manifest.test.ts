@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import { parseManifest } from "pomade-kit/protocol";
 import { describe, expect, it } from "vitest";
 
+import { skillProblems } from "../../scripts/build-folder.ts";
 import { createApi } from "../backend/interfaces/api.ts";
 import { API_METHODS } from "./api.ts";
 import { LIVE_NOW_CHANGED_EVENT } from "./live-now.ts";
@@ -59,6 +60,42 @@ describe("manifest.json", () => {
     const live = { entries: () => [] };
     const roster = { answer: () => ({ epoch: "e", revision: 0, agents: [], profilesOff: null }), list: () => [], agent: () => undefined };
     const projects = { projects: none, visibleAgents: none };
-    expect(Object.keys(createApi({ info, sessions, live, liveNow: { answer: () => ({ epoch: "l", revision: 0, rows: [] }) }, realPath: (p: string) => Promise.resolve(p), roster, projects, open: none }))).toEqual(api);
+    expect(Object.keys(createApi({ info, sessions, live, liveNow: { answer: () => ({ epoch: "l", revision: 0, rows: [] }) }, realPath: (p: string) => Promise.resolve(p), roster, projects, open: none, tabs: { ofTab: () => null } }))).toEqual(api);
+  });
+
+  it("declares the pomade-agents command, built from the command's entry", () => {
+    const parsed = parseManifest(raw);
+    if (!parsed.ok) throw new Error(parsed.message);
+    expect(parsed.manifest.commands).toEqual([{ name: "pomade-agents", entry: "cli/pomade-agents.mjs", title: expect.any(String) as string }]);
+    const config = readFileSync(new URL("../../vite.command.config.ts", import.meta.url), "utf8");
+    expect(config).toContain('ssr: "src/command/main.ts"');
+    expect(config).toContain('outDir: "dist/cli"');
+    expect(config).toContain('entryFileNames: "pomade-agents.mjs"');
+  });
+
+  it("ships each skill it declares from public/, with a SKILL.md that names it and says when to use it", () => {
+    const parsed = parseManifest(raw);
+    if (!parsed.ok) throw new Error(parsed.message);
+    expect(parsed.manifest.skills).toEqual([{ name: "pomade-agents-sessions", path: "skills/pomade-agents-sessions" }]);
+    for (const skill of parsed.manifest.skills ?? []) {
+      const text = readFileSync(new URL(`../../public/${skill.path}/SKILL.md`, import.meta.url), "utf8");
+      expect(skillProblems(skill.name, text)).toEqual([]);
+    }
+  });
+});
+
+describe("a skill's SKILL.md", () => {
+  it.each<[string, string, string]>([
+    ["no frontmatter", "# Skill\n", "it has no frontmatter"],
+    ["another name", "---\nname: other\ndescription: Use it.\n---\n", 'its name is "other", not its folder\'s "s"'],
+    ["no description", "---\nname: s\n---\n", "it has no description"],
+    ["a blank description", "---\nname: s\ndescription: \"  \"\n---\n", "it has no description"],
+    ["a description past the limit", `---\nname: s\ndescription: ${"x".repeat(1025)}\n---\n`, "its description is longer than 1024 characters"],
+  ])("is refused with %s", (_case, text, problem) => {
+    expect(skillProblems("s", text)).toEqual([problem]);
+  });
+
+  it("is refused when its frontmatter is not YAML", () => {
+    expect(skillProblems("s", "---\nname: [s\n---\n")[0]).toMatch(/^its frontmatter is invalid/);
   });
 });

@@ -44,12 +44,14 @@ function isolatedEnv(sandbox: Sandbox, extra: Record<string, string>): Record<st
   };
 }
 
-/** Launch Pomade on the sandbox; `devApps` are build folders dev-linked for this run. */
-export async function launchPomade(sandbox: Sandbox, devApps: string[] = []): Promise<{ app: ElectronApplication; page: Page }> {
+/** Launch Pomade on the sandbox; `devApps` are build folders dev-linked for this run. `pomadeHome`
+ *  turns its commands on (they are off in a test run without it): Pomade writes its shims into
+ *  `<pomadeHome>/bin` and puts that folder first on its terminals' `PATH`. */
+export async function launchPomade(sandbox: Sandbox, devApps: string[] = [], pomadeHome?: string): Promise<{ app: ElectronApplication; page: Page }> {
   const app = await electron.launch({
     executablePath: ELECTRON,
     args: [MAIN],
-    env: isolatedEnv(sandbox, devApps.length > 0 ? { POMADE_DEV_APPS: devApps.join(";") } : {}),
+    env: isolatedEnv(sandbox, { ...(devApps.length > 0 ? { POMADE_DEV_APPS: devApps.join(";") } : {}), ...(pomadeHome === undefined ? {} : { POMADE_HOME: pomadeHome }) }),
   });
   const page = await app.firstWindow();
   await page.waitForURL("**/index.html");
@@ -77,7 +79,9 @@ export async function platformClient(sandbox: Sandbox): Promise<HostClient> {
 
 /** A Claude-shaped stand-in agent writing into the store `store`: ready at once; started with
  *  `--resume <id>` it says `AGENT_RESUMED <id>` and goes on in that session; otherwise its first
- *  prompt starts a session. Every prompt it gets is echoed as `AGENT_GOT: <prompt>`. */
+ *  prompt starts a session. Every prompt it gets is echoed as `AGENT_GOT: <prompt>`. The prompt
+ *  `/show` runs `pomade-agents show --json` as an agent would — from its terminal's `PATH` — into
+ *  `<store>/show.json`, and says `AGENT_SHOWED <exit status>`. */
 export const STAND_IN_AGENT = (store: string): string => `#!/bin/zsh
 current=""
 dir="${store}/projects/\${\${PWD:A}//[^a-zA-Z0-9]/-}"
@@ -89,6 +93,11 @@ fi
 echo AGENT_READY
 while IFS= read -r line; do
   if [[ "$line" == "/exit" ]]; then exit 0; fi
+  if [[ "$line" == "/show" ]]; then
+    pomade-agents show --json > "${store}/show.json" 2>&1
+    echo "AGENT_SHOWED $?"
+    continue
+  fi
   if [[ -z "$current" ]]; then
     current="$(uuidgen | tr A-Z a-z)"
     mkdir -p "$dir"

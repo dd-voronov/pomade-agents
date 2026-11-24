@@ -140,7 +140,7 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
             },
             { sessions, live, roster, workspace: info.workspace, workspaceReal: info.workspaceReal, realPath, log },
           );
-        connected.api.serve(createApi({ info, sessions, live, liveNow, realPath, roster, projects: projectReads(connected), open })).then(
+        connected.api.serve(createApi({ info, sessions, live, tabs: bound, liveNow, realPath, roster, projects: projectReads(connected), open })).then(
           ({ methods }) => log(`serving ${methods.join(", ")}`),
           (err: unknown) => log(`could not serve the API: ${message(err)}`),
         );

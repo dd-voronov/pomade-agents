@@ -14,8 +14,13 @@ The interfaces this app offers and the ones its own parts share. Pomade's conven
 ## Manifest
 
 `public/manifest.json` is the single source of the app's id, name, version and API list; every
-build copies it into the app folder. `src/shared/manifest.test.ts` keeps `package.json`'s version
-and the backend's handlers in step with it.
+build copies it into the app folder, with everything else in `public/` (the strip icon, the skill).
+`src/shared/manifest.test.ts` keeps `package.json`'s version, the backend's handlers, the command's
+build entry and the skill's master copy in step with it; `npm run build` ends with
+`scripts/check-build.ts` (`scripts/build-folder.ts`), which fails when `dist/` is not installable:
+an invalid manifest, a file it names (UI entry, icon, backend, command entry) missing, or a skill
+folder without a `SKILL.md` whose frontmatter `name` is the folder's and whose `description` is set
+(at most 1024 characters).
 
 | Key | Value |
 |---|---|
@@ -26,6 +31,8 @@ and the backend's handlers in step with it.
 | `events` | publishes `sessions.changed`, `roster.changed` and `liveNow.changed` (for its own UI frames) and `session.turnFinished` (declared, never published), `session.closed`, `session.statusChanged` ("Published events" below); subscribes to `pomade-agents:sessions.changed`, `pomade-agents:roster.changed` and `pomade-agents:liveNow.changed` (its own, for its UI frames), `project.created`, `project.renamed` and `project.removed` (the backend, and the UI frames for project names) and, for the backend, `pomade.ready`, `agentTab.changed`, `agentTab.exited` and Runner's `pomade-runner:run.started`, `pomade-runner:run.finished` ("Subscribed events" below) |
 | `backend` | `backend/main.mjs`, mode `with-pomade` |
 | `api` | the methods of "Published API" below — `sessions.forRepo`, `sessions.liveIn` and `roster.list` among them, which Pomade reads (HOST-API §4, "Platform reads of app APIs") |
+| `commands` | one, `pomade-agents` — entry `cli/pomade-agents.mjs` ("Command" below) |
+| `skills` | one, `skills/pomade-agents-sessions` — the session-data format skill ("Command" below) |
 | `outsideWorkspace` | `~/.claude/`, `~/.codex/`, `~/.zshrc` — the paths outside the workspace the backend uses; Pomade shows them at install (HOST-API §1) |
 
 ## Surfaces and routes
@@ -122,6 +129,7 @@ it the same way. Method names and shapes are in `src/shared/api.ts`, `src/shared
 | `roster.projectsFor` | `RosterProjectsForParams` `{ agent }` | `RosterProjectsForResult` `{ projects: string[] }` |
 | `roster.agentsFor` | `RosterAgentsForParams` `{ project }` | `RosterAgentsForResult` `{ agents: string[] }` |
 | `roster.agents` | — | `RosterAgentsAnswer` (the app's own frames) |
+| `sessions.ofTab` | `SessionsOfTabParams` `{ tabId }` | `SessionsOfTabResult` `{ agentTab, session: Session \| null }` (the command) |
 
 ```ts
 interface AppInfo {
@@ -583,6 +591,70 @@ A profile changed on disk is seen at once (the data folder's watch); agent folde
 Adding a method: its name in the manifest's `api` and in `API_METHODS`, its shapes in
 `src/shared/`, its handler in `src/backend/interfaces/api.ts`.
 
+### Session of a tab
+
+`sessions.ofTab` — the session bound to an agent tab, by the tab's lasting id (`POMADE_TAB_ID` in
+its terminal); what the `pomade-agents` command asks for its default target. Answered from the
+agent tabs Pomade lists ("Bound tabs" above).
+
+```ts
+type SessionsOfTabParams = { tabId: string };
+type SessionsOfTabResult = {
+  agentTab: boolean;        // Pomade lists an agent tab with this id; false: a plain terminal's tab, or one that is gone
+  session: Session | null;  // the session the tab names; null: no agent tab, the agent not prompted yet,
+                            // or its transcript not read yet
+};
+```
+
+An empty or non-string `tabId` is `invalid-params`.
+
+## Command
+
+`pomade-agents` (manifest `commands`; DESIGN §7), source `src/command/` — `main.ts` (the entry:
+the kit's `connectSocket` as role `command`, `resolveWorkspace`), `cli.ts` (arguments, sub-commands,
+failures), `session-text.ts` (the text form); built by `vite.command.config.ts` into
+`dist/cli/pomade-agents.mjs`, one self-contained module. Pomade's shim runs it (HOST-API §2
+"Commands"). It reads no file: every answer is the backend's, through the broker (`apps.call` to
+the app itself).
+
+```
+pomade-agents show [--session <id>] [--json]
+pomade-agents --help · pomade-agents show --help
+```
+
+- **Target:** `--session <id>` (or `--session=<id>`) → `sessions.get`; otherwise the tab in
+  `POMADE_TAB_ID` → `sessions.ofTab`. Without either, it fails before connecting.
+- **`--json`:** the `Session` ("Sessions" above) — exactly what `sessions.get` answers in
+  `session` — as one JSON document (2-space indent, a trailing newline) on stdout.
+- **Text:** the name (`Unnamed session` when none), then `label  value` lines — status and note,
+  live state and since when, agent · provider · model effort, project(s) by name and id (from
+  `project.list`; the Workspace when none), start folder, branch, start and last activity, first and
+  last message and last answer (one line, at most 100 characters), tokens, ~$ cost, context, Runner
+  job, transcript, id. Times in UTC; no colour or escape sequence. A line whose value is unknown is
+  left out. For people: its layout is not a contract.
+- **Failures:** one line on stderr, `pomade-agents: <what happened> — <what to do>`, nothing on
+  stdout, and an exit status per case (`EXIT` in `cli.ts`):
+
+| Exit | Case |
+|---|---|
+| 0 | printed (also `--help`) |
+| 1 | Pomade refused the hello (`unauthorized`, a version); no app identity in the environment (not started by the shim); any other refusal of the call; an answer that fails its guard |
+| 2 | usage: no command, an unknown command (`set-status` among them) or option, `--session` twice or without an id, an argument `show` does not take |
+| 3 | Pomade not running (`connectSocket` → `not-running`); the line names `<workspace>/Apps/pomade-agents/sessions/` (the workspace from `resolveWorkspace`) and the skill |
+| 4 | the backend not answering: the broker's `app-absent` or `app-not-responding` (5 s) |
+| 5 | no `--session`, and no `POMADE_TAB_ID` |
+| 6 | the tab has no session: `agentTab: false`, or an agent tab with `session: null` |
+| 7 | `--session` names no session `sessions.get` knows (`not-found`) |
+
+- **Sub-commands** are a table in `cli.ts` (`SUB_COMMANDS`); each parses its own options and
+  resolves its target with `targetOf` / `sessionOf`.
+- **The format skill** — `public/skills/pomade-agents-sessions/SKILL.md`, shipped at
+  `skills/pomade-agents-sessions/` in the build (manifest `skills`): the record files (DESIGN §4,
+  every key of `SESSION_RECORD_KEYS`), status semantics, this command and its exit statuses, and a
+  worked example (Done sessions with their names, Done–skip left out, from the files alone).
+  `src/command/skill.test.ts` fails when its key, status or exit-status tables drift from the code.
+  Pomade links the skill nowhere; `host.info`'s `skills` gives its installed folder.
+
 ## Published events
 
 Events B and C (DESIGN §6) go out on Pomade's bus (HOST-API §4 `events`); a subscriber declares
@@ -809,6 +881,14 @@ type AgentRunFinished = AgentRunStarted & {
   `{ pid, output(), running(), stop() }`. It runs with `sandbox.backendEnv()` — Pomade's backend
   environment, with `POMADE_APP_STATE` at `<userData>/app-state/<appId>` — then `pomade.env()` over
   it when given, then `env` (`undefined` unsets a variable).
+- `shimHome(sandbox)`, `shimEnv(sandbox, appId, pomadeHome, terminal)`, `runCommand(entry, args, env)`
+  (`harness/command-process.ts`) — the built command (`BUILT_COMMAND` in `harness/app.ts`) run as
+  Pomade's shim runs it: `shimHome` writes `<root>/pomade-home/` with `host.json` (the sandbox's
+  socket) and the workspace pointer; `shimEnv` is the shim's environment (`POMADE_HOME`,
+  `POMADE_APP_ID`, `POMADE_APP_KEY_FILE`, `POMADE_CLIENT=command`, `POMADE_APP_STATE`) plus, for a
+  `terminal` `{ tabId, projectId }`, a Pomade terminal's (`POMADE_WORKSPACE`, `POMADE_TAB_ID`,
+  `POMADE_PROJECT_ID`) — no `POMADE_SOCKET`, as with the real shim; `runCommand` resolves
+  `{ code, stdout, stderr }`.
 - Playwright fixtures (`e2e/fixtures.ts`): `manifest`, `sandbox`, `pomade`, `backend`, `openShell`, and
   the options `seed` — `test.use({ seed: { into(sandbox) } })` writes into the sandbox before the
   backend starts (`null` by default) — `workspaceLink` (`false` by default) and `pomadeSeed` — what
@@ -816,10 +896,12 @@ type AgentRunFinished = AgentRunStarted & {
   `agentTabs.resume` finds and its workspace files (folders a resume runs in),
   `test.use({ pomadeSeed: { agentTabs: [...], sessions: [...], files: {...} } })` (nothing by default).
 - The Pomade smoke (`e2e/pomade/`, `npm run e2e:pomade`): `e2e/pomade/pomade.ts` launches a built
-  Pomade on a sandbox (`launchPomade`, `pomadeApps`), connects Pomade's own client
+  Pomade on a sandbox (`launchPomade(sandbox, devApps?, pomadeHome?)` — with `pomadeHome` its
+  commands are on: shims in `<pomadeHome>/bin`, first on its terminals' `PATH`; `pomadeApps`), connects Pomade's own client
   (`platformClient`) and holds the stand-in agent (`STAND_IN_AGENT`): a zsh script mapped onto the
-  fixture folder agent that writes a Claude-shaped transcript on its first prompt, and takes
-  `--resume <id>` as Pomade's resume starts it.
+  fixture folder agent that writes a Claude-shaped transcript on its first prompt, takes
+  `--resume <id>` as Pomade's resume starts it, and on the prompt `/show` runs
+  `pomade-agents show --json` from its `PATH` into `<store>/show.json`.
 - Transcript helpers (`e2e/transcripts.ts`): `prompt` and `answer` (Claude Code lines; a prompt
   may record a git branch, an answer carries its model, effort, usage and text), `claudeSession(sandbox, id, lines)`, `projectFolder(sandbox,
   projectId)`, and `seedIntoProject(sandbox, projectId)`, which moves the seeded transcripts' start

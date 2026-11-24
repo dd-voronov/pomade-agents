@@ -33,6 +33,7 @@ import {
   SESSIONS_LAST_MESSAGE_METHOD,
   SESSIONS_LIST_METHOD,
   SESSIONS_MOVE_METHOD,
+  SESSIONS_OF_TAB_METHOD,
   SESSIONS_OPEN_METHOD,
   SESSION_NAME_MAX,
   SESSIONS_RENAME_METHOD,
@@ -44,11 +45,13 @@ import {
   type SessionsFindResult,
   type SessionsGetResult,
   type SessionsLastMessageResult,
+  type SessionsOfTabResult,
   type SessionsOpenResult,
   type SessionsSince,
   type SessionsUpdated,
 } from "../../shared/sessions.ts";
 import type { RealPath } from "../core/real-paths.ts";
+import type { BoundTabs } from "../sessions/bound-tabs.ts";
 import { agentsFor, projectsFor, type ProjectReads } from "../roster/connections.ts";
 import { launchSpec } from "../roster/launch-spec.ts";
 import { enabledModes, type Roster } from "../roster/roster.ts";
@@ -62,6 +65,8 @@ export interface ApiSources {
   info: AppInfo;
   sessions: Pick<SessionData, "answer" | "list" | "get" | "changeStatus" | "rename" | "moveToProject">;
   live: Pick<LiveState, "entries">;
+  /** The agent tabs Pomade lists and the session each names (`bound-tabs.ts`). */
+  tabs: Pick<BoundTabs, "ofTab">;
   liveNow: Pick<LiveNow, "answer">;
   realPath: RealPath;
   roster: Pick<Roster, "answer" | "list" | "agent">;
@@ -177,7 +182,7 @@ function launchSpecParams(raw: unknown): LaunchSpecParams {
 /** The kit's contract shapes are interfaces, which TypeScript does not take for JSON values; they hold only JSON. */
 const json = (value: SessionsForRepoResult | SessionsLiveInResult): JsonValue => value as unknown as JsonValue;
 
-export function createApi({ info, sessions, live, liveNow, realPath, roster, projects, open }: ApiSources): Record<string, ApiHandler> {
+export function createApi({ info, sessions, live, tabs, liveNow, realPath, roster, projects, open }: ApiSources): Record<string, ApiHandler> {
   const updated = async (changed: Promise<SessionsUpdated["sessions"]>): Promise<SessionsUpdated> => ({ sessions: await changed });
   /** The session `{ id }` names; `not-found` when no transcript of it is known. */
   const sessionOf = (raw: unknown): Session => {
@@ -241,5 +246,12 @@ export function createApi({ info, sessions, live, liveNow, realPath, roster, pro
       agents: await agentsFor(nameOf(paramsOf(raw), "project", "a project id"), listedIds(), projects),
     }),
     [ROSTER_AGENTS_METHOD]: () => roster.answer(),
+    [SESSIONS_OF_TAB_METHOD]: (raw): SessionsOfTabResult => {
+      const tabId = paramsOf(raw).tabId;
+      if (typeof tabId !== "string" || tabId === "") throw new HostError("invalid-params", '"tabId" must be a tab id');
+      const tab = tabs.ofTab(tabId);
+      if (tab === null) return { agentTab: false, session: null };
+      return { agentTab: true, session: tab.sessionId === null ? null : (sessions.get(tab.sessionId) ?? null) };
+    },
   };
 }

@@ -32,6 +32,9 @@ export const SESSIONS_FIND_METHOD = "sessions.find";
  *  resumes it in a new agent tab; answers `SessionsOpenResult`. */
 export const SESSIONS_OPEN_METHOD = "sessions.open";
 
+/** The session bound to an agent tab, by the tab's id (`POMADE_TAB_ID`); answers `SessionsOfTabResult`. */
+export const SESSIONS_OF_TAB_METHOD = "sessions.ofTab";
+
 /** Published by the backend, unqualified, whenever sessions change; payload `SessionsChanged`. */
 export const SESSIONS_CHANGED_EVENT = "sessions.changed";
 
@@ -251,6 +254,20 @@ export type SessionsGetResult = {
   session: Session;
 };
 
+export type SessionsOfTabParams = {
+  /** A tab's lasting id: what Pomade gives its terminal as `POMADE_TAB_ID`. */
+  tabId: string;
+};
+
+export type SessionsOfTabResult = {
+  /** True when Pomade lists an agent tab with this id; false for a plain terminal's tab, or a tab
+   *  that is gone. */
+  agentTab: boolean;
+  /** The session the agent tab is bound to; `null` when there is no agent tab, or its agent has no
+   *  session yet (not prompted, or its transcript not read yet). */
+  session: Session | null;
+};
+
 export type SessionsLastMessageParams = {
   id: string;
 };
@@ -444,6 +461,16 @@ const OPENED: readonly unknown[] = ["tab", "run", "resumed"] satisfies SessionsO
 /** True for a well-formed `sessions.open` answer. */
 export function isSessionsOpenResult(value: unknown): value is SessionsOpenResult {
   return isObject(value) && OPENED.includes(value.opened) && isStringOrNull(value.tabId) && isSession(value.session);
+}
+
+/** True for a well-formed `sessions.ofTab` answer: no agent tab never carries a session. */
+export function isSessionsOfTabResult(value: unknown): value is SessionsOfTabResult {
+  return isObject(value) && typeof value.agentTab === "boolean" && (value.session === null || (value.agentTab && isSession(value.session)));
+}
+
+/** True for a well-formed `sessions.get` answer. */
+export function isSessionsGetResult(value: unknown): value is SessionsGetResult {
+  return isObject(value) && isSession(value.session);
 }
 
 /** True for a well-formed answer of a change method (`SessionsUpdated`). */

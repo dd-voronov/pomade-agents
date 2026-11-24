@@ -55,7 +55,7 @@ export default tseslint.config(
   },
   {
     name: "pomade-agents/node",
-    files: ["src/backend/**/*.ts", "src/shared/**/*.ts", ...UI_TESTS, "harness/**/*.ts", "scripts/**/*.ts", "vite.config.ts", "vite.backend.config.ts", "vitest.config.ts"],
+    files: ["src/backend/**/*.ts", "src/command/**/*.ts", "src/shared/**/*.ts", ...UI_TESTS, "harness/**/*.ts", "scripts/**/*.ts", "vite.config.ts", "vite.backend.config.ts", "vite.command.config.ts", "vitest.config.ts"],
     ignores: ["harness/shell/shell.ts"],
     ...typeAware("tsconfig.node.json"),
   },

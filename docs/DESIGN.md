@@ -508,8 +508,10 @@ pomade-agents show     [--session <id>] [--json]
 - **Without `--session`,** the command acts on the session bound to the terminal tab it runs in.
   The tab is identified by an environment variable Pomade gives every terminal.
 - **There is no status command.** Status is the user's, in the UI.
-- **The format skill** ships from this repo. It teaches agents and scripts to read the session
-  records (§4) and to use this command.
+- **The format skill**, `pomade-agents-sessions`, ships from this repo in the app's build. It
+  teaches agents and scripts to read the session records (§4) and to use this command.
+- **Every failure** is one line on stderr with its own exit status (CONTRACTS "Command"); with
+  Pomade closed, the line says where the record files are.
 
 ## 8. Platform and kit usage
 

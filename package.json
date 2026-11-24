@@ -9,7 +9,7 @@
     "node": ">=22.18"
   },
   "scripts": {
-    "build": "rm -rf dist && vite build && vite build --config vite.backend.config.ts",
+    "build": "rm -rf dist && vite build && vite build --config vite.backend.config.ts && vite build --config vite.command.config.ts && node scripts/check-build.ts",
     "dev": "node scripts/dev.ts",
     "dev:fake": "node scripts/dev-fake.ts",
     "install-app": "npm run build && node scripts/pomade.ts apps install dist",

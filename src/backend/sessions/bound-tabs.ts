@@ -1,4 +1,5 @@
-// Which agent tab each session is bound to (`Session.tab`; pomade:E-033): every agent tab Pomade
+// Which agent tab each session is bound to (`Session.tab`; pomade:E-033), and which session each
+// agent tab names (`sessions.ofTab`, the `pomade-agents` command's default target): every agent tab Pomade
 // lists (`agentTabs.list`, then every `agentTab.changed`; forgotten when the connection ends) and
 // the session it names. A tab stays bound while Pomade lists it — an `exited` one too: a tab
 // restored from an earlier run revives when it is focused, and a dead one shows why it died. Of
@@ -14,6 +15,9 @@ export interface BoundTabs {
   list(tabs: readonly AgentTabInfo[]): void;
   /** One agent tab as it is now (`closed`: it left the list). */
   changed(tab: AgentTabInfo, closed: boolean): void;
+  /** The agent tab with this id as Pomade lists it now: the session it names (`null`: none yet);
+   *  `null` when Pomade lists no agent tab with this id. */
+  ofTab(tabId: string): { sessionId: string | null } | null;
   /** The tab bound to the session; `null` when none is. */
   ofSession(sessionId: string): SessionTab | null;
   /** Called with the sessions whose tab changed; returns an unsubscribe function. */
@@ -59,6 +63,11 @@ export function createBoundTabs(): BoundTabs {
         if (closed) tabs.delete(tab.tabId);
         else tabs.set(tab.tabId, tab);
       });
+    },
+
+    ofTab(tabId) {
+      const tab = tabs.get(tabId);
+      return tab === undefined ? null : { sessionId: tab.sessionId };
     },
 
     ofSession,

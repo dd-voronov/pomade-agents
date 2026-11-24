@@ -28,6 +28,8 @@ const AGENTS: Record<string, { profile: AgentProfile; orphan: boolean }> = {
   quiet: { profile: { ...PROFILE, id: "quiet", kind: "folder", command: "quiet", hidden: true }, orphan: false },
   gone: { profile: { ...PROFILE, id: "gone", kind: "folder", command: "gone" }, orphan: true },
 };
+/** Agent tabs: one bound to a listed session, one not prompted yet, one bound to a session with no transcript known. */
+const TABS: Record<string, { sessionId: string | null }> = { bound: { sessionId: "a" }, fresh: { sessionId: null }, early: { sessionId: "ghost" } };
 const LISTED_AGENTS = ["claude", "codex", "locked"];
 const VISIBLE: Record<string, string[]> = { alpha: ["*"], beta: ["codex", "quiet", "ghost"], gamma: [] };
 
@@ -67,7 +69,8 @@ function api() {
       return visible === undefined ? Promise.reject(new HostError("not-found", `No project ${id}`)) : Promise.resolve(visible);
     },
   };
-  return { handlers: createApi({ info, sessions, live, liveNow: { answer: () => ({ epoch: "l", revision: 0, rows: [] }) }, realPath: (p) => Promise.resolve(p), roster, projects, open: (id) => {
+  const tabs: ApiSources["tabs"] = { ofTab: (tabId) => TABS[tabId] ?? null };
+  return { handlers: createApi({ info, sessions, live, tabs, liveNow: { answer: () => ({ epoch: "l", revision: 0, rows: [] }) }, realPath: (p) => Promise.resolve(p), roster, projects, open: (id) => {
     calls.push(["open", id]);
     return Promise.resolve({ opened: "resumed", tabId: "t1", session: testSession({ id }) });
   } }), calls };
@@ -156,6 +159,19 @@ describe("the API's params", () => {
       ],
     });
     expect(await handlers["sessions.find"]?.({ ...window, agent: "codex" }, ctx)).toEqual({ sessions: [] });
+  });
+
+  it("answers the session an agent tab is bound to; none for an agent tab without one, or a tab that is no agent's", async () => {
+    const ctx = { from: "pomade-agents" };
+    const { handlers } = api();
+    expect(await handlers["sessions.ofTab"]?.({ tabId: "bound" }, ctx)).toEqual({ agentTab: true, session: LISTED[0] });
+    expect(await handlers["sessions.ofTab"]?.({ tabId: "fresh" }, ctx)).toEqual({ agentTab: true, session: null });
+    expect(await handlers["sessions.ofTab"]?.({ tabId: "early" }, ctx)).toEqual({ agentTab: true, session: null });
+    expect(await handlers["sessions.ofTab"]?.({ tabId: "plain-terminal" }, ctx)).toEqual({ agentTab: false, session: null });
+  });
+
+  it.each([null, {}, { tabId: "" }, { tabId: 3 }])("refuses sessions.ofTab with %j as invalid-params", async (params) => {
+    await expect(Promise.resolve().then(() => call("sessions.ofTab", params))).rejects.toMatchObject({ code: "invalid-params" });
   });
 
   it.each(["sessions.get", "sessions.lastMessage"])("answers %s for an unknown session as not-found", async (method) => {

@@ -35,6 +35,20 @@ describe("the agent tabs sessions are bound to", () => {
     expect(heard).toEqual([["s1", "s2"]]);
   });
 
+  it("answers the session each listed agent tab names, until it leaves the list", () => {
+    const { tabs } = setup();
+    tabs.list([tab({ tabId: "t1", sessionId: "s1", state: "exited" }), tab({ tabId: "t2" })]);
+    expect(tabs.ofTab("t1")).toEqual({ sessionId: "s1" });
+    expect(tabs.ofTab("t2")).toEqual({ sessionId: null });
+    expect(tabs.ofTab("plain")).toBeNull();
+    tabs.changed(tab({ tabId: "t2", sessionId: "s2" }), false);
+    expect(tabs.ofTab("t2")).toEqual({ sessionId: "s2" });
+    tabs.changed(tab({ tabId: "t2", sessionId: "s2" }), true);
+    expect(tabs.ofTab("t2")).toBeNull();
+    tabs.list([]);
+    expect(tabs.ofTab("t1")).toBeNull();
+  });
+
   it("prefers a live tab over an exited one, then the first listed", () => {
     const { tabs } = setup();
     tabs.list([tab({ tabId: "dead", sessionId: "s1", state: "exited" }), tab({ tabId: "a", sessionId: "s1" }), tab({ tabId: "b", sessionId: "s1", state: "working" })]);
