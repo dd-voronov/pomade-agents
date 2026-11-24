@@ -24,7 +24,7 @@ function tab(patch: Partial<AgentTabInfo> & Pick<AgentTabInfo, "tabId">): AgentT
   };
 }
 
-const entry = (id: string, name: string): RosterEntry => ({ id, name, profile: null, problem: null, orphan: false, configDir: null, model: null, effort: null });
+const entry = (id: string, name: string): RosterEntry => ({ id, name, profile: null, problem: null, orphan: false, configDir: null, model: null, effort: null, provider: "claude", kind: "folder", hidden: false });
 
 function setup() {
   const live = createLiveState(() => new Date(T0));

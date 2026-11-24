@@ -1,7 +1,7 @@
 import { HostError } from "pomade-kit/sdk";
 import { describe, expect, it } from "vitest";
 
-import type { AgentProfile } from "../../shared/roster.ts";
+import type { AgentProfile, RosterEntry } from "../../shared/roster.ts";
 import { testSession, testSummary } from "../../shared/test-sessions.ts";
 import { createApi, type ApiSources } from "./api.ts";
 
@@ -33,7 +33,7 @@ const TABS: Record<string, { sessionId: string | null }> = { bound: { sessionId:
 const LISTED_AGENTS = ["claude", "codex", "locked"];
 const VISIBLE: Record<string, string[]> = { alpha: ["*"], beta: ["codex", "quiet", "ghost"], gamma: [] };
 
-function api() {
+function api(entries: string[] = [], profilesOff: string | null = null) {
   const calls: unknown[][] = [];
   const sessions: ApiSources["sessions"] = {
     answer: (since) => {
@@ -58,7 +58,7 @@ function api() {
   const live = { entries: () => [] };
   const info = { version: "0", startedAt: "", workspace: null, workspaceReal: null, dataDir: null, stateDir: "/s" };
   const roster: ApiSources["roster"] = {
-    answer: () => ({ epoch: "r", revision: 1, agents: [], profilesOff: null }),
+    answer: () => ({ epoch: "r", revision: 1, agents: entries.map((id) => ({ id, name: id }) as RosterEntry), profilesOff }),
     list: () => LISTED_AGENTS.map((id) => ({ id, name: id, command: id, provider: AGENTS[id]?.profile.provider ?? "claude" })),
     agent: (id) => AGENTS[id],
     updateProfile: (id, edit) => {
@@ -359,6 +359,23 @@ describe("the roster API", () => {
     await expect(Promise.resolve().then(() => projectsFor("ghost"))).rejects.toMatchObject({ code: "not-found" });
     await expect(Promise.resolve().then(() => handlers["roster.agentsFor"]?.({ project: "" }, ctx))).rejects.toMatchObject({ code: "invalid-params" });
     await expect(Promise.resolve().then(() => handlers["roster.projectsFor"]?.({}, ctx))).rejects.toMatchObject({ code: "invalid-params" });
+  });
+
+  it("answers every agent's connected projects at once: a hidden agent by the project setting, an orphan left out", async () => {
+    const { handlers } = api(["claude", "codex", "locked", "quiet", "gone"]);
+    expect(await handlers["roster.connections"]?.({}, ctx)).toEqual({
+      connections: [
+        { agent: "claude", projects: ["alpha"] },
+        { agent: "codex", projects: ["alpha", "beta"] },
+        { agent: "locked", projects: ["alpha"] },
+        { agent: "quiet", projects: ["alpha", "beta"] },
+      ],
+    });
+  });
+
+  it("answers no connected project to any agent while no workspace is open", async () => {
+    const { handlers } = api(["claude", "codex"], "No workspace is open.");
+    expect(await handlers["roster.connections"]?.({}, ctx)).toEqual({ connections: [{ agent: "claude", projects: [] }, { agent: "codex", projects: [] }] });
   });
 });
 

@@ -27,6 +27,9 @@ export const ROSTER_AGENTS_METHOD = "roster.agents";
 /** Published by the backend, unqualified, whenever `roster.agents` would answer differently; payload `RosterChanged`. */
 export const ROSTER_CHANGED_EVENT = "roster.changed";
 
+/** The projects each agent is connected to, for the app's own frames; answers `RosterConnectionsAnswer`. */
+export const ROSTER_CONNECTIONS_METHOD = "roster.connections";
+
 /** The modes every provider has (DESIGN §3.5), in the order the roster lists them. */
 export const MODE_IDS = ["normal", "full-autonomy"] as const;
 export type ModeId = (typeof MODE_IDS)[number];
@@ -69,6 +72,11 @@ export type RosterEntry = {
   /** The default model and effort, from the provider's own config; `null` when it sets none. */
   model: string | null;
   effort: string | null;
+  /** What answers for the agent — its usable profile, else its first-sight values: the provider, the
+   *  kind and whether it is hidden from the "+" menu. A file that cannot be used still gives them. */
+  provider: AgentProvider;
+  kind: AgentKind;
+  hidden: boolean;
 };
 
 export type RosterAgentsAnswer = {
@@ -157,7 +165,10 @@ function isRosterEntry(v: unknown): v is RosterEntry {
     typeof v.orphan === "boolean" &&
     (v.configDir === null || typeof v.configDir === "string") &&
     (v.model === null || typeof v.model === "string") &&
-    (v.effort === null || typeof v.effort === "string")
+    (v.effort === null || typeof v.effort === "string") &&
+    isAgentProvider(v.provider) &&
+    (v.kind === "builtin" || v.kind === "folder") &&
+    typeof v.hidden === "boolean"
   );
 }
 
@@ -484,5 +495,20 @@ export function isAgentModelConfig(value: unknown): value is AgentModelConfig {
     (value.model === null || typeof value.model === "string") &&
     (value.effort === null || typeof value.effort === "string") &&
     typeof value.writable === "boolean"
+  );
+}
+
+/** One agent's connected projects: the projects whose "+" menu offers it, in the Projects panel's order. */
+export type RosterConnection = { agent: string; projects: string[] };
+
+/** `roster.connections`: every agent the roster answers for — a hidden one too, an orphan with none. */
+export type RosterConnectionsAnswer = { connections: RosterConnection[] };
+
+/** True for a well-formed `roster.connections` answer. */
+export function isRosterConnectionsAnswer(value: unknown): value is RosterConnectionsAnswer {
+  return (
+    isObject(value) &&
+    Array.isArray(value.connections) &&
+    value.connections.every((c) => isObject(c) && typeof c.agent === "string" && Array.isArray(c.projects) && c.projects.every((p) => typeof p === "string"))
   );
 }

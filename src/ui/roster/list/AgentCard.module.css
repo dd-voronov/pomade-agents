@@ -1,0 +1,217 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel-raised);
+  box-shadow: var(--shadow-1);
+  container-type: inline-size;
+  transition: border-color var(--dur-fast) var(--ease);
+}
+
+.card:hover {
+  border-color: var(--border-strong);
+}
+
+.card[data-orphan] {
+  border-style: dashed;
+  border-color: var(--border-strong);
+  background: var(--bg);
+  box-shadow: none;
+}
+
+.card[data-hidden] {
+  background: var(--bg);
+}
+
+.top {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 24px;
+}
+
+.more {
+  margin-right: -4px;
+}
+
+.name {
+  flex: 0 1 auto;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  line-height: 20px;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.name:hover:not(:disabled) {
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 3px;
+}
+
+.name:disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.sub {
+  margin-top: -6px;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sep {
+  margin: 0 5px;
+  color: var(--text-faint);
+}
+
+.faint {
+  color: var(--text-faint);
+}
+
+/* Two lines, always: the room the role line has when it is edited in place. */
+.role {
+  display: -webkit-box;
+  flex: none;
+  height: calc(var(--fs-base) * var(--lh) * 2);
+  margin: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* One row, always: the tags that do not fit are cut at the edge, the full list is the tooltip. */
+.tags {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  overflow: hidden;
+  mask-image: linear-gradient(to right, black calc(100% - 20px), transparent);
+}
+
+.tag {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 10px;
+  background: var(--active-bg);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: 7px 10px;
+  border-radius: var(--radius-md);
+  background: var(--warning-soft);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  line-height: 17px;
+}
+
+.notice svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--warning);
+}
+
+.notice span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.notice code {
+  background: var(--hover-bg);
+}
+
+.link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--badge-fg);
+  font-size: inherit;
+  cursor: pointer;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  gap: 4px var(--space-2);
+  margin: 0;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+  font-size: var(--fs-sm);
+}
+
+.facts dt {
+  color: var(--text-faint);
+}
+
+.facts dd {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: auto;
+  padding-top: var(--space-1);
+}
+
+.open {
+  gap: 2px;
+  min-width: 0;
+}
+
+.openChevron {
+  display: inline-flex;
+  margin-right: -4px;
+  color: var(--text-faint);
+}
+
+/* A card too narrow for the three labels gives Sessions an icon. */
+@container (max-width: 315px) {
+  .sessionsLabel {
+    display: none;
+  }
+}

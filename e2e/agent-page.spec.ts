@@ -116,7 +116,7 @@ test("the folder agent's page shows each tab from its folder's files, and a relo
 
   // ← Roster returns to the Roster.
   await frame.getByTestId("agent-back").click();
-  await expect(frame.getByTestId("roster-empty")).toBeVisible();
+  await expect(frame.getByTestId("roster")).toBeVisible();
   await expect.poll(() => tabRoute(pomade)).toBe("roster");
   expect(backend.running()).toBe(true);
 });
@@ -359,7 +359,7 @@ test("a route names an agent the roster does not hold, or no tab: the page says 
   const frame = tabFrame("alpha");
   await expect(frame.getByTestId("agent-missing")).toContainText("no agent called “ghost”");
   await frame.getByTestId("agent-missing-back").click();
-  await expect(frame.getByTestId("roster-empty")).toBeVisible();
+  await expect(frame.getByTestId("roster")).toBeVisible();
   await expect.poll(() => tabRoute(pomade)).toBe("roster");
 
   pomade.fake.openAppTab({ projectId: "alpha", route: `roster/${LIBRA}` });

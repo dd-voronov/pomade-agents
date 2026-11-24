@@ -182,6 +182,9 @@ export function startRoster(options: RosterOptions): Roster {
         orphan,
         configDir: profile === null ? null : configDir,
         ...defaults,
+        provider: answering?.provider ?? "claude",
+        kind: answering?.kind ?? "folder",
+        hidden: answering?.hidden ?? false,
       });
       if (answering !== null) facts.set(id, { profile: answering, orphan });
     }

@@ -1,0 +1,118 @@
+/* The Roster's shared controls: buttons, the icon button, state chips. */
+
+.btn,
+.primary {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+}
+
+.btn {
+  border: 1px solid var(--border-strong);
+  background: var(--panel-raised);
+  color: var(--text);
+}
+
+.btn:hover {
+  background: linear-gradient(var(--hover-bg), var(--hover-bg)), var(--panel-raised);
+}
+
+.primary {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.primary:hover {
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
+}
+
+.primary[aria-expanded="true"] {
+  border-color: var(--accent-active);
+  background: var(--accent-active);
+}
+
+.btn:disabled,
+.primary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.small {
+  height: 24px;
+  padding: 0 var(--space-2);
+}
+
+.caret {
+  margin-right: -4px;
+  color: var(--text-faint);
+}
+
+.primary .caret {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.danger {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: #fff;
+}
+
+.iconBtn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon-btn);
+  height: var(--icon-btn);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.iconBtn:hover,
+.iconBtn[aria-expanded="true"] {
+  background: var(--active-bg);
+  color: var(--text);
+}
+
+.chip {
+  flex: 0 100 auto;
+  min-width: 24px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  height: 16px;
+  padding: 0 5px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: var(--fw-medium);
+  line-height: 14px;
+  white-space: nowrap;
+}
+
+.chip[data-tone="warn"] {
+  border-color: transparent;
+  background: var(--warning-soft);
+  color: var(--text);
+}

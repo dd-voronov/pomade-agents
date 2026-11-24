@@ -5,13 +5,13 @@ import type { AgentProvider, RosterEntry } from "../../../shared/roster.ts";
 
 export const PROVIDER_LABELS: Record<AgentProvider, string> = { claude: "Claude Code", codex: "Codex" };
 
-/** The provider an agent runs: its profile's; for one with no usable profile, the built-in's own, else Claude Code (every folder agent). */
+/** The provider an agent runs, as the roster answers it (an unusable profile answers from first-sight values). */
 export function providerOf(entry: RosterEntry): AgentProvider {
-  return entry.profile?.provider ?? (entry.id === "codex" ? "codex" : "claude");
+  return entry.provider;
 }
 
 export function isBuiltin(entry: RosterEntry): boolean {
-  return entry.profile === null ? entry.id === "claude" || entry.id === "codex" : entry.profile.kind === "builtin";
+  return entry.kind === "builtin";
 }
 
 export type ChipTone = "plain" | "warn";

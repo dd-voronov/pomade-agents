@@ -38,3 +38,12 @@ export async function projectsFor(agent: string, listed: readonly string[], read
   const visible = await Promise.all(projects.map((id) => reads.visibleAgents(id).catch((): string[] => [])));
   return projects.filter((_, i) => offered(visible[i] ?? [], [agent]).length > 0);
 }
+
+/** Each of `agents` (roster ids) with the projects whose "+" menu offers it, in the Projects panel's
+ *  order: the same reading as `projectsFor`, over every project once. Hidden agents are among
+ *  `agents` as the project setting offers them; an agent not offered anywhere has `[]`. */
+export async function connectionsOf(agents: readonly string[], reads: ProjectReads): Promise<{ agent: string; projects: string[] }[]> {
+  const projects = await reads.projects();
+  const visible = await Promise.all(projects.map((id) => reads.visibleAgents(id).catch((): string[] => [])));
+  return agents.map((agent) => ({ agent, projects: projects.filter((_, i) => offered(visible[i] ?? [], [agent]).length > 0) }));
+}

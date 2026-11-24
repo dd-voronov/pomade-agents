@@ -16,6 +16,7 @@ import { Toast } from "../../sessions/Toast.tsx";
 import { useToast, type Toast as ToastData } from "../../sessions/useToast.ts";
 import { rosterWindows } from "../agent-counts-model.ts";
 import { useAgentCounts } from "../useAgentCounts.ts";
+import { useRoster } from "../useRoster.ts";
 import { useProfileEdit } from "../profile-edit/useProfileEdit.ts";
 import { useAgentActions } from "./agent-actions.ts";
 import type { AgentContext } from "./agent-context.ts";
@@ -24,7 +25,6 @@ import type { WorkspaceRoots } from "./agent-model.ts";
 import { useOpenFile } from "./open-file.ts";
 import styles from "./page.module.css";
 import { AGENT_TAB_VIEWS } from "./tabs.tsx";
-import { useRosterAnswer } from "./useRosterAnswer.ts";
 
 const NO_PROJECTS = new Map();
 /** Relative times ("5m") are renewed this often. */
@@ -38,7 +38,7 @@ export interface AgentPageProps {
 }
 
 export function AgentPage({ host, agent, tab, navigate }: AgentPageProps): ReactElement {
-  const { answer, patchProfile } = useRosterAnswer(host);
+  const { answer, patchProfile } = useRoster(host);
   const backend = useBackendInfo(host);
   const projects = useProjects(host) ?? NO_PROJECTS;
   const now = useNow(CLOCK_MS);

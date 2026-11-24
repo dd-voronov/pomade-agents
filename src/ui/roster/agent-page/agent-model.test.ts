@@ -13,21 +13,24 @@ const entry = (over: Partial<RosterEntry> = {}): RosterEntry => ({
   configDir: "/ws/Agents/claude-libra",
   model: "opus",
   effort: "high",
+  provider: "claude",
+  kind: "folder",
+  hidden: false,
   ...over,
 });
 
 describe("provider", () => {
-  it("is the profile's; for an agent with no usable profile the built-in's own, else Claude Code", () => {
+  it("is the one the roster answers, with or without a usable profile", () => {
     expect(providerOf(entry())).toBe("claude");
-    expect(providerOf(entry({ id: "codex", profile: { ...PROFILE, id: "codex", provider: "codex", kind: "builtin" } }))).toBe("codex");
-    expect(providerOf(entry({ id: "codex", profile: null }))).toBe("codex");
+    expect(providerOf(entry({ id: "codex", provider: "codex", kind: "builtin", profile: { ...PROFILE, id: "codex", provider: "codex", kind: "builtin" } }))).toBe("codex");
+    expect(providerOf(entry({ id: "codex", provider: "codex", kind: "builtin", profile: null }))).toBe("codex");
     expect(providerOf(entry({ profile: null }))).toBe("claude");
   });
 
-  it("tells a built-in by its profile, or by its id without one", () => {
+  it("tells a built-in by the roster's kind", () => {
     expect(isBuiltin(entry())).toBe(false);
-    expect(isBuiltin(entry({ id: "claude", profile: null }))).toBe(true);
-    expect(isBuiltin(entry({ profile: { ...PROFILE, kind: "builtin" } }))).toBe(true);
+    expect(isBuiltin(entry({ id: "claude", kind: "builtin", profile: null }))).toBe(true);
+    expect(isBuiltin(entry({ kind: "builtin", profile: { ...PROFILE, kind: "builtin" } }))).toBe(true);
     expect(isBuiltin(entry({ profile: null }))).toBe(false);
   });
 });
@@ -38,7 +41,7 @@ describe("state chips", () => {
   });
 
   it("names a built-in, an orphan, an unreadable profile and a hidden agent", () => {
-    expect(chipsOf(entry({ profile: { ...PROFILE, kind: "builtin", hidden: true } })).map((c) => c.key)).toEqual(["builtin", "hidden"]);
+    expect(chipsOf(entry({ kind: "builtin", profile: { ...PROFILE, kind: "builtin", hidden: true } })).map((c) => c.key)).toEqual(["builtin", "hidden"]);
     expect(chipsOf(entry({ orphan: true })).map((c) => [c.key, c.tone])).toEqual([["orphan", "warn"]]);
     expect(chipsOf(entry({ profile: null, problem: "line 3 is wrong" }))).toEqual([{ key: "problem", label: "agent.yaml can’t be read", tone: "warn", title: "line 3 is wrong" }]);
   });
@@ -75,7 +78,7 @@ describe("paths", () => {
     expect(profileFileOf("/ws/Apps/pomade-agents", "claude-libra")).toBe("/ws/Apps/pomade-agents/agents/claude-libra/agent.yaml");
     expect(profileFileOf(null, "claude-libra")).toBeNull();
     expect(claudeMdOf(entry())).toBe("/ws/Agents/claude-libra/CLAUDE.md");
-    expect(claudeMdOf(entry({ id: "codex", profile: { ...PROFILE, provider: "codex" }, configDir: "/h/.codex" }))).toBeNull();
+    expect(claudeMdOf(entry({ id: "codex", provider: "codex", profile: { ...PROFILE, provider: "codex" }, configDir: "/h/.codex" }))).toBeNull();
     expect(claudeMdOf(entry({ configDir: null }))).toBeNull();
   });
 });

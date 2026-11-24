@@ -125,7 +125,7 @@ describe("the roster", () => {
     expect(await readFile(profilePath("claude-libra"), "utf8")).toContain("command: libra\n");
     expect(ids(r)).toEqual(["claude", "claude-libra"]);
     expect(r.list().find((a) => a.id === "claude-libra")?.command).toBe("libra");
-    expect(r.answer().agents.map((a) => a.id)).toEqual(["claude", "codex", "claude-libra"]);
+    expect(r.answer().agents.map((a) => [a.id, a.hidden])).toEqual([["claude", false], ["codex", true], ["claude-libra", false]]);
   });
 
   it("follows a profile edited on disk: hidden, a mode disabled, with a change notice", async () => {
@@ -148,7 +148,7 @@ describe("the roster", () => {
     const r = await start();
     await expect.poll(() => readdir(join(dataDir, "agents")).catch(() => []), SOON).toEqual(["claude", "claude-libra", "codex"]);
     expect(await readFile(profilePath("claude-libra"), "utf8")).toBe("id: [\n");
-    expect(r.answer().agents.find((a) => a.id === "claude-libra")).toMatchObject({ profile: null, problem: expect.stringContaining("not valid YAML"), configDir: null });
+    expect(r.answer().agents.find((a) => a.id === "claude-libra")).toMatchObject({ profile: null, problem: expect.stringContaining("not valid YAML"), configDir: null, provider: "claude", kind: "folder", hidden: false });
     expect(r.list().find((a) => a.id === "claude-libra")).toMatchObject({ command: "claude-libra" });
     expect(r.list().find((a) => a.id === "claude")).toMatchObject({ command: "my-claude", modes: [{ id: "normal", name: "Normal", args: [] }] });
     expect(await readFile(profilePath("claude"), "utf8")).not.toContain("tags");
@@ -185,7 +185,7 @@ describe("the roster", () => {
   it("without a workspace holds the built-ins from first sight and keeps no profiles", async () => {
     const r = await start({ workspace: null });
     expect(ids(r)).toEqual(["claude", "codex"]);
-    expect(r.answer()).toMatchObject({ profilesOff: "No workspace is open.", agents: [{ id: "claude", profile: null }, { id: "codex", profile: null }] });
+    expect(r.answer()).toMatchObject({ profilesOff: "No workspace is open.", agents: [{ id: "claude", profile: null, provider: "claude", kind: "builtin" }, { id: "codex", profile: null, provider: "codex", kind: "builtin" }] });
   });
 
   it("writes a role and tags into agent.yaml, only those keys, keeping the file's comments and other keys, and answers the profile", async () => {

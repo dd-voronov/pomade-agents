@@ -1,0 +1,133 @@
+.roster {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.banner {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0 var(--space-4) var(--space-3);
+  padding: 7px var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+  line-height: 17px;
+}
+
+.banner svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.banner[data-tone="warn"] {
+  background: var(--warning-soft);
+}
+
+.banner[data-tone="warn"] svg {
+  color: var(--warning);
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  padding: 0 var(--space-4) var(--space-5);
+  overflow-y: auto;
+}
+
+/* Cards: as many columns as fit the three buttons of a card inside it (346 px, `AgentCard`'s). */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(346px, 100%), 1fr));
+  gap: var(--space-3);
+}
+
+.group {
+  margin: var(--space-4) 0 var(--space-2);
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  margin-left: -6px;
+  padding: 0 6px 0 2px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+}
+
+.toggle:hover {
+  background: var(--hover-bg);
+}
+
+.chevron {
+  display: inline-flex;
+  color: var(--text-faint);
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.toggle[aria-expanded="true"] .chevron {
+  transform: rotate(90deg);
+}
+
+.groupTitle {
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.groupCount {
+  color: var(--text-faint);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Only the built-ins: an invitation after them. */
+.first1 {
+  margin-top: var(--space-3);
+}
+
+.first {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 232px;
+  padding: var(--space-4);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  text-align: center;
+}
+
+.first b {
+  color: var(--text);
+  font-size: var(--fs-base);
+}
+
+.first p {
+  max-width: 300px;
+  margin: 0 0 var(--space-1);
+}
+
+.firstGlyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  background: var(--active-bg);
+  color: var(--text-muted);
+}

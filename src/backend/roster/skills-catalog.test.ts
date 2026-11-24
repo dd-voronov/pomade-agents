@@ -118,7 +118,7 @@ describe("the skills catalog with its settings", () => {
   });
 
   const roster: Pick<Roster, "answer" | "agent"> = {
-    answer: () => ({ epoch: "r", revision: 0, profilesOff: null, agents: [{ id: "claude-libra", name: "claude-libra", profile: null, problem: null, orphan: false, configDir: null, model: null, effort: null }] }),
+    answer: () => ({ epoch: "r", revision: 0, profilesOff: null, agents: [{ id: "claude-libra", name: "claude-libra", profile: null, problem: null, orphan: false, configDir: null, model: null, effort: null, provider: "claude", kind: "folder", hidden: false }] }),
     agent: () => ({ orphan: false, profile: { id: "claude-libra", provider: "claude", kind: "folder", configDir: "Agents/claude-libra", command: "claude-libra", tags: [], hidden: false, modes: {} } }),
   };
 

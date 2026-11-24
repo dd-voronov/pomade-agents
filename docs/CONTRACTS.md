@@ -28,7 +28,7 @@ folder without a `SKILL.md` whose frontmatter `name` is the folder's and whose `
 | `hostApi` | `0` |
 | `capabilities` | `project.read` (projects, their stable ids, names and folders, their visible agents) · `agentTabs.read` (each agent tab's session, folder, title and live state) · `agentTabs.write` (an agent tab's title, the unnamed mark) — the backend's project attribution, live state, tab titles and the project ↔ agent connection; the Sessions tab's and Live now's project names · `tabs.open` — Live now focuses agent tabs (`agentTabs.focus`) and opens a Runner run's attached terminal (`tabs.openAttached`); the backend's `sessions.open` does the same and resumes sessions (`agentTabs.resume`) · `files.read` — the Settings page's **Add folder…** asks Pomade's folder picker (`files.pickFolder`) · `project.write` — a new agent is connected to the projects chosen for it (`project.setAgents`, `roster.create`) |
 | `strip` | one icon, `agents` — action `panel` |
-| `events` | publishes `sessions.changed`, `roster.changed`, `liveNow.changed` and `roster.creating` (for its own UI frames) and `session.turnFinished` (declared, never published), `session.closed`, `session.statusChanged` ("Published events" below); subscribes to `pomade-agents:sessions.changed`, `pomade-agents:roster.changed`, `pomade-agents:liveNow.changed` and `pomade-agents:roster.creating` (its own, for its UI frames), `project.created`, `project.renamed` and `project.removed` (the backend, and the UI frames for project names) and, for the backend, `pomade.ready`, `agentTab.changed`, `agentTab.exited` and Runner's `pomade-runner:run.started`, `pomade-runner:run.finished` ("Subscribed events" below); publishes `skills.changed` and subscribes to `pomade-agents:skills.changed` (its own, for the Settings page and the Skills tab; "Skills" below) |
+| `events` | publishes `sessions.changed`, `roster.changed`, `liveNow.changed` and `roster.creating` (for its own UI frames) and `session.turnFinished` (declared, never published), `session.closed`, `session.statusChanged` ("Published events" below); subscribes to `pomade-agents:sessions.changed`, `pomade-agents:roster.changed`, `pomade-agents:liveNow.changed` and `pomade-agents:roster.creating` (its own, for its UI frames), `project.created`, `project.renamed` and `project.removed` (the backend, and the UI frames for project names), `project.updated` (the Roster's frame, for the agents each project offers) and, for the backend, `pomade.ready`, `agentTab.changed`, `agentTab.exited` and Runner's `pomade-runner:run.started`, `pomade-runner:run.finished` ("Subscribed events" below); publishes `skills.changed` and subscribes to `pomade-agents:skills.changed` (its own, for the Settings page and the Skills tab; "Skills" below) |
 | `backend` | `backend/main.mjs`, mode `with-pomade` |
 | `api` | the methods of "Published API" below — `sessions.forRepo`, `sessions.liveIn` and `roster.list` among them, which Pomade reads (HOST-API §4, "Platform reads of app APIs") |
 | `commands` | one, `pomade-agents` — entry `cli/pomade-agents.mjs` ("Command" below) |
@@ -51,6 +51,9 @@ One UI bundle; `welcome.surface` and the frame's route pick the view (`src/ui/co
 | tab | `settings` | the app's Settings — the skill folders ("Skills" below) |
 | tab | `sessions?agent=<id>&project=<id>` | Sessions — as `sessions`, with the Agent and Project filters preset (below) |
 
+- **The Roster list's navigation** (`RosterActions`, `src/ui/roster/list/actions.ts`): the name and
+  **Open ›** of a card or row navigate the tab to `agentRoute(agent, "overview")`, **Connected to** to
+  `agentRoute(agent, "projects")`, **New agent** to `NEW_AGENT_ROUTE`.
 - `sessions` is the route Pomade's History icon opens (HOST-API §4 `apps`, "Platform reads of app
   APIs").
 - **The selection is the route.** `<id>` is the session id, URI-encoded (`sessionsRoute`,
@@ -174,6 +177,7 @@ it the same way. Method names and shapes are in `src/shared/api.ts`, `src/shared
 | `roster.setModel` | `RosterSetModelParams` `{ agent, model?: string \| null, effort?: string \| null }` | `AgentModelConfig` (the app's own frames) |
 | `skills.link` | `SkillLinkParams` `{ agent, name, target }` | `SkillLinkResult` (the app's own frames) |
 | `skills.unlink` | `SkillUnlinkParams` `{ agent, name }` | `SkillLinkResult` (the app's own frames) |
+| `roster.connections` | — | `RosterConnectionsAnswer` `{ connections: { agent, projects }[] }` (the app's own frames) |
 
 ```ts
 interface AppInfo {
@@ -630,6 +634,9 @@ type RosterEntry = {
   configDir: string | null;       // the profile's, absolute
   model: string | null;           // from the provider's config: settings.json `model` (Claude Code),
   effort: string | null;          // `effortLevel`; config.toml top-level `model`, `model_reasoning_effort` (Codex)
+  provider: "claude" | "codex";   // what answers for the agent: its usable profile, else its first-sight
+  kind: "builtin" | "folder";     // values — so a file that cannot be used still gives the three
+  hidden: boolean;
 };
 type RosterAgentsAnswer = {
   epoch: string;                  // one backend run
@@ -638,6 +645,29 @@ type RosterAgentsAnswer = {
   profilesOff: string | null;     // why no profiles are kept (no workspace open)
 };
 ```
+
+**`roster.connections`** — every agent's connected projects in one read, for the Roster tab's
+**Connected to** (DESIGN §3.3); read from Pomade on every call like `projectsFor`, never kept:
+
+```ts
+type RosterConnectionsAnswer = { connections: { agent: string; projects: string[] }[] };
+```
+
+- One entry per agent the roster answers for, in roster order, an orphan and an agent that
+  neither a profile nor the scan answers for left out; `projects` are stable project ids in the
+  Projects panel's order (the Workspace not among them), the projects whose visible agents list the
+  agent or are `["*"]`.
+- A hidden agent is answered by the project setting all the same (`projectsFor` answers `[]` for
+  it, being the "+" menu's reading); an agent no project offers has `[]`.
+- No workspace open: every entry has `[]`.
+
+**The Roster's reading** (`src/ui/roster/useRoster.ts`, shared by the list and the agent's page, which takes `patchProfile` from it): `roster.agents` and
+`roster.connections` asked together, and again on `roster.changed` and on `project.created`,
+`project.renamed`, `project.removed` and `project.updated`; the agents' counts are `useAgentCounts`
+("Agent counts" below). Every card and row reads from these: the order and the hidden section
+(`sections`), the model line, **Connected to** (`rankConnected` over the connected projects and the
+agent's `ProjectCounts`, `fitCount` for how many names a field's width holds, `src/ui/roster/list/`).
+The view (cards or list) is kept in the frame's `localStorage` under `pomade-agents.roster.view`.
 
 **Change notice — `roster.changed`** `{ epoch, revision }`: published whenever `roster.agents`
 would answer differently. The roster is small: a frame behind it asks `roster.agents` again, whole.

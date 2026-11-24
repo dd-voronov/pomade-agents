@@ -263,7 +263,7 @@ export function NewAgentPage({ host, navigate }: Props): ReactElement {
   return (
     <div className={styles.page} data-testid="new-agent" data-phase={run.phase}>
       <header className={styles.head}>
-        <button type="button" className={styles.crumb} onClick={() => navigate(ROSTER_ROUTE)}>
+        <button type="button" className={styles.crumb} data-testid="new-agent-back" onClick={() => navigate(ROSTER_ROUTE)}>
           <BackGlyph />
           Roster
         </button>

@@ -21,6 +21,7 @@ import {
   ROSTER_AGENTS_METHOD,
   ROSTER_CHECK_ALIAS_METHOD,
   ROSTER_CHECK_NAME_METHOD,
+  ROSTER_CONNECTIONS_METHOD,
   ROSTER_CREATE_METHOD,
   ROSTER_LAUNCH_SPEC_METHOD,
   ROSTER_LIST_METHOD,
@@ -35,6 +36,7 @@ import {
   type LaunchSpecParams,
   type NameVerdict,
   type RosterAgentsForResult,
+  type RosterConnectionsAnswer,
   type RosterProjectsForResult,
   ROSTER_MODEL_CONFIG_METHOD,
   ROSTER_SET_MODEL_METHOD,
@@ -67,7 +69,7 @@ import {
 import { SESSIONS_AGENT_COUNTS_METHOD, agentCounts, type AgentCountsAnswer } from "../../shared/work-sessions.ts";
 import type { RealPath } from "../core/real-paths.ts";
 import type { BoundTabs } from "../sessions/bound-tabs.ts";
-import { agentsFor, projectsFor, type ProjectReads } from "../roster/connections.ts";
+import { agentsFor, connectionsOf, projectsFor, type ProjectReads } from "../roster/connections.ts";
 import { launchSpec } from "../roster/launch-spec.ts";
 import { checkProfileEdit } from "../roster/profile-edit.ts";
 import { enabledModes, resolveConfigDir, type Roster } from "../roster/roster.ts";
@@ -381,6 +383,12 @@ export function createApi({ info, sessions, live, tabs, liveNow, realPath, roste
     [SKILLS_UNLINK_METHOD]: (raw) => {
       const params = paramsOf(raw);
       return skills.unlink(nameOf(params, "agent", "a roster id"), nameOf(params, "name", "an entry name of skills/"));
+    },
+    [ROSTER_CONNECTIONS_METHOD]: async (): Promise<RosterConnectionsAnswer> => {
+      const { agents, profilesOff } = roster.answer();
+      const ids = agents.filter((entry) => roster.agent(entry.id)?.orphan === false).map((entry) => entry.id);
+      // With no workspace open there is no project for an agent to be connected to.
+      return { connections: profilesOff === null ? await connectionsOf(ids, projects) : ids.map((agent) => ({ agent, projects: [] })) };
     },
   };
 }

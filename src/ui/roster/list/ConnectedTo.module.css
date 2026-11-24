@@ -1,0 +1,101 @@
+/* "7 (■ Pomade, ■ pomade-agents, …)": the field hangs 6 px to each side of its column, so its text
+   lines up with the other facts and its hover box has room. */
+.field {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: calc(100% + 12px);
+  height: 21px;
+  margin: -2px -6px;
+  padding: 0 6px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: inherit;
+  line-height: 21px;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.field:hover {
+  background: var(--active-bg);
+}
+
+.total {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.bracket,
+.punct {
+  flex: none;
+  color: var(--text-faint);
+  white-space: pre;
+}
+
+.item {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  min-width: 0;
+}
+
+.swatch {
+  display: inline-block;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-right: 5px;
+  border-radius: 2px;
+  background: var(--row-tint-blue-strong);
+}
+
+.swatch[data-tint="red"] {
+  background: var(--row-tint-red-strong);
+}
+.swatch[data-tint="amber"] {
+  background: var(--row-tint-amber-strong);
+}
+.swatch[data-tint="green"] {
+  background: var(--row-tint-green-strong);
+}
+.swatch[data-tint="teal"] {
+  background: var(--row-tint-teal-strong);
+}
+.swatch[data-tint="purple"] {
+  background: var(--row-tint-purple-strong);
+}
+
+/* Cut to size by `ConnectedTo` itself, so the … sits right after the last letter. */
+.name {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.more {
+  flex: none;
+  color: var(--text-faint);
+}
+
+/* While the widths are read every part stands at its natural width. */
+.field[data-measure] .item {
+  flex: none;
+}
+
+.item[hidden],
+.more[hidden] {
+  display: none;
+}
+
+.none {
+  color: var(--text-faint);
+}
+
+.none:hover {
+  color: var(--text-muted);
+}

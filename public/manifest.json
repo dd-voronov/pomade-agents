@@ -38,6 +38,7 @@
       "project.created",
       "project.renamed",
       "project.removed",
+      "project.updated",
       "agentTab.changed",
       "agentTab.exited",
       "pomade-runner:run.started",
@@ -81,7 +82,8 @@
     "roster.modelConfig",
     "roster.setModel",
     "skills.link",
-    "skills.unlink"
+    "skills.unlink",
+    "roster.connections"
   ],
   "commands": [
     {

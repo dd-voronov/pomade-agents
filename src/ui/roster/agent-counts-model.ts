@@ -29,7 +29,7 @@ export function countsByAgent(answer: AgentCountsAnswer): ReadonlyMap<string, Ag
 
 /** This week's work sessions and ~$ across agents: the Roster header's. `costUsd` is `null` when no
  *  session in the week has an estimate. */
-export function weekTotal(agents: Iterable<AgentCounts>): AgentCounts["week"] {
+export function weekTotal(agents: Iterable<Pick<AgentCounts, "week">>): AgentCounts["week"] {
   let sessions = 0;
   let costUsd: number | null = null;
   for (const { week } of agents) {

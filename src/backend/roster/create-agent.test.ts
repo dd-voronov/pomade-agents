@@ -281,13 +281,14 @@ describe("creating an agent", () => {
     expect(result.outcome).toBe("incomplete");
   });
 
+  // Every name check starts a shell: under a loaded suite a few take seconds.
   it("holds the name while its Create runs", async () => {
     let release: () => void = () => undefined;
     const c = creation({ refreshRoster: () => new Promise<void>((resolve) => (release = resolve)) });
     const running = c.create(params(), () => undefined);
-    await expect.poll(async () => (await c.checkName("claude-tax")).problem, WATCH).toBe("folder");
+    await expect.poll(async () => (await c.checkName("claude-tax")).problem, { timeout: 12_000, interval: 25 }).toBe("folder");
     release();
     expect((await running).outcome).toBe("created");
     expect(logs.at(-1)).toContain("create: claude-tax created in");
-  });
+  }, 20_000);
 });

@@ -39,7 +39,7 @@ describe("manifest.json", () => {
     expect(parsed.manifest.capabilities).toEqual(["project.read", "agentTabs.read", "agentTabs.write", "tabs.open", "files.read", "project.write"]);
     expect(parsed.manifest.events).toEqual({
       publish: ["sessions.changed", ROSTER_CHANGED_EVENT, LIVE_NOW_CHANGED_EVENT, SESSION_TURN_FINISHED_EVENT, SESSION_CLOSED_EVENT, SESSION_STATUS_CHANGED_EVENT, SKILLS_CHANGED_EVENT, ROSTER_CREATING_EVENT],
-      subscribe: ["pomade-agents:sessions.changed", "pomade-agents:roster.changed", `pomade-agents:${LIVE_NOW_CHANGED_EVENT}`, "pomade.ready", "project.created", "project.renamed", "project.removed", "agentTab.changed", "agentTab.exited", RUN_STARTED_EVENT, RUN_FINISHED_EVENT, `pomade-agents:${SKILLS_CHANGED_EVENT}`, `pomade-agents:${ROSTER_CREATING_EVENT}`],
+      subscribe: ["pomade-agents:sessions.changed", "pomade-agents:roster.changed", `pomade-agents:${LIVE_NOW_CHANGED_EVENT}`, "pomade.ready", "project.created", "project.renamed", "project.removed", "project.updated", "agentTab.changed", "agentTab.exited", RUN_STARTED_EVENT, RUN_FINISHED_EVENT, `pomade-agents:${SKILLS_CHANGED_EVENT}`, `pomade-agents:${ROSTER_CREATING_EVENT}`],
     });
   });
 
