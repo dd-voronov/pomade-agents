@@ -364,7 +364,7 @@ test("a route names an agent the roster does not hold, or no tab: the page says 
 
   pomade.fake.openAppTab({ projectId: "alpha", route: `roster/${LIBRA}` });
   await expect(frame.getByTestId("agent-page")).toHaveAttribute("data-tab", "overview");
-  for (const [tab, title] of [["skills", "Skills"], ["projects", "Projects"]] as const) {
+  for (const [tab, title] of [["projects", "Projects"]] as const) {
     await frame.getByTestId(`agent-tab-${tab}`).click();
     await expect(frame.getByTestId(`agent-${tab}`)).toContainText(title);
     await expect(frame.getByTestId(`agent-${tab}`)).toContainText("not built yet");

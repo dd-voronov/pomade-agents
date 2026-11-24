@@ -76,7 +76,7 @@ import { foundSessions } from "../sessions/for-runner.ts";
 import type { LiveNow } from "../sessions/live-now.ts";
 import type { LiveState } from "../sessions/live-state.ts";
 import type { SessionData } from "../sessions/session-data.ts";
-import { SETTINGS_SET_SKILL_FOLDERS_METHOD, SKILLS_CATALOG_METHOD } from "../../shared/skills.ts";
+import { SETTINGS_SET_SKILL_FOLDERS_METHOD, SKILLS_CATALOG_METHOD, SKILLS_LINK_METHOD, SKILLS_UNLINK_METHOD } from "../../shared/skills.ts";
 import type { SkillsCatalogService } from "../roster/skills-catalog.ts";
 
 export interface ApiSources {
@@ -93,7 +93,7 @@ export interface ApiSources {
   /** Open / Resume the session, through the connection the API is served on (`open.ts`). */
   open: (id: string) => Promise<SessionsOpenResult>;
   /** The skill folders and the skills catalog (`skills-catalog.ts`). */
-  skills: Pick<SkillsCatalogService, "read" | "setFolders">;
+  skills: Pick<SkillsCatalogService, "read" | "setFolders" | "link" | "unlink">;
   /** Creating agents (`create-agent.ts`), its progress published as `roster.creating`; absent or
    *  `null` when no profiles are kept (no workspace open). */
   creation?: AgentCreationSource | null;
@@ -373,6 +373,14 @@ export function createApi({ info, sessions, live, tabs, liveNow, realPath, roste
       const params = paramsOf(raw);
       const agent = nameOf(params, "agent", "a roster id");
       return (await roster.setModel(agent, modelChangeOf(params))) as unknown as JsonValue;
+    },
+    [SKILLS_LINK_METHOD]: (raw) => {
+      const params = paramsOf(raw);
+      return skills.link(nameOf(params, "agent", "a roster id"), nameOf(params, "name", "an entry name of skills/"), nameOf(params, "target", "a skill's folder, workspace-relative or absolute"));
+    },
+    [SKILLS_UNLINK_METHOD]: (raw) => {
+      const params = paramsOf(raw);
+      return skills.unlink(nameOf(params, "agent", "a roster id"), nameOf(params, "name", "an entry name of skills/"));
     },
   };
 }

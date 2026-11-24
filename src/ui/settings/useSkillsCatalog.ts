@@ -2,7 +2,8 @@
 // `skills.catalog`), then again whenever the backend's `skills.changed` says the folder list
 // changed, and whenever the tab comes back into view — the catalog is read from disk on request, so
 // skills and links made meanwhile show then. While the backend does not answer, it asks again
-// every second.
+// every second. A change made here — the folder list, a skill's link — sets the catalog its answer
+// carries.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { HostClient } from "pomade-kit/sdk";
@@ -11,10 +12,16 @@ import {
   SETTINGS_SET_SKILL_FOLDERS_METHOD,
   SKILLS_CATALOG_METHOD,
   SKILLS_CHANGED_EVENT,
+  SKILLS_LINK_METHOD,
+  SKILLS_UNLINK_METHOD,
   isSetSkillFoldersResult,
+  isSkillLinkResult,
   isSkillsCatalog,
   isSkillsChanged,
   type SetSkillFoldersResult,
+  type SkillLinkParams,
+  type SkillLinkResult,
+  type SkillUnlinkParams,
   type SkillsCatalog,
 } from "../../shared/skills.ts";
 
@@ -26,6 +33,10 @@ export interface SkillsCatalogState {
   catalog: SkillsCatalog | null;
   /** Write `folders` as the list; the catalog follows the answer. Rejects as the call does. */
   setFolders: (folders: string[]) => Promise<SetSkillFoldersResult>;
+  /** Make a link in an agent's `skills/` (`skills.link`); the catalog follows the answer. Rejects as the call does. */
+  link: (params: SkillLinkParams) => Promise<SkillLinkResult>;
+  /** Take a link out of an agent's `skills/` (`skills.unlink`); the catalog follows the answer. Rejects as the call does. */
+  unlink: (params: SkillUnlinkParams) => Promise<SkillLinkResult>;
 }
 
 export function useSkillsCatalog(host: HostClient): SkillsCatalogState {
@@ -95,5 +106,18 @@ export function useSkillsCatalog(host: HostClient): SkillsCatalogState {
     [host],
   );
 
-  return { catalog, setFolders };
+  const write = useCallback(
+    async (method: string, params: SkillLinkParams | SkillUnlinkParams): Promise<SkillLinkResult> => {
+      const answer = await host.apps.call(host.welcome.appId, method, params, { timeoutMs: ANSWER_TIMEOUT_MS });
+      if (!isSkillLinkResult(answer)) throw new Error("The backend's answer was malformed.");
+      if (answer.ok) setCatalog(answer.catalog);
+      else void askRef.current();
+      return answer;
+    },
+    [host],
+  );
+  const link = useCallback((params: SkillLinkParams) => write(SKILLS_LINK_METHOD, params), [write]);
+  const unlink = useCallback((params: SkillUnlinkParams) => write(SKILLS_UNLINK_METHOD, params), [write]);
+
+  return { catalog, setFolders, link, unlink };
 }

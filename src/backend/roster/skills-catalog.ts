@@ -7,7 +7,8 @@
 //   symlinked folders are followed once each (by real path), at most `MAX_DEPTH` deep.
 // - **Read on request.** Every `read` walks the listed folders and the agents' `skills/` folders
 //   anew, so a skill added or removed on disk, and a link made or taken away, show on the next
-//   read. The folder list itself is followed as it changes (`skills.changed`).
+//   read. The folder list itself is followed as it changes (`skills.changed`), and so is every
+//   link the Skills tab makes or takes away through `link` / `unlink` (`skill-links.ts`).
 // - **Matching** is by real path: a link points at a skill when both resolve to the same folder,
 //   and into a listed folder when its target resolves inside it — or, for a broken link, when the
 //   path it names lies inside it.
@@ -19,7 +20,8 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { readFrontmatter } from "pomade-kit/protocol";
 import { HostError } from "pomade-kit/sdk";
 
-import { SKILL_FILE, type AgentSkillEntry, type AgentSkills, type CatalogSkill, type SetSkillFoldersResult, type SkillFolder, type SkillsCatalog, type SkillsChanged } from "../../shared/skills.ts";
+import { linkSkill, unlinkSkill, type LinkWrite } from "./skill-links.ts";
+import { SKILL_FILE, type AgentSkillEntry, type AgentSkills, type CatalogSkill, type SetSkillFoldersResult, type SkillFolder, type SkillLinkResult, type SkillsCatalog, type SkillsChanged } from "../../shared/skills.ts";
 import type { SkillFolderSettings } from "../settings/settings.ts";
 import { resolveConfigDir, type Roster } from "./roster.ts";
 
@@ -173,7 +175,8 @@ export async function readCatalog(workspace: string, roots: readonly string[], f
       }
       if (link === null) {
         if (!(await isFolder(path))) continue;
-        entries.push({ name, kind: "own", target: null, targetPath: null, broken: false, folder: null, listed: false, targetFolder: null });
+        const { description } = await skillFacts(path);
+        entries.push({ name, kind: "own", target: null, targetPath: null, broken: false, folder: null, listed: false, targetFolder: null, description });
         continue;
       }
       const target = isAbsolute(link) ? link : resolve(agent.skillsDir, link);
@@ -189,6 +192,7 @@ export async function readCatalog(workspace: string, roots: readonly string[], f
         folder,
         listed: folder !== null,
         targetFolder: show(dirname(real ?? target)),
+        description: real === null ? null : (await skillFacts(real)).description,
       });
       if (real !== null) {
         const skill = skills.find((s) => s.real === real);
@@ -230,7 +234,11 @@ export interface SkillsCatalogService {
   read(): Promise<SkillsCatalog>;
   /** Replace the list of skill folders (`settings.setSkillFolders`). */
   setFolders(folders: string[]): Promise<SetSkillFoldersResult>;
-  /** Called when the folder list changes (`skills.changed`); returns an unsubscribe function. */
+  /** Make the link `<agent's skills/>/<name>` → `target` (workspace-relative or absolute) (`skills.link`). */
+  link(agent: string, name: string, target: string): Promise<SkillLinkResult>;
+  /** Take the link `<agent's skills/>/<name>` away (`skills.unlink`). */
+  unlink(agent: string, name: string): Promise<SkillLinkResult>;
+  /** Called when the folder list changes or a link is made or taken away here (`skills.changed`); returns an unsubscribe function. */
   onChange(listener: (changed: SkillsChanged) => void): () => void;
   stop(): void;
 }
@@ -260,11 +268,31 @@ export function startSkillsCatalog(options: SkillsCatalogOptions): SkillsCatalog
     return { epoch, revision: at, ...answer, foldersOff };
   };
 
-  const unsubscribe = settings.onChange(() => {
+  const changed = (): void => {
     revision++;
-    const changed = { epoch, revision };
-    for (const listener of listeners) listener(changed);
-  });
+    const now = { epoch, revision };
+    for (const listener of listeners) listener(now);
+  };
+  const unsubscribe = settings.onChange(changed);
+
+  /** The `skills/` of a Claude Code agent of the roster; `not-found` for any other. */
+  const skillsDirOf = (agent: string): string => {
+    const found = catalogAgents().find((a) => a.id === agent);
+    if (found === undefined) throw new HostError("not-found", `No Claude Code agent ${JSON.stringify(agent)} in the roster: only a Claude Code agent has a skills folder`);
+    return found.skillsDir;
+  };
+
+  const write = async (run: () => Promise<LinkWrite>): Promise<SkillLinkResult> => {
+    let result: LinkWrite;
+    try {
+      result = await run();
+    } catch (err) {
+      throw new HostError("io-error", err instanceof Error ? err.message : String(err));
+    }
+    if (!result.ok) return result;
+    changed();
+    return { ok: true, target: result.target, catalog: await read() };
+  };
 
   return {
     read,
@@ -279,6 +307,16 @@ export function startSkillsCatalog(options: SkillsCatalogOptions): SkillsCatalog
       }
       if (!result.ok) return result;
       return { ok: true, catalog: await read() };
+    },
+    async link(agent, name, target) {
+      if (workspace === null) throw new HostError("not-ready", "No workspace is open in Pomade, so skills cannot be linked.");
+      const dir = skillsDirOf(agent);
+      return write(() => linkSkill(dir, name, isAbsolute(target) ? target : join(workspace, target), workspace));
+    },
+    async unlink(agent, name) {
+      if (workspace === null) throw new HostError("not-ready", "No workspace is open in Pomade, so skills cannot be unlinked.");
+      const dir = skillsDirOf(agent);
+      return write(() => unlinkSkill(dir, name));
     },
     onChange(listener) {
       listeners.add(listener);

@@ -145,6 +145,7 @@ test("Remove warns naming the agents whose links depend on the folder; its skill
     folder: null,
     listed: false,
     targetFolder: "Knowledge/_skills/wiki",
+    description: "The wiki-query skill.",
   });
   expect((await lstat(join(sandbox.workspace, "Agents", LIBRA, "skills", "wiki-query"))).isSymbolicLink()).toBe(true);
   expect((await lstat(join(sandbox.home, ".claude", "skills", "wiki-query"))).isSymbolicLink()).toBe(true);

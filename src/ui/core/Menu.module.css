@@ -91,3 +91,92 @@
   margin: var(--space-1) var(--space-2);
   background: var(--border);
 }
+
+.wide {
+  width: 380px;
+  max-width: calc(100vw - 16px);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-weight: var(--fw-medium);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.twoLines {
+  display: flex;
+  flex-direction: column;
+}
+
+.labelMain,
+.detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.labelMain {
+  font-weight: var(--fw-medium);
+}
+
+.detail {
+  color: var(--text-faint);
+  font-size: var(--fs-xs);
+}
+
+.item:hover .detail,
+.item:focus-visible .detail {
+  color: var(--badge-fg);
+  opacity: 0.8;
+}
+
+/* The search field stays in view while the items under it scroll. */
+.search {
+  position: sticky;
+  top: calc(-1 * var(--space-1));
+  z-index: 1;
+  display: flex;
+  flex: none;
+  align-items: center;
+  margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-1)) var(--space-1);
+  padding: calc(var(--space-1) + 2px) calc(var(--space-1) + 2px) 2px;
+  background: var(--panel-raised);
+}
+
+.search > svg {
+  position: absolute;
+  left: calc(var(--space-1) + 10px);
+  color: var(--text-faint);
+  pointer-events: none;
+}
+
+.search input {
+  width: 100%;
+  height: 28px;
+  padding: 0 8px 0 28px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--panel-raised);
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  appearance: none;
+}
+
+.search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.search input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.note {
+  flex: none;
+  padding: 6px var(--space-2);
+  color: var(--text-faint);
+  font-size: var(--fs-xs);
+}

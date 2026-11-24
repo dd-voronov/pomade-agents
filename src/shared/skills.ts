@@ -10,7 +10,13 @@ export const SKILLS_CATALOG_METHOD = "skills.catalog";
 /** Replace the list of skill folders; answers `SetSkillFoldersResult`. */
 export const SETTINGS_SET_SKILL_FOLDERS_METHOD = "settings.setSkillFolders";
 
-/** Published by the backend, unqualified, whenever the list of skill folders changes; payload `SkillsChanged`. */
+/** Make a link in an agent's `skills/`; answers `SkillLinkResult`. */
+export const SKILLS_LINK_METHOD = "skills.link";
+
+/** Take a link out of an agent's `skills/`; answers `SkillLinkResult`. */
+export const SKILLS_UNLINK_METHOD = "skills.unlink";
+
+/** Published by the backend, unqualified, whenever the list of skill folders changes or the app makes or takes away a link; payload `SkillsChanged`. */
 export const SKILLS_CHANGED_EVENT = "skills.changed";
 
 /** The folders the catalog reads while `settings.yaml` has no `skillFolders` key. */
@@ -67,6 +73,8 @@ export type AgentSkillEntry = {
   listed: boolean;
   /** The parent folder of the target, as `targetPath` is written (a broken link's from `target`); where the Skills tab groups a link whose folder is not listed. `null` for an own skill. */
   targetFolder: string | null;
+  /** The `description` of the skill's `SKILL.md` frontmatter (an own skill's, a link's target's); `null` when there is none. */
+  description: string | null;
 };
 
 /** One Claude Code agent's `skills/` folder. */
@@ -97,6 +105,15 @@ export type SetSkillFoldersParams = { folders: string[] };
 
 /** The catalog with the new list, or the folder refused and why (nothing is written then). */
 export type SetSkillFoldersResult = { ok: true; catalog: SkillsCatalog } | { ok: false; folder: string; reason: string };
+
+/** `skills.link`: make `<agent's skills/>/<name>` a link to `target` — workspace-relative, or absolute. */
+export type SkillLinkParams = { agent: string; name: string; target: string };
+
+/** `skills.unlink`: take the link `<agent's skills/>/<name>` away. */
+export type SkillUnlinkParams = { agent: string; name: string };
+
+/** The catalog after the write and the link's target (absolute: made, or taken away — what Undo links again); or why nothing was written. */
+export type SkillLinkResult = { ok: true; target: string; catalog: SkillsCatalog } | { ok: false; reason: string };
 
 /** `skills.changed`: the revision `skills.catalog` answers now. */
 export type SkillsChanged = { epoch: string; revision: number };
@@ -131,7 +148,8 @@ function isAgentSkillEntry(v: unknown): v is AgentSkillEntry {
     typeof v.broken === "boolean" &&
     isStringOrNull(v.folder) &&
     typeof v.listed === "boolean" &&
-    isStringOrNull(v.targetFolder)
+    isStringOrNull(v.targetFolder) &&
+    isStringOrNull(v.description)
   );
 }
 
@@ -165,4 +183,11 @@ export function isSetSkillFoldersResult(value: unknown): value is SetSkillFolder
 /** True for a well-formed `skills.changed` payload. */
 export function isSkillsChanged(value: unknown): value is SkillsChanged {
   return isObject(value) && typeof value.epoch === "string" && typeof value.revision === "number";
+}
+
+/** True for a well-formed `skills.link` / `skills.unlink` answer. */
+export function isSkillLinkResult(value: unknown): value is SkillLinkResult {
+  if (!isObject(value)) return false;
+  if (value.ok === true) return typeof value.target === "string" && isSkillsCatalog(value.catalog);
+  return value.ok === false && typeof value.reason === "string";
 }

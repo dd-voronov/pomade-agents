@@ -87,7 +87,13 @@ function api() {
   return { handlers: createApi({ info, sessions, live, tabs, liveNow: { answer: () => ({ epoch: "l", revision: 0, rows: [] }) }, realPath: (p) => Promise.resolve(p), roster, projects, open: (id) => {
     calls.push(["open", id]);
     return Promise.resolve({ opened: "resumed", tabId: "t1", session: testSession({ id }) });
-  }, skills: { read: () => Promise.reject(new Error("not called")), setFolders: () => Promise.reject(new Error("not called")) } }), calls };
+  }, skills: { read: () => Promise.reject(new Error("not called")), setFolders: () => Promise.reject(new Error("not called")), link: (agent, name, target) => {
+    calls.push(["link", agent, name, target]);
+    return Promise.resolve({ ok: false, reason: "stub" });
+  }, unlink: (agent, name) => {
+    calls.push(["unlink", agent, name]);
+    return Promise.resolve({ ok: false, reason: "stub" });
+  } } }), calls };
 }
 
 const call = (method: string, params: unknown): unknown => {
@@ -353,5 +359,27 @@ describe("the roster API", () => {
     await expect(Promise.resolve().then(() => projectsFor("ghost"))).rejects.toMatchObject({ code: "not-found" });
     await expect(Promise.resolve().then(() => handlers["roster.agentsFor"]?.({ project: "" }, ctx))).rejects.toMatchObject({ code: "invalid-params" });
     await expect(Promise.resolve().then(() => handlers["roster.projectsFor"]?.({}, ctx))).rejects.toMatchObject({ code: "invalid-params" });
+  });
+});
+
+describe("the skills links API", () => {
+  const ctx = { from: "pomade-agents" };
+  it("passes a link and an unlink on to the catalog", async () => {
+    const { handlers, calls } = api();
+    await handlers["skills.link"]?.({ agent: "claude-pm", name: "grill-me", target: "Agents/_shared/skills/grill-me" }, ctx);
+    expect(calls.at(-1)).toEqual(["link", "claude-pm", "grill-me", "Agents/_shared/skills/grill-me"]);
+    await handlers["skills.unlink"]?.({ agent: "claude-pm", name: "grill-me" }, ctx);
+    expect(calls.at(-1)).toEqual(["unlink", "claude-pm", "grill-me"]);
+  });
+
+  it.each<[string, string, unknown]>([
+    ["skills.link", "no agent", { name: "x", target: "y" }],
+    ["skills.link", "no name", { agent: "a", target: "y" }],
+    ["skills.link", "no target", { agent: "a", name: "x" }],
+    ["skills.link", "a target that is not text", { agent: "a", name: "x", target: 3 }],
+    ["skills.unlink", "no name", { agent: "a" }],
+    ["skills.unlink", "params that are not an object", "a"],
+  ])("refuses %s with %s as invalid-params", async (method, _, params) => {
+    await expect(Promise.resolve().then(() => api().handlers[method]?.(params as never, ctx))).rejects.toMatchObject({ code: "invalid-params" });
   });
 });

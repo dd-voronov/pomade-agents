@@ -1,0 +1,139 @@
+/* The Skills tab (layout: prototypes/roster): a lead line over one block of groups; each group a
+   28 px head (the folder path, the count of links on, a mark for a folder not listed) over 28 px
+   rows — switch, name, description, "also in". A row's columns are fixed, so switching changes
+   colour only and never moves a row. Below 560 px the description gives way. */
+
+.lead {
+  margin: -4px 0 var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  line-height: 17px;
+}
+
+.code {
+  padding: 1px 4px;
+  border-radius: var(--radius-sm);
+  background: var(--active-bg);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
+.group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 28px;
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.box + .box > .group {
+  border-top: 1px solid var(--border);
+}
+
+.src {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.count {
+  flex: none;
+  color: var(--text-faint);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+.note {
+  flex: none;
+  margin-left: auto;
+  color: color-mix(in srgb, var(--warning) 62%, var(--text));
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 26px minmax(120px, 172px) minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-3);
+  height: 28px;
+  padding: 0 var(--space-4);
+  font-size: var(--fs-sm);
+}
+
+.row + .row {
+  border-top: 1px solid var(--border);
+}
+
+.row[data-on="false"] .name,
+.row[data-on="false"] .desc {
+  color: var(--text-faint);
+}
+
+.name {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: var(--fw-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desc {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.also {
+  max-width: 220px;
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: var(--fs-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row[data-on="true"] .brokenText,
+.brokenMark {
+  color: color-mix(in srgb, var(--warning) 62%, var(--text));
+}
+
+.brokenText {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+}
+
+.own {
+  justify-self: start;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--active-bg);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: var(--fw-semibold);
+  line-height: 14px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+@container (max-width: 560px) {
+  .row {
+    grid-template-columns: 26px minmax(0, 1fr) auto;
+  }
+
+  .desc {
+    display: none;
+  }
+}

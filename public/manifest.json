@@ -79,7 +79,9 @@
     "roster.permissions",
     "roster.memory",
     "roster.modelConfig",
-    "roster.setModel"
+    "roster.setModel",
+    "skills.link",
+    "skills.unlink"
   ],
   "commands": [
     {

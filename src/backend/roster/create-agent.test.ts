@@ -128,8 +128,13 @@ describe("creating an agent", () => {
 
     it("refuses a name whose profile exists without its folder", async () => {
       await mkdir(join(dataDir, "agents", "claude-gone"), { recursive: true });
-      await writeFile(join(dataDir, "agents", "claude-gone", "agent.yaml"), "id: claude-gone\nprovider: claude\nkind: folder\nconfigDir: Agents/elsewhere\ncommand: claude-gone\n");
-      await expect.poll(() => records.profiles.get("claude-gone") !== undefined, WATCH).toBe(true);
+      // Written again on every poll: FSEvents may miss a write made while the watch starts.
+      await expect
+        .poll(async () => {
+          await writeFile(join(dataDir, "agents", "claude-gone", "agent.yaml"), "id: claude-gone\nprovider: claude\nkind: folder\nconfigDir: Agents/elsewhere\ncommand: claude-gone\n");
+          return records.profiles.get("claude-gone") !== undefined;
+        }, WATCH)
+        .toBe(true);
       expect((await creation().checkName("claude-gone")).problem).toBe("agent");
     });
   });

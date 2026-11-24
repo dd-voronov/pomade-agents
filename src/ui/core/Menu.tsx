@@ -1,15 +1,21 @@
 // A context menu: entries (items, section heads, separators) in a raised box over a transparent
 // scrim, placed at a point (a right-click) or under an element (a ⋯ button) and kept inside the
 // window. The first item takes focus; ↑ ↓ move between items, Enter or a click runs one and closes
-// the menu, Esc or a click outside closes it.
+// the menu, Esc or a click outside closes it. A menu with a search field (a long list to pick from)
+// focuses the field instead: typing filters, ↓ moves to the items, Enter runs the first one.
 
 import { useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactElement, type ReactNode } from "react";
 
-import { CheckIcon } from "./icons.tsx";
+import { CheckIcon, SearchIcon } from "./icons.tsx";
 import styles from "./Menu.module.css";
 
 export type MenuEntry =
-  | { kind: "head"; label: string }
+  | {
+      kind: "head";
+      label: string;
+      /** A path as the head: monospace, as written (not upper case). */
+      mono?: boolean;
+    }
   | { kind: "separator" }
   | {
       kind: "item";
@@ -21,16 +27,24 @@ export type MenuEntry =
       checked?: boolean;
       /** A key or a count after the label. */
       trail?: string;
+      /** A second, fainter line under the label (a description), cut to one line. */
+      detail?: string;
       /** Shown dimmed and not run; keys skip it. `why` is its tooltip. */
       disabled?: { why: string };
       run: () => void;
-    };
+    }
+  /** A search field at the top; the caller filters the entries by its value. */
+  | { kind: "search"; value: string; placeholder: string; onChange: (value: string) => void }
+  /** A faint line of text, such as why a list is empty. */
+  | { kind: "note"; text: string };
 
 /** Where the menu opens: at a point, or under (else over) an element's box. */
 export type MenuAnchor = { x: number; y: number } | DOMRect;
 
 /** The items keys move between: a disabled one takes no focus. */
 const ENABLED_ITEM = "[role^='menuitem']:not(:disabled)";
+/** The search field, when the menu has one. */
+const SEARCH = "input[type='search']";
 
 /** Keeps this much room to the window's edges. */
 const EDGE = 8;
@@ -53,9 +67,11 @@ export interface MenuProps {
   onClose: () => void;
   label: string;
   testId?: string;
+  /** A wider box, for items with a description. */
+  wide?: boolean;
 }
 
-export function Menu({ entries, anchor, onClose, label, testId = "menu" }: MenuProps): ReactElement {
+export function Menu({ entries, anchor, onClose, label, testId = "menu", wide = false }: MenuProps): ReactElement {
   const box = useRef<HTMLDivElement>(null);
   const [at, setAt] = useState<{ left: number; top: number } | null>(null);
 
@@ -68,7 +84,7 @@ export function Menu({ entries, anchor, onClose, label, testId = "menu" }: MenuP
   // Once placed (a hidden box takes no focus), the first item takes focus.
   const placed = at !== null;
   useLayoutEffect(() => {
-    if (placed) box.current?.querySelector<HTMLButtonElement>(ENABLED_ITEM)?.focus();
+    if (placed) (box.current?.querySelector<HTMLElement>(SEARCH) ?? box.current?.querySelector<HTMLButtonElement>(ENABLED_ITEM))?.focus();
   }, [placed]);
 
   useLayoutEffect(() => {
@@ -84,7 +100,11 @@ export function Menu({ entries, anchor, onClose, label, testId = "menu" }: MenuP
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
     const items = [...(box.current?.querySelectorAll<HTMLButtonElement>(ENABLED_ITEM) ?? [])];
     const index = items.indexOf(document.activeElement as HTMLButtonElement);
+    const inSearch = event.target instanceof HTMLInputElement;
     if (event.key === "Escape" || event.key === "Tab") onClose();
+    else if (inSearch && event.key === "ArrowDown") items[0]?.focus();
+    else if (inSearch && event.key === "Enter") items[0]?.click();
+    else if (inSearch) return;
     else if (event.key === "ArrowDown") items[(index + 1) % items.length]?.focus();
     else if (event.key === "ArrowUp") items[(index - 1 + items.length) % items.length]?.focus();
     else if (event.key === "Home") items[0]?.focus();
@@ -107,7 +127,7 @@ export function Menu({ entries, anchor, onClose, label, testId = "menu" }: MenuP
       />
       <div
         ref={box}
-        className={styles.menu}
+        className={wide ? `${styles.menu} ${styles.wide}` : styles.menu}
         role="menu"
         aria-label={label}
         data-testid={testId}
@@ -119,8 +139,30 @@ export function Menu({ entries, anchor, onClose, label, testId = "menu" }: MenuP
           switch (entry.kind) {
             case "head":
               return (
-                <div key={i} className={styles.head} data-testid={`${testId}-head`}>
+                <div key={i} className={entry.mono === true ? `${styles.head} ${styles.mono}` : styles.head} data-testid={`${testId}-head`}>
                   {entry.label}
+                </div>
+              );
+            case "search":
+              return (
+                <div key={i} className={styles.search}>
+                  <SearchIcon size={14} />
+                  <input
+                    type="search"
+                    value={entry.value}
+                    placeholder={entry.placeholder}
+                    aria-label={entry.placeholder}
+                    autoComplete="off"
+                    spellCheck={false}
+                    data-testid={`${testId}-search`}
+                    onChange={(event) => entry.onChange(event.target.value)}
+                  />
+                </div>
+              );
+            case "note":
+              return (
+                <div key={i} className={styles.note} data-testid={`${testId}-note`}>
+                  {entry.text}
                 </div>
               );
             case "separator":
@@ -142,7 +184,14 @@ export function Menu({ entries, anchor, onClose, label, testId = "menu" }: MenuP
                   }}
                 >
                   <span className={styles.glyph}>{entry.checked === true ? <CheckIcon size={14} /> : entry.glyph}</span>
-                  <span className={styles.label}>{entry.label}</span>
+                  {entry.detail === undefined ? (
+                    <span className={styles.label}>{entry.label}</span>
+                  ) : (
+                    <span className={`${styles.label} ${styles.twoLines}`}>
+                      <span className={styles.labelMain}>{entry.label}</span>
+                      <span className={styles.detail}>{entry.detail}</span>
+                    </span>
+                  )}
                   {entry.trail !== undefined && <span className={styles.trail}>{entry.trail}</span>}
                 </button>
               );

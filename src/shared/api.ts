@@ -31,7 +31,7 @@ import {
   ROSTER_MODEL_CONFIG_METHOD,
   ROSTER_SET_MODEL_METHOD,
 } from "./roster.ts";
-import { SETTINGS_SET_SKILL_FOLDERS_METHOD, SKILLS_CATALOG_METHOD } from "./skills.ts";
+import { SETTINGS_SET_SKILL_FOLDERS_METHOD, SKILLS_CATALOG_METHOD, SKILLS_LINK_METHOD, SKILLS_UNLINK_METHOD } from "./skills.ts";
 
 /** Answers `AppInfo`: which backend is running and where it keeps the app's data. */
 export const APP_INFO_METHOD = "app.info";
@@ -67,6 +67,8 @@ export const API_METHODS = [
   ROSTER_MEMORY_METHOD,
   ROSTER_MODEL_CONFIG_METHOD,
   ROSTER_SET_MODEL_METHOD,
+  SKILLS_LINK_METHOD,
+  SKILLS_UNLINK_METHOD,
 ] as const;
 
 export interface AppInfo {

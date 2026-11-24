@@ -28,7 +28,7 @@ folder without a `SKILL.md` whose frontmatter `name` is the folder's and whose `
 | `hostApi` | `0` |
 | `capabilities` | `project.read` (projects, their stable ids, names and folders, their visible agents) · `agentTabs.read` (each agent tab's session, folder, title and live state) · `agentTabs.write` (an agent tab's title, the unnamed mark) — the backend's project attribution, live state, tab titles and the project ↔ agent connection; the Sessions tab's and Live now's project names · `tabs.open` — Live now focuses agent tabs (`agentTabs.focus`) and opens a Runner run's attached terminal (`tabs.openAttached`); the backend's `sessions.open` does the same and resumes sessions (`agentTabs.resume`) · `files.read` — the Settings page's **Add folder…** asks Pomade's folder picker (`files.pickFolder`) · `project.write` — a new agent is connected to the projects chosen for it (`project.setAgents`, `roster.create`) |
 | `strip` | one icon, `agents` — action `panel` |
-| `events` | publishes `sessions.changed`, `roster.changed`, `liveNow.changed` and `roster.creating` (for its own UI frames) and `session.turnFinished` (declared, never published), `session.closed`, `session.statusChanged` ("Published events" below); subscribes to `pomade-agents:sessions.changed`, `pomade-agents:roster.changed`, `pomade-agents:liveNow.changed` and `pomade-agents:roster.creating` (its own, for its UI frames), `project.created`, `project.renamed` and `project.removed` (the backend, and the UI frames for project names) and, for the backend, `pomade.ready`, `agentTab.changed`, `agentTab.exited` and Runner's `pomade-runner:run.started`, `pomade-runner:run.finished` ("Subscribed events" below); publishes `skills.changed` and subscribes to `pomade-agents:skills.changed` (its own, for the Settings page; "Skills" below) |
+| `events` | publishes `sessions.changed`, `roster.changed`, `liveNow.changed` and `roster.creating` (for its own UI frames) and `session.turnFinished` (declared, never published), `session.closed`, `session.statusChanged` ("Published events" below); subscribes to `pomade-agents:sessions.changed`, `pomade-agents:roster.changed`, `pomade-agents:liveNow.changed` and `pomade-agents:roster.creating` (its own, for its UI frames), `project.created`, `project.renamed` and `project.removed` (the backend, and the UI frames for project names) and, for the backend, `pomade.ready`, `agentTab.changed`, `agentTab.exited` and Runner's `pomade-runner:run.started`, `pomade-runner:run.finished` ("Subscribed events" below); publishes `skills.changed` and subscribes to `pomade-agents:skills.changed` (its own, for the Settings page and the Skills tab; "Skills" below) |
 | `backend` | `backend/main.mjs`, mode `with-pomade` |
 | `api` | the methods of "Published API" below — `sessions.forRepo`, `sessions.liveIn` and `roster.list` among them, which Pomade reads (HOST-API §4, "Platform reads of app APIs") |
 | `commands` | one, `pomade-agents` — entry `cli/pomade-agents.mjs` ("Command" below) |
@@ -172,6 +172,8 @@ it the same way. Method names and shapes are in `src/shared/api.ts`, `src/shared
 | `roster.memory` | `{ agent }` | `AgentMemory` (the app's own frames) |
 | `roster.modelConfig` | `{ agent }` | `AgentModelConfig` (the app's own frames) |
 | `roster.setModel` | `RosterSetModelParams` `{ agent, model?: string \| null, effort?: string \| null }` | `AgentModelConfig` (the app's own frames) |
+| `skills.link` | `SkillLinkParams` `{ agent, name, target }` | `SkillLinkResult` (the app's own frames) |
+| `skills.unlink` | `SkillUnlinkParams` `{ agent, name }` | `SkillLinkResult` (the app's own frames) |
 
 ```ts
 interface AppInfo {
@@ -875,8 +877,9 @@ type ProjectCounts = {
 
 The skill folders and the skills catalog (DESIGN §3.4, §3.8), all shapes in
 `src/shared/skills.ts`; `src/backend/settings/` keeps the folder list, `src/backend/roster/skills-catalog.ts`
-reads the catalog. The agent page's Skills tab and **Add skill** read `skills.catalog`; the
-Settings page (`src/ui/settings/`) reads it and changes the list.
+reads the catalog, `src/backend/roster/skill-links.ts` makes and takes away links. The agent
+page's Skills tab and **Add skill** read `skills.catalog` and switch links with `skills.link` /
+`skills.unlink`; the Settings page (`src/ui/settings/`) reads it and changes the list.
 
 **The folder list** — `settings.yaml`'s `skillFolders` ("Backend" below): workspace-relative POSIX
 folders, each read with its subfolders. No key (or no file): `Agents/_shared/skills`,
@@ -907,17 +910,22 @@ type AgentSkillEntry = {
   folder: string | null;          // the listed folder the target lies in; null: own, or not listed
   listed: boolean;                // folder !== null
   targetFolder: string | null;    // the target's parent, as targetPath is written: where a link into a folder no longer listed groups
+  description: string | null;     // SKILL.md frontmatter `description` of the own skill or the link's target; null: none, broken
 };
 type AgentSkills = { agent: string; dir: string; entries: AgentSkillEntry[] };   // dir: <config folder>/skills, absolute; entries by name
 type SkillsCatalog = {
   epoch: string;                  // one backend run
-  revision: number;               // counts changes of the folder list
+  revision: number;               // counts changes of the folder list and the links made or taken away here
   folders: SkillFolder[];         // the list's order
   skills: CatalogSkill[];         // by folder, then path
   agents: AgentSkills[];          // every Claude Code agent that is not an orphan, roster order (built-in claude: ~/.claude/skills)
   foldersOff: string | null;      // why the list cannot be changed now; null while it can
 };
 type SetSkillFoldersResult = { ok: true; catalog: SkillsCatalog } | { ok: false; folder: string; reason: string };
+type SkillLinkParams = { agent: string; name: string; target: string };   // target: workspace-relative or absolute
+type SkillUnlinkParams = { agent: string; name: string };
+type SkillLinkResult = { ok: true; target: string; catalog: SkillsCatalog } | { ok: false; reason: string };
+                                  // target: absolute — the link made, or the one taken away (what Undo links again)
 ```
 
 - **A skill** is a folder holding `SKILL.md`, at any depth of a listed folder (at most 8 deep);
@@ -943,8 +951,24 @@ type SetSkillFoldersResult = { ok: true; catalog: SkillsCatalog } | { ok: false;
   unusable (not YAML, not a mapping, a malformed `adoptedAt` or `skillFolders`) — then the
   catalog reads the default folders and the file is never written over.
 
+- **`skills.link({ agent, name, target })`** makes `<agent's skills/>/<name>` a symlink to
+  `target`; **`skills.unlink({ agent, name })`** takes that symlink away. Both answer the catalog
+  after the write. The rules (`skill-links.ts`): the write is only ever a direct child of the
+  agent's own `skills/` — `name` is one path segment, not starting with `.`, at most 255
+  characters; a `skills/` that is a symlink or not a folder is refused; a missing `skills/` is
+  made by `link` (its parent must exist). Only symlinks: `unlink` refuses a real folder (an own
+  skill) or a file, and never follows a link, so its target is untouched; `link` never replaces
+  an entry. **The link's form:** relative to `skills/` when both it and the target lie in the
+  workspace as Pomade names it (`../../_shared/skills/grill-me`, as the template's), else
+  absolute (`~/.claude/skills/grill-me` → `<workspace>/Agents/_shared/skills/grill-me`). A
+  refusal is `{ ok: false, reason }` with nothing written; `not-found` for an agent that is not
+  a Claude Code agent of the roster (Codex, an orphan); `not-ready` without a workspace;
+  `io-error` when the disk refuses.
+
 **Change notice — `skills.changed`** `{ epoch, revision }`: published whenever the folder list
-(or `foldersOff`) changes — through the app or by hand in `settings.yaml`.
+(or `foldersOff`) changes — through the app or by hand in `settings.yaml` — and after every link
+`skills.link` / `skills.unlink` makes or takes away, so every open frame reads again. A link made
+or removed by hand on disk is not announced: it shows on the next read.
 
 ## Command
 

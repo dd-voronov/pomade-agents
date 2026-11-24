@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readlink, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -55,7 +55,7 @@ describe("readCatalog", () => {
   });
 
   it("reads each agent's skills/: links into listed folders, links elsewhere, broken links and own skills", async () => {
-    await skill("Agents/_shared/skills/grill-me", "name: grill-me");
+    await skill("Agents/_shared/skills/grill-me", "name: grill-me\ndescription: Interview the user.");
     await skill("Knowledge/_skills/wiki/wiki-query", "name: wiki-query");
     await skill("Projects/kit/skills/kit-release", "name: kit-release");
     const libra = join(ws, "Agents/claude-libra/skills");
@@ -64,7 +64,7 @@ describe("readCatalog", () => {
     await symlink(join(ws, "Knowledge/_skills/wiki/wiki-query"), join(libra, "wiki-query"));
     await symlink("../../../Projects/kit/skills/kit-release", join(libra, "kit-release"));
     await symlink("../../_shared/skills/gone", join(libra, "gone"));
-    await skill("Agents/claude-libra/skills/vault-audit", "name: vault-audit");
+    await skill("Agents/claude-libra/skills/vault-audit", "name: vault-audit\ndescription: Audit the vault.");
     await writeFile(join(libra, "notes.txt"), "a file is no skill\n");
     const claude = join(home, ".claude/skills");
     await mkdir(claude, { recursive: true });
@@ -86,11 +86,11 @@ describe("readCatalog", () => {
     expect(read.agents.map((a) => a.agent)).toEqual(["claude", "claude-libra", "claude-pm"]);
     expect(read.agents[2]?.entries).toEqual([]);
     expect(read.agents[1]?.entries).toEqual([
-      { name: "gone", kind: "link", target: join(ws, "Agents/_shared/skills/gone"), targetPath: null, broken: true, folder: "Agents/_shared/skills", listed: true, targetFolder: "Agents/_shared/skills" },
-      { name: "grill-me", kind: "link", target: join(ws, "Agents/_shared/skills/grill-me"), targetPath: "Agents/_shared/skills/grill-me", broken: false, folder: "Agents/_shared/skills", listed: true, targetFolder: "Agents/_shared/skills" },
-      { name: "kit-release", kind: "link", target: join(ws, "Projects/kit/skills/kit-release"), targetPath: "Projects/kit/skills/kit-release", broken: false, folder: null, listed: false, targetFolder: "Projects/kit/skills" },
-      { name: "vault-audit", kind: "own", target: null, targetPath: null, broken: false, folder: null, listed: false, targetFolder: null },
-      { name: "wiki-query", kind: "link", target: join(ws, "Knowledge/_skills/wiki/wiki-query"), targetPath: "Knowledge/_skills/wiki/wiki-query", broken: false, folder: "Knowledge/_skills", listed: true, targetFolder: "Knowledge/_skills/wiki" },
+      { name: "gone", kind: "link", target: join(ws, "Agents/_shared/skills/gone"), targetPath: null, broken: true, folder: "Agents/_shared/skills", listed: true, targetFolder: "Agents/_shared/skills", description: null },
+      { name: "grill-me", kind: "link", target: join(ws, "Agents/_shared/skills/grill-me"), targetPath: "Agents/_shared/skills/grill-me", broken: false, folder: "Agents/_shared/skills", listed: true, targetFolder: "Agents/_shared/skills", description: "Interview the user." },
+      { name: "kit-release", kind: "link", target: join(ws, "Projects/kit/skills/kit-release"), targetPath: "Projects/kit/skills/kit-release", broken: false, folder: null, listed: false, targetFolder: "Projects/kit/skills", description: null },
+      { name: "vault-audit", kind: "own", target: null, targetPath: null, broken: false, folder: null, listed: false, targetFolder: null, description: "Audit the vault." },
+      { name: "wiki-query", kind: "link", target: join(ws, "Knowledge/_skills/wiki/wiki-query"), targetPath: "Knowledge/_skills/wiki/wiki-query", broken: false, folder: "Knowledge/_skills", listed: true, targetFolder: "Knowledge/_skills/wiki", description: null },
     ]);
   });
 
@@ -166,5 +166,29 @@ describe("the skills catalog with its settings", () => {
     expect((await catalog.read()).folders.map((f) => f.path)).toEqual(["Agents/_shared/skills", "Knowledge/_skills"]);
     await expect(catalog.setFolders([])).rejects.toMatchObject({ code: "not-ready" });
     expect(await readFile(file, "utf8")).toBe("skillFolders: [\n");
+  });
+
+  it("links and unlinks a skill in the agent's skills/: the catalog answered shows it, and the change is heard", async () => {
+    await skill("Agents/_shared/skills/grill-me", "name: grill-me");
+    await mkdir(join(ws, "Agents/claude-libra"), { recursive: true });
+    const { catalog, heard } = await start();
+    const libra = join(ws, "Agents/claude-libra/skills");
+
+    const linked = await catalog.link("claude-libra", "grill-me", "Agents/_shared/skills/grill-me");
+    expect(linked).toMatchObject({ ok: true, target: join(ws, "Agents/_shared/skills/grill-me") });
+    expect(linked.ok && linked.catalog.skills[0]?.agents).toEqual(["claude-libra"]);
+    expect(await readlink(join(libra, "grill-me"))).toBe("../../_shared/skills/grill-me");
+    expect(heard).toEqual([1]);
+    expect(linked.ok && linked.catalog.revision).toBe(1);
+
+    expect(await catalog.link("claude-libra", "grill-me", "Agents/_shared/skills/grill-me")).toEqual({ ok: false, reason: "skills/grill-me already exists." });
+    expect(heard).toEqual([1]);
+
+    const unlinked = await catalog.unlink("claude-libra", "grill-me");
+    expect(unlinked).toMatchObject({ ok: true, target: join(ws, "Agents/_shared/skills/grill-me") });
+    expect(unlinked.ok && unlinked.catalog.agents[0]?.entries).toEqual([]);
+    expect(heard).toEqual([1, 2]);
+
+    await expect(catalog.link("claude-pm", "grill-me", "Agents/_shared/skills/grill-me")).rejects.toMatchObject({ code: "not-found" });
   });
 });
