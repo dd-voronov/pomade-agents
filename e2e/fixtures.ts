@@ -31,7 +31,7 @@ interface Fixtures {
    *  `agentTabs.resume` finds, the workspace's files, its projects with the agents each offers and
    *  the roster `agentTabs.launch` accepts (`test.use({ pomadeSeed: { agentTabs: [...] } })`);
    *  nothing by default, the projects `alpha` and `beta`. */
-  pomadeSeed: Pick<FakeHostOptions, "agentTabs" | "sessions" | "files" | "projects" | "activeProject" | "roster">;
+  pomadeSeed: Pick<FakeHostOptions, "agentTabs" | "sessions" | "files" | "projects" | "groups" | "activeProject" | "roster">;
   manifest: AppManifest;
   sandbox: Sandbox;
   pomade: FakePomade;

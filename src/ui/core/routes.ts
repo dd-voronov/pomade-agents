@@ -67,11 +67,18 @@ export function agentRoute(agent: string, tab: AgentTab = "overview"): string {
   return `${ROSTER_ROUTE}/${encodeURIComponent(agent)}/${tab}`;
 }
 
+/** The route of an agent's Sessions tab filtered to one project: `roster/<agent>/sessions?project=<id>`;
+ *  with no project, the tab's own route. */
+export function agentSessionsRoute(agent: string, project: string | null): string {
+  const route = agentRoute(agent, "sessions");
+  return project === null ? route : `${route}?${new URLSearchParams({ project }).toString()}`;
+}
+
 /** The agent and tab an agent-page route names; `null` for the Roster itself and for `roster/new…`, since `new` never names an agent.
- *  A route with no tab, or one this build does not know, opens Overview. */
+ *  A route with no tab, or one this build does not know, opens Overview. A query is not part of the tab (`agentProjectOf`). */
 export function agentPageOf(route: string): { agent: string; tab: AgentTab } | null {
   if (isNewAgentRoute(route)) return null;
-  const [head, id, tab, ...rest] = route.split("/");
+  const [head, id, tab, ...rest] = route.split("?")[0]?.split("/") ?? [];
   if (head !== ROSTER_ROUTE || id === undefined || id === "" || rest.length > 0) return null;
   if (id === "new") return null;
   let agent: string;
@@ -81,6 +88,15 @@ export function agentPageOf(route: string): { agent: string; tab: AgentTab } | n
     return null;
   }
   return { agent, tab: AGENT_TABS.find((known) => known === tab) ?? "overview" };
+}
+
+/** The project an agent page's route filters the Sessions tab to (`agentSessionsRoute`); `null` for none, and for any other tab. */
+export function agentProjectOf(route: string): string | null {
+  const page = agentPageOf(route);
+  if (page === null || page.tab !== "sessions") return null;
+  const query = route.split("?")[1];
+  const project = query === undefined ? null : new URLSearchParams(query).get("project");
+  return project === null || project === "" ? null : project;
 }
 
 /** What the Sessions tab opens with: the agent and the project its filters start on. */

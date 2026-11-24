@@ -6,7 +6,8 @@
 
 import { useLayoutEffect, useMemo, useRef, useState, type ReactElement } from "react";
 
-import { NAME_MAX_WIDTH, connectedTitle, connectedTotal, cutName, fitCount, projectTint, type ConnectedProject } from "./connected-model.ts";
+import { ProjectSwatch } from "../ProjectSwatch.tsx";
+import { NAME_MAX_WIDTH, connectedTitle, connectedTotal, cutName, fitCount, type ConnectedProject } from "./connected-model.ts";
 import styles from "./ConnectedTo.module.css";
 
 export interface ConnectedToProps {
@@ -89,7 +90,7 @@ export function ConnectedTo({ agent, agentName, ranked, projects, max, onOpen }:
       {candidates.map((project, i) => (
         <span key={project.id} className={styles.item} data-item hidden={i >= shown}>
           {i > 0 && <span className={styles.punct}>, </span>}
-          <span className={styles.swatch} data-tint={projectTint(project.id)} aria-hidden="true" />
+          <ProjectSwatch id={project.id} className={styles.swatch} />
           <span className={styles.name} data-name>
             {labels[i] ?? project.name}
           </span>

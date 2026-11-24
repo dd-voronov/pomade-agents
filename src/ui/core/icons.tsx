@@ -267,6 +267,16 @@ export function DocIcon({ size = 16 }: IconProps): ReactElement {
   );
 }
 
+/** A closed padlock — a setting that cannot be changed here. */
+export function LockIcon({ size = 16 }: IconProps): ReactElement {
+  return (
+    <Glyph size={size}>
+      <rect x="3.5" y="7" width="9" height="6.5" rx="1.25" />
+      <path d="M5.5 7V5.25a2.5 2.5 0 0 1 5 0V7" />
+    </Glyph>
+  );
+}
+
 /** A key — an agent that is not logged in yet. */
 export function KeyIcon({ size = 16 }: IconProps): ReactElement {
   return (

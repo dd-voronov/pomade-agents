@@ -45,29 +45,7 @@
 }
 
 .swatch {
-  display: inline-block;
-  flex: none;
-  width: 8px;
-  height: 8px;
   margin-right: 5px;
-  border-radius: 2px;
-  background: var(--row-tint-blue-strong);
-}
-
-.swatch[data-tint="red"] {
-  background: var(--row-tint-red-strong);
-}
-.swatch[data-tint="amber"] {
-  background: var(--row-tint-amber-strong);
-}
-.swatch[data-tint="green"] {
-  background: var(--row-tint-green-strong);
-}
-.swatch[data-tint="teal"] {
-  background: var(--row-tint-teal-strong);
-}
-.swatch[data-tint="purple"] {
-  background: var(--row-tint-purple-strong);
 }
 
 /* Cut to size by `ConnectedTo` itself, so the … sits right after the last letter. */

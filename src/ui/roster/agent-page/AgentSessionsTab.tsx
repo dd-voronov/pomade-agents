@@ -9,7 +9,7 @@ import { WORKSPACE_PROJECT_ID } from "pomade-kit/protocol";
 import { CaretIcon, SessionsIcon } from "../../core/icons.tsx";
 import { LiveMark } from "../../core/LiveMark.tsx";
 import { Menu, type MenuAnchor, type MenuEntry } from "../../core/Menu.tsx";
-import { sessionsFilterRoute } from "../../core/routes.ts";
+import { agentSessionsRoute, sessionsFilterRoute } from "../../core/routes.ts";
 import { useNow } from "../../core/useNow.ts";
 import { WORKSPACE_TARGET } from "../../sessions/edit-model.ts";
 import { STATUS_SHORT_LABELS, formatAgo, formatMoney, formatStamp, liveTitle, projectLabel, rowName, statusOf } from "../../sessions/table-model.ts";
@@ -24,16 +24,18 @@ import rows from "./sessions-tab.module.css";
 const CLOCK_MS = 30_000;
 
 export function AgentSessionsTab({ context }: { context: AgentContext }): ReactElement {
-  const { host, entry, projects, show } = context;
+  const { host, entry, projects, show, navigate, sessionsProject: project } = context;
   const { copy } = useSessions(host);
   const now = useNow(CLOCK_MS);
-  const [project, setProject] = useState<string | null>(null);
   const [menu, setMenu] = useState<MenuAnchor | null>(null);
   const filter = useRef<HTMLButtonElement>(null);
   const names = useMemo(() => new Map([...projects].map(([id, p]) => [id, p.name])), [projects]);
   const listed = useMemo(() => agentSessions(copy?.byId.values() ?? [], entry.id, project, names), [copy, entry.id, project, names]);
   const { rows: sessions, total } = listed;
   const projectName = project === null ? null : project === WORKSPACE_PROJECT_ID ? WORKSPACE_TARGET : (names.get(project) ?? project);
+
+  /** The Project filter is the route's: a reload and a restart of Pomade keep it. */
+  const setProject = (next: string | null): void => navigate(agentSessionsRoute(entry.id, next));
 
   const entries: MenuEntry[] = [
     { kind: "item", id: "project-all", label: "All projects", checked: project === null, trail: String(listed.projects.all), run: () => setProject(null) },

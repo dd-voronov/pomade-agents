@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { NEW_AGENT_ROUTE, agentPageOf, agentRoute, cloneSourceOf, isNewAgentRoute, newAgentRoute, selectedSessionOf, sessionsFilterRoute, sessionsPresetOf, sessionsRoute, viewFor } from "./routes.ts";
+import { NEW_AGENT_ROUTE, agentPageOf, agentProjectOf, agentRoute, agentSessionsRoute, cloneSourceOf, isNewAgentRoute, newAgentRoute, selectedSessionOf, sessionsFilterRoute, sessionsPresetOf, sessionsRoute, viewFor } from "./routes.ts";
 
 describe("viewFor", () => {
   it("shows Live now in the panel, whatever the route", () => {
@@ -82,6 +82,31 @@ describe("the agent page's route", () => {
 
   it("shows every agent-page route in the Roster view", () => {
     expect(viewFor("tab", agentRoute("claude-libra", "sessions"))).toBe("roster");
+    expect(viewFor("tab", agentSessionsRoute("claude-libra", "alpha"))).toBe("roster");
+  });
+});
+
+describe("the agent page's Sessions tab filtered to a project", () => {
+  it("names the project after `sessions?project=`, and the plain tab route for none", () => {
+    expect(agentSessionsRoute("claude-libra", "alpha")).toBe("roster/claude-libra/sessions?project=alpha");
+    expect(agentSessionsRoute("claude-libra", null)).toBe("roster/claude-libra/sessions");
+  });
+
+  it("keeps the agent and the tab whatever the query says", () => {
+    expect(agentPageOf("roster/claude-libra/sessions?project=alpha")).toEqual({ agent: "claude-libra", tab: "sessions" });
+    expect(agentPageOf("roster/claude-libra/projects?project=alpha")).toEqual({ agent: "claude-libra", tab: "projects" });
+  });
+
+  it("reads the project back, URI-encoded ids included", () => {
+    for (const project of ["alpha", "a/b&c=d", "ünï %41", "__workspace__"]) {
+      expect(agentProjectOf(agentSessionsRoute("a b", project))).toBe(project);
+    }
+  });
+
+  it("names no project on another tab, with no query, with an empty one, or on a route that is no agent's page", () => {
+    for (const route of ["roster/a/sessions", "roster/a/sessions?", "roster/a/sessions?project=", "roster/a/sessions?other=1", "roster/a/memory?project=x", "roster?project=x", "sessions?project=x", "roster/new?project=x"]) {
+      expect(agentProjectOf(route)).toBeNull();
+    }
   });
 });
 

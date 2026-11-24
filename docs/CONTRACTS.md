@@ -26,9 +26,9 @@ folder without a `SKILL.md` whose frontmatter `name` is the folder's and whose `
 |---|---|
 | `id` · `name` | `pomade-agents` · Agents |
 | `hostApi` | `0` |
-| `capabilities` | `project.read` (projects, their stable ids, names and folders, their visible agents) · `agentTabs.read` (each agent tab's session, folder, title and live state) · `agentTabs.write` (an agent tab's title, the unnamed mark) — the backend's project attribution, live state, tab titles and the project ↔ agent connection; the Sessions tab's and Live now's project names · `tabs.open` — Live now focuses agent tabs (`agentTabs.focus`) and opens a Runner run's attached terminal (`tabs.openAttached`); the backend's `sessions.open` does the same and resumes sessions (`agentTabs.resume`) · `files.read` — the Settings page's **Add folder…** asks Pomade's folder picker (`files.pickFolder`) · `project.write` — a new agent is connected to the projects chosen for it (`project.setAgents`, `roster.create`) |
+| `capabilities` | `project.read` (projects, their stable ids, names and folders, their visible agents) · `agentTabs.read` (each agent tab's session, folder, title and live state) · `agentTabs.write` (an agent tab's title, the unnamed mark) — the backend's project attribution, live state, tab titles and the project ↔ agent connection; the Sessions tab's and Live now's project names · `tabs.open` — Live now focuses agent tabs (`agentTabs.focus`) and opens a Runner run's attached terminal (`tabs.openAttached`); the backend's `sessions.open` does the same and resumes sessions (`agentTabs.resume`) · `files.read` — the Settings page's **Add folder…** asks Pomade's folder picker (`files.pickFolder`) · `project.write` — a new agent is connected to the projects chosen for it (`project.setAgents`, `roster.create`), and the agent page's Projects tab connects and disconnects an agent (`project.setAgents`, from the frame) |
 | `strip` | one icon, `agents` — action `panel` |
-| `events` | publishes `sessions.changed`, `roster.changed`, `liveNow.changed` and `roster.creating` (for its own UI frames) and `session.turnFinished` (declared, never published), `session.closed`, `session.statusChanged` ("Published events" below); subscribes to `pomade-agents:sessions.changed`, `pomade-agents:roster.changed`, `pomade-agents:liveNow.changed` and `pomade-agents:roster.creating` (its own, for its UI frames), `project.created`, `project.renamed` and `project.removed` (the backend, and the UI frames for project names), `project.updated` (the Roster's frame, for the agents each project offers) and, for the backend, `pomade.ready`, `agentTab.changed`, `agentTab.exited` and Runner's `pomade-runner:run.started`, `pomade-runner:run.finished` ("Subscribed events" below); publishes `skills.changed` and subscribes to `pomade-agents:skills.changed` (its own, for the Settings page and the Skills tab; "Skills" below) |
+| `events` | publishes `sessions.changed`, `roster.changed`, `liveNow.changed` and `roster.creating` (for its own UI frames) and `session.turnFinished` (declared, never published), `session.closed`, `session.statusChanged` ("Published events" below); subscribes to `pomade-agents:sessions.changed`, `pomade-agents:roster.changed`, `pomade-agents:liveNow.changed` and `pomade-agents:roster.creating` (its own, for its UI frames), `project.created`, `project.renamed` and `project.removed` (the backend, and the UI frames for project names), `project.updated` (the Roster's and the agent page's frames, for the agents each project offers and its group) and, for the backend, `pomade.ready`, `agentTab.changed`, `agentTab.exited` and Runner's `pomade-runner:run.started`, `pomade-runner:run.finished` ("Subscribed events" below); publishes `skills.changed` and subscribes to `pomade-agents:skills.changed` (its own, for the Settings page and the Skills tab; "Skills" below) |
 | `backend` | `backend/main.mjs`, mode `with-pomade` |
 | `api` | the methods of "Published API" below — `sessions.forRepo`, `sessions.liveIn` and `roster.list` among them, which Pomade reads (HOST-API §4, "Platform reads of app APIs") |
 | `commands` | one, `pomade-agents` — entry `cli/pomade-agents.mjs` ("Command" below) |
@@ -48,6 +48,7 @@ One UI bundle; `welcome.surface` and the frame's route pick the view (`src/ui/co
 | tab | `roster/new` | Roster — the New agent page (`NEW_AGENT_ROUTE`) |
 | tab | `roster/new?clone=<id>` | Roster — the New agent page as a clone of agent `<id>` (`newAgentRoute`, `cloneSourceOf`) |
 | tab | `roster/<agent>`, `roster/<agent>/<tab>` | Roster — the agent's page on `<tab>` (below) |
+| tab | `roster/<agent>/sessions?project=<id>` | Roster — the agent's Sessions tab with its Project filter on `<id>` (`agentSessionsRoute`, `agentProjectOf`) |
 | tab | any other `roster/…` | Roster |
 | tab | `settings` | the app's Settings — the skill folders ("Skills" below) |
 | tab | `sessions?agent=<id>&project=<id>` | Sessions — as `sessions`, with the Agent and Project filters preset (below) |
@@ -82,6 +83,23 @@ One UI bundle; `welcome.surface` and the frame's route pick the view (`src/ui/co
   `roster.changed` like the Roster, and `roster.permissions` / `roster.memory` /
   `roster.modelConfig` / `roster.launchSpec` for its tabs; each
   tab is one file under `tabs.tsx` that takes an `AgentContext` (`agent-context.ts`).
+- **The Sessions tab's Project filter is the route's** — `roster/<agent>/sessions?project=<id>`
+  (`agentSessionsRoute`, the id URI-encoded; `agentProjectOf` reads it, `AgentContext.sessionsProject`).
+  Choosing a project in the filter, **Clear**, and a row of the Projects tab are the tab navigating
+  to that route, so a reload and a restart of Pomade keep the filter. `agentPageOf` ignores the query.
+- **The Projects tab** (`ProjectsTab.tsx`, `projects-model.ts`) reads `project.list`
+  (`ProjectInfo.groupId`, `groupPath`: the sidebar's groups, in the Projects panel's order), each
+  project's `project.getAgents` (`useVisibleAgents.ts`, again on `project.created`,
+  `project.renamed`, `project.removed` and `project.updated`) and the agent's `ProjectCounts` from
+  `sessions.agentCounts` ("Agent counts" below): **Sessions (90 d)** is `sessions`, **Last session**
+  is `lastAt`, and a project missing from `projects` shows "—". A project is connected when its
+  list names the agent or is `["*"]` (locked). **Connect** and **Disconnect** (`project-offers.ts`)
+  read the project's list, edit that list and write it back whole with `project.setAgents`
+  (capability `project.write`), so another change made meanwhile is kept; a project offering
+  `["*"]` is never rewritten from here, and the list is not rewritten when the agent is already in
+  (or out of) it. Undo is the inverse edit on the list read again: a Connect is undone by removing
+  the agent, a Disconnect by inserting it at its old place. The Workspace is not a row: it offers
+  every agent.
 - **Open in the editor** — Open CLAUDE.md, Open agent.yaml, Open `settings.json` and a memory
   file are `tabs.openFile` in the project in front (HOST-API §4): the path is workspace-relative
   inside the workspace (as Pomade names it, or resolved), else absolute (`openPathOf`). A refusal

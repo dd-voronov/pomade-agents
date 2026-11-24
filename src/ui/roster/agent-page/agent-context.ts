@@ -2,7 +2,7 @@
 // tab needs to act — the host, the project names, a toast, opening a file in Pomade's editor, saving
 // the profile. Each tab is one file that takes this and nothing else.
 
-import type { ProjectRef } from "pomade-kit/protocol";
+import type { ProjectInfo } from "pomade-kit/protocol";
 import type { HostClient } from "pomade-kit/sdk";
 
 import type { RosterEntry } from "../../../shared/roster.ts";
@@ -21,8 +21,10 @@ export interface AgentContext {
   roots: WorkspaceRoots;
   /** `<workspace>/Apps/pomade-agents`, absolute; `null` without a workspace. */
   dataDir: string | null;
-  /** Pomade's projects by stable id; empty until Pomade has answered. */
-  projects: ReadonlyMap<string, ProjectRef>;
+  /** Pomade's projects by stable id, in the Projects panel's order; empty until Pomade has answered. */
+  projects: ReadonlyMap<string, ProjectInfo>;
+  /** Pomade has answered `project.list`: an empty `projects` then means the workspace has none. */
+  projectsRead: boolean;
   /** Each agent's work-session counts (this week, last active, per project); `null` until the first answer. */
   counts: AgentCountsView | null;
   /** The current time, renewed every 30 s: relative times stay true. */
@@ -31,6 +33,8 @@ export interface AgentContext {
   /** Open an absolute path in Pomade's editor. */
   openFile: (absolute: string) => void;
   profileEdit: ProfileEdit;
+  /** The project the route filters the Sessions tab to (`agentSessionsRoute`); `null` for none. */
+  sessionsProject: string | null;
   /** Move this tab to a route (`tabs.setRoute`). */
   navigate: (route: string) => void;
 }

@@ -34,13 +34,16 @@ export interface AgentPageProps {
   host: HostClient;
   agent: string;
   tab: AgentTab;
+  /** The project the route filters the Sessions tab to; `null` for none. */
+  project: string | null;
   navigate: (route: string) => void;
 }
 
-export function AgentPage({ host, agent, tab, navigate }: AgentPageProps): ReactElement {
+export function AgentPage({ host, agent, tab, project, navigate }: AgentPageProps): ReactElement {
   const { answer, patchProfile } = useRoster(host);
   const backend = useBackendInfo(host);
-  const projects = useProjects(host) ?? NO_PROJECTS;
+  const projectList = useProjects(host);
+  const projects = projectList ?? NO_PROJECTS;
   const now = useNow(CLOCK_MS);
   const counts = useAgentCounts(host, rosterWindows(now));
   const toasts = useToast();
@@ -54,7 +57,7 @@ export function AgentPage({ host, agent, tab, navigate }: AgentPageProps): React
   const context: AgentContext | null =
     answer === null || entry === undefined
       ? null
-      : { host, entry, revision: answer.revision, profilesOff: answer.profilesOff, roots, dataDir: info?.dataDir ?? null, projects, counts, now, show, openFile, profileEdit, navigate };
+      : { host, entry, revision: answer.revision, profilesOff: answer.profilesOff, roots, dataDir: info?.dataDir ?? null, projects, projectsRead: projectList !== null, counts, now, show, openFile, profileEdit, sessionsProject: project, navigate };
 
   if (answer === null) {
     const down = backend.status === "down";
