@@ -5,7 +5,7 @@
 // without markup in strings.
 
 import { AGENT_NAME_MAX, nameRuleProblem } from "../../../shared/agent-name.ts";
-import type { CreateAgentResult, CreateStep, CreateStepId, NameVerdict, RosterEntry } from "../../../shared/roster.ts";
+import { ROLE_MAX, TAGS_MAX, TAG_MAX, type CreateAgentResult, type CreateStep, type CreateStepId, type NameVerdict, type RosterEntry } from "../../../shared/roster.ts";
 
 /** A run of text: plain, or a name or path shown as code. */
 export type Part = string | { code: string };
@@ -92,10 +92,26 @@ export function cloneable(agents: readonly RosterEntry[]): RosterEntry[] {
   return agents.filter((a) => a.profile !== null && a.profile.provider === "claude" && a.profile.kind === "folder" && !a.orphan);
 }
 
-/** What a clone pre-fills from its source: the role line, the tags, and the projects (of those the
- *  form lists) that list the source among their agents. */
+/** What a clone pre-fills from its source: the role line, the tags — both cut to the limits a new
+ *  agent holds — and the projects (of those the form lists) that list the source among their agents. */
 export function clonePrefill(source: RosterEntry, projects: readonly { id: string; agents: readonly string[] }[]): { role: string; tags: string[]; projects: string[] } {
-  return { role: source.profile?.role ?? "", tags: [...(source.profile?.tags ?? [])], projects: projects.filter((p) => p.agents.includes(source.id)).map((p) => p.id) };
+  const tags = (source.profile?.tags ?? []).map((tag) => tag.slice(0, TAG_MAX).trim()).filter((tag, i, all) => tag !== "" && all.indexOf(tag) === i);
+  return {
+    role: (source.profile?.role ?? "").slice(0, ROLE_MAX),
+    tags: tags.slice(0, TAGS_MAX),
+    projects: projects.filter((p) => p.agents.includes(source.id)).map((p) => p.id),
+  };
+}
+
+/** The fields the user has changed since the page opened: a clone source's values never replace them. */
+export type Touched = { role: boolean; tags: boolean; projects: boolean };
+
+export const UNTOUCHED: Touched = { role: false, tags: false, projects: false };
+
+/** The form's role, tags and projects once a clone source's `fill` is taken: each field the user left
+ *  alone takes the source's value, the others keep theirs. */
+export function takePrefill(form: { role: string; tags: string[]; projects: string[] }, touched: Touched, fill: { role: string; tags: string[]; projects: string[] }): { role: string; tags: string[]; projects: string[] } {
+  return { role: touched.role ? form.role : fill.role, tags: touched.tags ? form.tags : fill.tags, projects: touched.projects ? form.projects : fill.projects };
 }
 
 /** Where the first tab opens: the first project checked, in the form's order, else the Workspace. */
@@ -142,13 +158,6 @@ export function stepLabel(id: CreateStepId, name: string, projectNames: readonly
     case "open":
       return `Open a ${name} tab in ${openIn}`;
   }
-}
-
-/** Add the tags typed into `raw` (comma-separated), trimmed and lowercased, each once. */
-export function addTags(tags: readonly string[], raw: string): string[] {
-  const next = [...tags];
-  for (const tag of raw.split(",").map((t) => t.trim().toLowerCase())) if (tag !== "" && !next.includes(tag)) next.push(tag);
-  return next;
 }
 
 /** Where the page is:

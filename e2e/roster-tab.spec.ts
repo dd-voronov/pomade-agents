@@ -157,7 +157,7 @@ test.describe("the Roster with a full roster", () => {
       await expect(tab.getByTestId("agent-card-codex").getByTestId("chip-hidden")).toBeVisible();
       await expect(tab.getByTestId("agent-card-codex").getByTestId("chip-built-in")).toBeVisible();
       const broken = tab.getByTestId("agent-card-claude-broken");
-      await expect(broken.getByTestId("chip-unreadable")).toHaveText("agent.yaml can't be read");
+      await expect(broken.getByTestId("chip-unreadable")).toHaveText("agent.yaml can’t be read");
       await expect(broken.getByTestId("chip-unreadable")).toHaveAttribute("title", /not valid YAML/);
       const orphan = tab.getByTestId("agent-card-claude-writer");
       await expect(orphan.getByTestId("chip-orphan")).toBeVisible();

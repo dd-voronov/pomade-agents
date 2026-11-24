@@ -1,6 +1,6 @@
 // The agent page's header: ← Roster, the name with its state chips, Start session ▾ and the ⋯
 // menu — the Roster card's own (`commands/`): Clone…, Hide / Show in the "+" menu, Open CLAUDE.md,
-// Open agent.yaml; then the provider, the model and the launch command; then a notice for what needs
+// Open agent.yaml; then the id (when the name differs), the provider, the model and the launch command; then a notice for what needs
 // the user's attention — an orphan, an unreadable profile, Needs login with its setup prompt; the
 // tab bar closes it (`children`).
 
@@ -13,8 +13,9 @@ import { agentMenuEntries, StartSession, type RosterScope } from "../commands/Ag
 import type { AgentCommands } from "../commands/useAgentCommands.ts";
 import { needsLogin, setupPromptOf } from "../needs-login.ts";
 import { NeedsLoginChip, NeedsLoginNotice } from "../NeedsLogin.tsx";
+import { stateChips } from "../state-chips.ts";
 import type { AgentContext } from "./agent-context.ts";
-import { PROVIDER_LABELS, chipsOf, modelText, providerOf } from "./agent-model.ts";
+import { PROVIDER_LABELS, modelText, providerOf } from "./agent-model.ts";
 import styles from "./page.module.css";
 
 export interface AgentHeaderProps {
@@ -31,7 +32,7 @@ export function AgentHeader({ context, commands, connected, children }: AgentHea
   const [menu, setMenu] = useState<MenuAnchor | null>(null);
   const more = useRef<HTMLButtonElement>(null);
   const model = modelText(entry);
-  const chips = chipsOf(entry);
+  const chips = stateChips(entry);
   const loggedOut = needsLogin(entry, counts);
   const scope: RosterScope = { projects, profilesOff, dataDir };
 
@@ -42,14 +43,14 @@ export function AgentHeader({ context, commands, connected, children }: AgentHea
         Roster
       </button>
       <div className={styles.title}>
-        <h1 className={styles.name} title={entry.id} data-testid="agent-name">
-          {entry.id}
+        <h1 className={styles.name} title={entry.name} data-testid="agent-name">
+          {entry.name}
         </h1>
         {(chips.length > 0 || loggedOut) && (
           <div className={styles.chips}>
             {loggedOut && <NeedsLoginChip testId="agent-chip-needs-login" />}
             {chips.map((chip) => (
-              <span key={chip.key} className={styles.chip} data-tone={chip.tone} title={chip.title} data-testid={`agent-chip-${chip.key}`}>
+              <span key={chip.id} className={styles.chip} data-tone={chip.tone} title={chip.title} data-testid={`agent-chip-${chip.id}`}>
                 {chip.label}
               </span>
             ))}
@@ -84,6 +85,12 @@ export function AgentHeader({ context, commands, connected, children }: AgentHea
         </div>
       </div>
       <div className={styles.sub} data-testid="agent-sub">
+        {entry.name !== entry.id && (
+          <>
+            id <code data-testid="agent-id">{entry.id}</code>
+            <span className={styles.sep}>·</span>
+          </>
+        )}
         {PROVIDER_LABELS[providerOf(entry)]}
         <span className={styles.sep}>·</span>
         {model.model === null ? <span className={styles.dash}>provider default</span> : <>{model.model}{model.effort !== null && <span className={styles.faint}> {model.effort}</span>}</>}

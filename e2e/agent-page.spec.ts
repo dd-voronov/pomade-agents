@@ -15,6 +15,7 @@ import type { Locator, Page } from "@playwright/test";
 import type { Sandbox } from "../harness/sandbox.ts";
 import { ROSTER_AGENTS_METHOD, claudeFolderName, isRosterAgentsAnswer } from "../src/shared/roster.ts";
 import { agentRoute, type AgentTab } from "../src/ui/core/routes.ts";
+import { agentName } from "../src/backend/roster/first-sight.ts";
 import { expect, test, type Shell } from "./fixtures.ts";
 import { answer, projectFolder, prompt, seedIntoProject } from "./transcripts.ts";
 
@@ -65,7 +66,7 @@ async function openPage(page: Page, openShell: (page: Page) => Promise<Shell>, p
   const { tabFrame } = await openShell(page);
   pomade.fake.openAppTab({ projectId: "alpha", route: agentRoute(agent, tab) });
   const frame = tabFrame("alpha");
-  await expect(frame.getByTestId("agent-name")).toHaveText(agent);
+  await expect(frame.getByTestId("agent-name")).toHaveText(agentName(agent));
   return frame.locator("html");
 }
 
@@ -247,7 +248,7 @@ test("an agent.yaml the app cannot use is reported, its role and tags are not ed
   await writeFile(file, broken);
   await openPage(page, openShell, pomade, LIBRA, "overview");
   const frame = frameOf(page);
-  await expect(frame.getByTestId("agent-chip-problem")).toHaveText("agent.yaml can’t be read");
+  await expect(frame.getByTestId("agent-chip-unreadable")).toHaveText("agent.yaml can’t be read");
   await expect(frame.getByTestId("agent-problem-notice")).toContainText("never written over");
   await expect(frame.getByTestId("agent-role-text")).toBeDisabled();
   await expect(frame.getByTestId("agent-tags-add")).toHaveCount(0);
@@ -308,7 +309,7 @@ test("Open CLAUDE.md, agent.yaml, settings.json and a memory file open in Pomade
   // The built-in's files lie in the home folder, outside the workspace: Pomade refuses, the page says so.
   await frame.getByTestId("agent-back").click();
   pomade.fake.openAppTab({ projectId: "alpha", route: agentRoute("claude", "overview") });
-  await expect(frame.getByTestId("agent-name")).toHaveText("claude");
+  await expect(frame.getByTestId("agent-name")).toHaveText("Claude");
   await frame.getByTestId("open-claude-md").click();
   await expect(frame.getByTestId("toast-text")).toHaveText("CLAUDE.md was not opened. Pomade does not let the app open files there.");
   expect(opened()).toHaveLength(6);
@@ -352,8 +353,8 @@ test.describe("the header's actions — the Roster card's own", () => {
     // The built-ins cannot be cloned.
     await frame.getByTestId("agent-back").click();
     pomade.fake.openAppTab({ projectId: "alpha", route: agentRoute("claude", "overview") });
-    await expect(frame.getByTestId("agent-name")).toHaveText("claude");
-    await expect(frame.getByTestId("agent-chip-builtin")).toHaveText("built-in");
+    await expect(frame.getByTestId("agent-name")).toHaveText("Claude");
+    await expect(frame.getByTestId("agent-chip-built-in")).toHaveText("built-in");
     await frame.getByTestId("agent-more").click();
     await expect(frame.getByTestId("menu-item-clone")).toHaveCount(0);
   });
@@ -362,15 +363,15 @@ test.describe("the header's actions — the Roster card's own", () => {
 test("the built-ins: Claude's permissions come from its settings.json and the home .claude.json, Codex's from config.toml, and Codex has no CLAUDE.md or memory", async ({ page, openShell, pomade }) => {
   await openPage(page, openShell, pomade, "claude", "permissions");
   const frame = frameOf(page);
-  await expect(frame.getByTestId("agent-sub")).toHaveText("Claude Code·opus high·launches with claude");
+  await expect(frame.getByTestId("agent-sub")).toHaveText("id claude·Claude Code·opus high·launches with claude");
   await expect(frame.getByTestId("perm-allow").locator("code")).toHaveText(["Bash(git status:*)"]);
   await expect(frame.getByTestId("perm-mcp")).toHaveText("claude-in-chromestdiodocshttp");
   await expect(frame.getByTestId("perm-plugins")).toHaveText("none");
 
   await frame.getByTestId("agent-back").click();
   pomade.fake.openAppTab({ projectId: "alpha", route: agentRoute("codex", "permissions") });
-  await expect(frame.getByTestId("agent-name")).toHaveText("codex");
-  await expect(frame.getByTestId("agent-sub")).toHaveText("Codex·gpt-5.2-codex medium·launches with codex");
+  await expect(frame.getByTestId("agent-name")).toHaveText("Codex");
+  await expect(frame.getByTestId("agent-sub")).toHaveText("id codex·Codex·gpt-5.2-codex medium·launches with codex");
   await expect(frame.getByTestId("permissions-facts")).toContainText("Approvals");
   await expect(frame.getByTestId("perm-mode")).toHaveText("on-request");
   await expect(frame.getByTestId("perm-sandbox")).toHaveText("workspace-write");

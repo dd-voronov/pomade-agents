@@ -45,6 +45,11 @@ import {
   ROSTER_REMOVE_ORPHAN_METHOD,
   ROSTER_UNDO_RELINK_METHOD,
   PROFILE_TEXT_MAX,
+  ROLE_MAX,
+  TAG_MAX,
+  TAGS_MAX,
+  isRoleLine,
+  isTagList,
   type RemoveOrphanResult,
   type UnclaimedFoldersAnswer,
 } from "../../shared/roster.ts";
@@ -220,12 +225,7 @@ function launchSpecParams(raw: unknown): LaunchSpecParams {
 
 /** The longest text `roster.checkName` looks at: anything longer is refused by its rules anyway. */
 const NAME_PARAM_MAX = 256;
-const ROLE_MAX = 200;
-const TAG_MAX = 40;
-const TAGS_MAX = 20;
 const PROJECTS_MAX = 200;
-
-const isOneLine = (v: unknown, max: number): v is string => typeof v === "string" && v.trim() !== "" && v.length <= max && !/[\r\n\0]/.test(v);
 
 function checkNameParams(raw: unknown): string {
   const { name } = paramsOf(raw);
@@ -237,9 +237,9 @@ function createParams(raw: unknown): CreateAgentParams {
   const params = paramsOf(raw);
   const { name, role, tags, projects, createId } = params;
   if (typeof name !== "string" || name.length > NAME_PARAM_MAX) throw new HostError("invalid-params", `"name" must be a text of at most ${NAME_PARAM_MAX} characters`);
-  if (!isOneLine(role, ROLE_MAX)) throw new HostError("invalid-params", `"role" must be one line of at most ${ROLE_MAX} characters`);
-  if (!Array.isArray(tags) || tags.length > TAGS_MAX || !tags.every((t) => isOneLine(t, TAG_MAX))) {
-    throw new HostError("invalid-params", `"tags" must be at most ${TAGS_MAX} one-line tags of at most ${TAG_MAX} characters`);
+  if (!isRoleLine(role)) throw new HostError("invalid-params", `"role" must be one line of at most ${ROLE_MAX} characters`);
+  if (!isTagList(tags)) {
+    throw new HostError("invalid-params", `"tags" must be a list of at most ${TAGS_MAX} tags, each one line of at most ${TAG_MAX} characters`);
   }
   if (!Array.isArray(projects) || projects.length > PROJECTS_MAX || !projects.every((p) => typeof p === "string" && p !== "")) {
     throw new HostError("invalid-params", '"projects" must be a list of project ids');

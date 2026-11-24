@@ -87,7 +87,7 @@ function CodexModel({ context, config }: { context: AgentContext; config: AgentM
         </dd>
       </dl>
       <p className={`${styles.hint} ${tab.hintIn}`} data-testid="model-hint">
-        Read-only here: editing Codex’s model comes with Codex-based agents (P-003).
+        Read-only here: editing Codex’s model comes with Codex-based agents.
       </p>
     </div>
   );

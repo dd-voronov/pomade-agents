@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { AgentProfile, RosterEntry } from "../../../shared/roster.ts";
-import { chipsOf, claudeMdOf, isBuiltin, isEditable, modelText, openPathOf, profileFileOf, providerOf } from "./agent-model.ts";
+import { claudeMdOf, isBuiltin, isEditable, modelText, openPathOf, profileFileOf, providerOf } from "./agent-model.ts";
 
 const PROFILE: AgentProfile = { id: "claude-libra", provider: "claude", kind: "folder", configDir: "Agents/claude-libra", command: "claude-libra", tags: [], hidden: false, modes: {} };
 const entry = (over: Partial<RosterEntry> = {}): RosterEntry => ({
@@ -32,18 +32,6 @@ describe("provider", () => {
     expect(isBuiltin(entry({ id: "claude", kind: "builtin", profile: null }))).toBe(true);
     expect(isBuiltin(entry({ kind: "builtin", profile: { ...PROFILE, kind: "builtin" } }))).toBe(true);
     expect(isBuiltin(entry({ profile: null }))).toBe(false);
-  });
-});
-
-describe("state chips", () => {
-  it("has none for a plain folder agent", () => {
-    expect(chipsOf(entry())).toEqual([]);
-  });
-
-  it("names a built-in, an orphan, an unreadable profile and a hidden agent", () => {
-    expect(chipsOf(entry({ kind: "builtin", profile: { ...PROFILE, kind: "builtin", hidden: true } })).map((c) => c.key)).toEqual(["builtin", "hidden"]);
-    expect(chipsOf(entry({ orphan: true })).map((c) => [c.key, c.tone])).toEqual([["orphan", "warn"]]);
-    expect(chipsOf(entry({ profile: null, problem: "line 3 is wrong" }))).toEqual([{ key: "problem", label: "agent.yaml can’t be read", tone: "warn", title: "line 3 is wrong" }]);
   });
 });
 

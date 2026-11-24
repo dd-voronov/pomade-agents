@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import { CREATE_STEP_IDS, type AgentProfile, type CreateAgentResult, type CreateStep, type RosterEntry } from "../../../shared/roster.ts";
 import {
-  addTags,
   aliasChecked,
   aliasFailed,
   answeredName,
@@ -14,6 +13,7 @@ import {
   phaseOf,
   settledPhase,
   stepLabel,
+  takePrefill,
   typedName,
   withOpen,
   type Part,
@@ -162,12 +162,26 @@ describe("a clone", () => {
     const bare: AgentProfile = { id: "claude-bare", provider: "claude", kind: "folder", configDir: "Agents/claude-bare", command: "claude-bare", tags: [], hidden: false, modes: {} };
     expect(clonePrefill(entry("claude-bare", { profile: bare }), [])).toEqual({ role: "", tags: [], projects: [] });
   });
+
+  it("cuts a source's role and tags to the limits a new agent holds", () => {
+    const long: AgentProfile = { id: "claude-long", provider: "claude", kind: "folder", configDir: "Agents/claude-long", command: "claude-long", role: "r".repeat(300), tags: Array.from({ length: 30 }, (_, i) => `tag-${i}`).concat(["x".repeat(40)]), hidden: false, modes: {} };
+    const fill = clonePrefill(entry("claude-long", { profile: long }), []);
+    expect(fill.role).toHaveLength(200);
+    expect(fill.tags).toHaveLength(20);
+    expect(clonePrefill(entry("claude-long", { profile: { ...long, tags: ["x".repeat(40)] } }), []).tags).toEqual(["x".repeat(24)]);
+  });
 });
 
-describe("tags", () => {
-  it("are added trimmed, lowercased, comma-separated, each once", () => {
-    expect(addTags([], "Tax, personal ,,tax")).toEqual(["tax", "personal"]);
-    expect(addTags(["tax"], " TAX ")).toEqual(["tax"]);
-    expect(addTags(["a"], "")).toEqual(["a"]);
+describe("takePrefill", () => {
+  const form = { role: "Typed.", tags: ["mine"], projects: ["alpha"] };
+  const fill = { role: "Source role.", tags: ["src"], projects: ["beta"] };
+
+  it("gives the untouched fields the source's values", () => {
+    expect(takePrefill(form, { role: false, tags: false, projects: false }, fill)).toEqual(fill);
+  });
+
+  it("keeps each field the user changed", () => {
+    expect(takePrefill(form, { role: true, tags: false, projects: true }, fill)).toEqual({ role: "Typed.", tags: ["src"], projects: ["alpha"] });
+    expect(takePrefill(form, { role: true, tags: true, projects: true }, fill)).toEqual(form);
   });
 });

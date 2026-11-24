@@ -1,11 +1,13 @@
 // One agent as a row of the list (DESIGN §3.3): name with its state chips over the role line,
 // provider and model, Connected to, Last active, This week, and Start session ▾ with the ⋯ menu —
 // the card's own buttons and menus; an orphan's Re-link ▾ and Remove, which asks in place first.
-// Narrow lists drop the provider column and This week first, then Last active.
+// An agent that Needs login keeps its chip at every width and offers the setup prompt on the second
+// line. Narrow lists drop the provider column and This week first, then Last active, then the other chips.
 
 import { useState, type ReactElement } from "react";
 
-import { type RosterTools, ModelLine, MoreButton, OrphanButtons, StartButton, StateChips } from "./AgentCard.tsx";
+import { NeedsLoginChip, NeedsLoginLine } from "../NeedsLogin.tsx";
+import { type RosterTools, ModelLine, MoreButton, OtherChips, OrphanButtons, StartButton } from "./AgentCard.tsx";
 import { ConnectedTo } from "./ConnectedTo.tsx";
 import { ROW_NAMES } from "./connected-model.ts";
 import { lastActiveText, weekText, type AgentView } from "./roster-model.ts";
@@ -22,6 +24,7 @@ function SecondLine({ agent, removing }: { agent: AgentView; removing: boolean }
   if (agent.orphan && removing) return <>Remove its profile? No agent folder is touched.</>;
   if (agent.orphan) return <>Config folder <code>{agent.configDir}</code> is gone</>;
   if (agent.problem !== null) return <>agent.yaml can’t be used: {agent.problem}</>;
+  if (agent.needsLogin) return <NeedsLoginLine prompt={agent.setupPrompt} testId={`agent-needs-login-${agent.id}`} />;
   return agent.role === null ? <span className={styles.faint}>No role line</span> : <>{agent.role}</>;
 }
 
@@ -36,8 +39,9 @@ export function AgentRow({ agent, tools, now }: AgentRowProps): ReactElement {
           <button type="button" className={styles.name} disabled={orphan} title={agent.id} data-testid={`agent-name-${agent.id}`} onClick={() => actions.openAgent(agent.id)}>
             {agent.name}
           </button>
+          {agent.needsLogin && <NeedsLoginChip testId={`chip-needs-login-${agent.id}`} />}
           <span className={styles.chips}>
-            <StateChips agent={agent} />
+            <OtherChips agent={agent} />
           </span>
         </div>
         <div className={styles.line2} data-testid={`agent-role-${agent.id}`} title={agent.role ?? undefined}>

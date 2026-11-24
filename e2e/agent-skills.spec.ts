@@ -17,6 +17,7 @@ import type { FakePomade } from "../harness/fake-pomade.ts";
 import type { Sandbox } from "../harness/sandbox.ts";
 import { SKILLS_CATALOG_METHOD, isSkillsCatalog } from "../src/shared/skills.ts";
 import { agentRoute } from "../src/ui/core/routes.ts";
+import { agentName } from "../src/backend/roster/first-sight.ts";
 import { expect, test, type Shell } from "./fixtures.ts";
 
 const ARTIFACTS = fileURLToPath(new URL("./artifacts", import.meta.url));
@@ -72,7 +73,7 @@ async function openSkills(page: Page, openShell: (page: Page) => Promise<Shell>,
   const { tabFrame } = await openShell(page);
   pomade.fake.openAppTab({ projectId: "alpha", route: agentRoute(agent, "skills") });
   const frame = tabFrame("alpha");
-  await expect(frame.getByTestId("agent-name")).toHaveText(agent);
+  await expect(frame.getByTestId("agent-name")).toHaveText(agentName(agent));
   return frame;
 }
 

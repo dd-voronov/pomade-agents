@@ -4,7 +4,7 @@
 import type { ErrorCode } from "pomade-kit/protocol";
 import { HostError } from "pomade-kit/sdk";
 
-import { TAG_MAX } from "../../../shared/roster.ts";
+import { TAG_MAX, TAGS_MAX } from "../../../shared/roster.ts";
 
 /** A role line from the field's text: runs of white space become one space, ends trimmed. */
 export function oneLine(text: string): string {
@@ -27,9 +27,14 @@ export function tagsOf(entry: string): string[] {
     .filter((tag) => tag !== "");
 }
 
-/** `tags` with the entry's tags added after them; the same list (`===`) when it adds none. */
+/** True when `tags` holds `TAGS_MAX` tags: no more are added. */
+export const tagsFull = (tags: readonly string[]): boolean => tags.length >= TAGS_MAX;
+
+/** `tags` with the entry's tags added after them, up to `TAGS_MAX`; the same list (`===`) when it adds none. */
 export function withTags(tags: readonly string[], entry: string): readonly string[] {
-  const added = tagsOf(entry).filter((tag, i, all) => !tags.includes(tag) && all.indexOf(tag) === i);
+  const added = tagsOf(entry)
+    .filter((tag, i, all) => !tags.includes(tag) && all.indexOf(tag) === i)
+    .slice(0, Math.max(0, TAGS_MAX - tags.length));
   return added.length === 0 ? tags : [...tags, ...added];
 }
 

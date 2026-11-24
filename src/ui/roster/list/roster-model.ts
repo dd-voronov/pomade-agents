@@ -119,13 +119,3 @@ export function weekText(week: AgentCounts["week"]): string {
 
 /** The card's Last active: relative ("5m", "yesterday"), "never" with none. */
 export const lastActiveText = (iso: string | null, now: Date): string => (iso === null ? "never" : formatAgo(iso, now));
-
-/** The state chips beside an agent's name, in order. */
-export function chipsOf(agent: AgentView): { id: "built-in" | "orphan" | "unreadable" | "hidden"; label: string; tone: "plain" | "warn"; title?: string }[] {
-  const chips: ReturnType<typeof chipsOf> = [];
-  if (agent.builtin) chips.push({ id: "built-in", label: "built-in", tone: "plain" });
-  if (agent.orphan) chips.push({ id: "orphan", label: "orphan", tone: "warn" });
-  if (agent.problem !== null) chips.push({ id: "unreadable", label: "agent.yaml can't be read", tone: "warn", title: agent.problem });
-  if (agent.hidden) chips.push({ id: "hidden", label: "hidden", tone: "plain", title: "Left out of Pomade's \"+\" menu" });
-  return chips;
-}

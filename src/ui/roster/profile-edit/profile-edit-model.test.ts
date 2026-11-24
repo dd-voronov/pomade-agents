@@ -1,7 +1,7 @@
 import { HostError } from "pomade-kit/sdk";
 import { describe, expect, it } from "vitest";
 
-import { failureText, oneLine, roleToSave, tagsOf, withTags, withoutTag } from "./profile-edit-model.ts";
+import { failureText, oneLine, roleToSave, tagsFull, tagsOf, withTags, withoutTag } from "./profile-edit-model.ts";
 
 describe("roleToSave", () => {
   it("sends the new role as one line", () => {
@@ -32,6 +32,14 @@ describe("tags", () => {
     expect(withTags(tags, "Vault, new, new, other")).toEqual(["vault", "new", "other"]);
     expect(withTags(tags, "vault")).toBe(tags);
     expect(withTags(tags, " ")).toBe(tags);
+  });
+
+  it("adds no tag past the 20th", () => {
+    const nineteen = Array.from({ length: 19 }, (_, i) => `t${i}`);
+    const full = withTags(nineteen, "a, b, c");
+    expect(full).toEqual([...nineteen, "a"]);
+    expect(tagsFull(full)).toBe(true);
+    expect(withTags(full, "d")).toBe(full);
   });
 
   it("removes one tag", () => {

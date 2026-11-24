@@ -367,6 +367,16 @@ export const ROSTER_MEMORY_METHOD = "roster.memory";
 export const ROLE_MAX = 200;
 /** The longest tag, in characters. */
 export const TAG_MAX = 24;
+/** The most tags one agent holds. */
+export const TAGS_MAX = 20;
+
+const isLineOfAtMost = (text: unknown, max: number): text is string => typeof text === "string" && text.trim() !== "" && text.trim().length <= max && !/[\r\n\0]/.test(text);
+
+/** True for a role line the roster accepts: one non-empty line of at most `ROLE_MAX` characters once trimmed. */
+export const isRoleLine = (text: unknown): text is string => isLineOfAtMost(text, ROLE_MAX);
+
+/** True for a tag list the roster accepts: at most `TAGS_MAX` tags, each one non-empty line of at most `TAG_MAX` characters once trimmed. */
+export const isTagList = (tags: unknown): tags is string[] => Array.isArray(tags) && tags.length <= TAGS_MAX && tags.every((tag) => isLineOfAtMost(tag, TAG_MAX));
 
 /** `roster.updateProfile` params: each key present is set, `role: null` removes the role line. */
 export type RosterUpdateProfileParams = {

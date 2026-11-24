@@ -7,9 +7,9 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from "react";
 
-import { TAG_MAX } from "../../../shared/roster.ts";
+import { TAGS_MAX, TAG_MAX } from "../../../shared/roster.ts";
 import { CloseIcon, PlusIcon } from "../../core/icons.tsx";
-import { withTags, withoutTag } from "./profile-edit-model.ts";
+import { tagsFull, withTags, withoutTag } from "./profile-edit-model.ts";
 import styles from "./TagList.module.css";
 
 export interface TagListProps {
@@ -115,7 +115,7 @@ export function TagList({ tags, editable, onSave, add = "always", oneRow = false
             onBlur={() => commit(false)}
           />
         ) : (
-          <button type="button" className={styles.add} data-testid={`${testId}-add`} onClick={() => setEntry("")}>
+          <button type="button" className={styles.add} disabled={tagsFull(shown)} title={tagsFull(shown) ? `At most ${TAGS_MAX} tags` : undefined} data-testid={`${testId}-add`} onClick={() => setEntry("")}>
             <PlusIcon size={12} />
             tag
           </button>

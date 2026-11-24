@@ -16,6 +16,7 @@ import type { FakePomade } from "../harness/fake-pomade.ts";
 import { ROSTER_CONNECTIONS_METHOD, isRosterConnectionsAnswer } from "../src/shared/roster.ts";
 import { agentRoute } from "../src/ui/core/routes.ts";
 import { rosterWindows } from "../src/ui/roster/agent-counts-model.ts";
+import { agentName } from "../src/backend/roster/first-sight.ts";
 import { expect, test, type Shell } from "./fixtures.ts";
 import { LONG_ID, ROSTER_PROJECTS, planned, seedRoster } from "./roster-fixtures.ts";
 
@@ -43,7 +44,7 @@ async function openPage(page: Page, openShell: (page: Page) => Promise<Shell>, p
   const { tabFrame } = await openShell(page);
   pomade.fake.openAppTab({ projectId: "agents", route });
   const frame = tabFrame("agents");
-  await expect(frame.getByTestId("agent-name")).toHaveText(agent);
+  await expect(frame.getByTestId("agent-name")).toHaveText(agentName(agent));
   return frame;
 }
 

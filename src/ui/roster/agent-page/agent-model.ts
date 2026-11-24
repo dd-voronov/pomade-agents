@@ -1,5 +1,5 @@
 // What the agent's page shows of one agent, as pure functions of its roster entry: the provider,
-// the state chips, whether its profile can be edited, the model line, and the path an editor opens.
+// whether its profile can be edited, the model line, and the path an editor opens.
 
 import type { AgentProvider, RosterEntry } from "../../../shared/roster.ts";
 
@@ -12,24 +12,6 @@ export function providerOf(entry: RosterEntry): AgentProvider {
 
 export function isBuiltin(entry: RosterEntry): boolean {
   return entry.kind === "builtin";
-}
-
-export type ChipTone = "plain" | "warn";
-export interface StateChip {
-  key: "builtin" | "orphan" | "problem" | "hidden";
-  label: string;
-  tone: ChipTone;
-  title?: string;
-}
-
-/** The chips after the name: built-in, orphan, an `agent.yaml` that cannot be read, hidden. */
-export function chipsOf(entry: RosterEntry): StateChip[] {
-  const chips: StateChip[] = [];
-  if (isBuiltin(entry)) chips.push({ key: "builtin", label: "built-in", tone: "plain" });
-  if (entry.orphan) chips.push({ key: "orphan", label: "orphan", tone: "warn" });
-  if (entry.problem !== null) chips.push({ key: "problem", label: "agent.yaml can’t be read", tone: "warn", title: entry.problem });
-  if (entry.profile?.hidden === true) chips.push({ key: "hidden", label: "hidden", tone: "plain", title: "Left out of Pomade’s “+” menu" });
-  return chips;
 }
 
 /** True when the role and tags can be written: a usable profile of an agent that is not an orphan. */

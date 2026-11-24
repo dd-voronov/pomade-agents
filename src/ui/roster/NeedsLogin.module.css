@@ -61,3 +61,38 @@
 .link:hover {
   text-decoration: underline;
 }
+
+/* A list row's one line: the instruction gives way first; the link keeps its place at the end. */
+.line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.lineText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.line .link {
+  flex: none;
+  white-space: nowrap;
+}
+
+.line code {
+  padding: 1px 4px;
+  border-radius: var(--radius-sm);
+  background: var(--active-bg);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+}
+
+/* Narrower than 640 px the list has no room for the instruction: the link and its title carry it. */
+@container (max-width: 640px) {
+  .lineText {
+    display: none;
+  }
+}

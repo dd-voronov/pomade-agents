@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { RosterAgentsAnswer, RosterEntry } from "../../../shared/roster.ts";
 import type { AgentCounts } from "../../../shared/work-sessions.ts";
-import { agentCount, agentViews, chipsOf, lastActiveText, modelLabel, sections, viewOf, weekText } from "./roster-model.ts";
+import { agentCount, agentViews, lastActiveText, modelLabel, sections, viewOf, weekText } from "./roster-model.ts";
 
 const profile = (id: string, extra: Partial<NonNullable<RosterEntry["profile"]>> = {}): NonNullable<RosterEntry["profile"]> => ({
   id,
@@ -105,19 +105,6 @@ describe("how values read", () => {
     expect(viewOf("cards")).toBe("cards");
     expect(viewOf(null)).toBe("cards");
     expect(viewOf("grid")).toBe("cards");
-  });
-
-  it("marks the built-ins, the orphans, the unusable files and the hidden", () => {
-    const [claude, orphan, broken, hidden] = agentViews(
-      answer([entry("claude", { kind: "builtin" }), entry("b", { orphan: true }), entry("c", { profile: null, problem: "bad" }), entry("d", { hidden: true })]),
-      new Map(),
-      new Map(),
-      NO_NAMES,
-    );
-    expect(chipsOf(claude!).map((c) => c.id)).toEqual(["built-in"]);
-    expect(chipsOf(orphan!).map((c) => c.id)).toEqual(["orphan"]);
-    expect(chipsOf(broken!)).toEqual([{ id: "unreadable", label: "agent.yaml can't be read", tone: "warn", title: "bad" }]);
-    expect(chipsOf(hidden!).map((c) => c.id)).toEqual(["hidden"]);
   });
 
   it("offers Clone… for a Claude Code folder agent only, and says which agents need login", () => {

@@ -7,11 +7,12 @@ import { useRef, useState, type KeyboardEvent, type ReactElement, type ReactNode
 import { WORKSPACE_PROJECT_ID } from "pomade-kit/protocol";
 import type { HostClient } from "pomade-kit/sdk";
 
-import type { CreateStep } from "../../../shared/roster.ts";
+import { ROLE_MAX, TAGS_MAX, TAG_MAX, type CreateStep } from "../../../shared/roster.ts";
 import { copyText } from "../../core/clipboard.ts";
 import { CaretIcon, CheckIcon, CloseIcon, TerminalIcon, WarningIcon } from "../../core/icons.tsx";
 import { Menu, type MenuAnchor, type MenuEntry } from "../../core/Menu.tsx";
 import { ROSTER_ROUTE, agentRoute } from "../../core/routes.ts";
+import { tagsFull, withTags } from "../profile-edit/profile-edit-model.ts";
 import { useRoster } from "../useRoster.ts";
 import { setupPrompt } from "../needs-login.ts";
 import { BackGlyph, CopyGlyph, SpinnerGlyph } from "./glyphs.tsx";
@@ -19,8 +20,8 @@ import {
   NEVER_CLONED,
   RC_FILE_LABEL,
   TEMPLATE_PATH,
+  UNTOUCHED,
   WORKSPACE_LABEL,
-  addTags,
   aliasFailed,
   clonePrefill,
   cloneable,
@@ -29,8 +30,10 @@ import {
   openInLabel,
   pageTitle,
   stepLabel,
+  takePrefill,
   type Part,
   type StartFrom,
+  type Touched,
 } from "./new-agent-model.ts";
 import styles from "./NewAgentPage.module.css";
 import { useConnectable, useCreateAgent, useNameCheck, type Connectable } from "./useNewAgent.ts";
@@ -40,9 +43,6 @@ const START_FROM: readonly { kind: StartFrom["kind"]; label: string }[] = [
   { kind: "template", label: "Blank template" },
   { kind: "clone", label: "Clone an agent" },
 ];
-
-const ROLE_MAX = 140;
-const TAG_MAX = 24;
 
 function Parts({ parts }: { parts: readonly Part[] }): ReactElement {
   return (
@@ -102,6 +102,8 @@ export function NewAgentPage({ host, clone, navigate }: Props): ReactElement {
   const [startFrom, setStartFrom] = useState<StartFrom>(clone === null ? { kind: "template" } : { kind: "clone", source: clone });
   /** The source whose role, tags and projects the form took. */
   const [prefilled, setPrefilled] = useState<string | null>(null);
+  /** What the user changed: a source's values replace only the rest. */
+  const [touched, setTouched] = useState<Touched>(UNTOUCHED);
   const [sourceMenu, setSourceMenu] = useState<MenuAnchor | null>(null);
   const sourceButton = useRef<HTMLButtonElement>(null);
   const [tried, setTried] = useState(false);
@@ -114,14 +116,19 @@ export function NewAgentPage({ host, clone, navigate }: Props): ReactElement {
   const sources = roster === null ? [] : cloneable(roster.agents);
   const source = startFrom.kind === "clone" ? startFrom.source : null;
   const sourceEntry = source === null ? undefined : sources.find((a) => a.id === source);
-  // A clone takes its source's role, tags and projects once both are known; the user changes them freely after.
+  // A clone takes its source's role, tags and projects once both are known — those the user has not
+  // typed or picked — and the user changes them freely after.
   if (sourceEntry !== undefined && source !== prefilled && connectable !== null) {
-    const fill = clonePrefill(sourceEntry, connectable.projects);
+    const taken = takePrefill({ role, tags, projects: chosen }, touched, clonePrefill(sourceEntry, connectable.projects));
     setPrefilled(source);
-    setRole(fill.role);
-    setTags(fill.tags);
-    setChosen(fill.projects);
+    setRole(taken.role);
+    setTags(taken.tags);
+    setChosen(taken.projects);
   }
+  const editTags = (next: readonly string[]): void => {
+    setTags([...next]);
+    setTouched((t) => ({ ...t, tags: true }));
+  };
   /** The checked projects, in sidebar order. */
   const checked = projects.filter((p) => chosen.includes(p.id));
   const checkedNames = checked.map((p) => p.name);
@@ -140,7 +147,7 @@ export function NewAgentPage({ host, clone, navigate }: Props): ReactElement {
       setTimeout(() => document.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus(), 0);
       return;
     }
-    const allTags = addTags(tags, tagDraft);
+    const allTags = [...withTags(tags, tagDraft)];
     setTags(allTags);
     setTagDraft("");
     const result = await create({ name, role: role.trim(), tags: allTags, projects: checked.map((p) => p.id), ...(source === null ? {} : { clone: source }) });
@@ -159,10 +166,10 @@ export function NewAgentPage({ host, clone, navigate }: Props): ReactElement {
   const onTagKey = (event: KeyboardEvent<HTMLInputElement>): void => {
     if ((event.key === "Enter" || event.key === ",") && tagDraft.trim() !== "") {
       event.preventDefault();
-      setTags(addTags(tags, tagDraft));
+      editTags(withTags(tags, tagDraft));
       setTagDraft("");
     } else if (event.key === "Backspace" && tagDraft === "" && tags.length > 0) {
-      setTags(tags.slice(0, -1));
+      editTags(tags.slice(0, -1));
     } else if (event.key === "Enter") {
       event.preventDefault();
     }
@@ -183,6 +190,7 @@ export function NewAgentPage({ host, clone, navigate }: Props): ReactElement {
   const message = nameMessage(nameState, tried);
   const nameInvalid = nameState.status === "bad" || (tried && nameState.status === "empty");
   const roleInvalid = tried && !roleOk;
+  const full = tagsFull(tags);
 
   const form = (
     <>
@@ -284,7 +292,10 @@ export function NewAgentPage({ host, clone, navigate }: Props): ReactElement {
               placeholder="Prepares the Spanish tax return and tracks its deadlines."
               maxLength={ROLE_MAX}
               data-testid="new-agent-role"
-              onChange={(e) => setRole(e.target.value)}
+              onChange={(e) => {
+                setRole(e.target.value);
+                setTouched((t) => ({ ...t, role: true }));
+              }}
               onKeyDown={onFieldKey}
             />
             <div className={roleInvalid ? styles.error : styles.hint}>{roleInvalid ? "One line on what it is for — the card and the setup prompt use it." : "One line: what it is for."}</div>
@@ -295,7 +306,7 @@ export function NewAgentPage({ host, clone, navigate }: Props): ReactElement {
               {tags.map((tag) => (
                 <span key={tag} className={styles.tag} data-testid="new-agent-tag-chip">
                   {tag}
-                  <button type="button" className={styles.tagRemove} title={`Remove ${tag}`} aria-label={`Remove ${tag}`} onClick={() => setTags(tags.filter((t) => t !== tag))}>
+                  <button type="button" className={styles.tagRemove} title={`Remove ${tag}`} aria-label={`Remove ${tag}`} onClick={() => editTags(tags.filter((t) => t !== tag))}>
                     <CloseIcon size={12} />
                   </button>
                 </span>
@@ -306,21 +317,25 @@ export function NewAgentPage({ host, clone, navigate }: Props): ReactElement {
                 value={tagDraft}
                 placeholder={tags.length === 0 ? "tax, personal" : ""}
                 maxLength={TAG_MAX}
+                disabled={full}
                 data-testid="new-agent-tag"
                 onChange={(e) => setTagDraft(e.target.value.replace(/,/g, ""))}
                 onKeyDown={onTagKey}
                 onBlur={() => {
                   if (tagDraft.trim() !== "") {
-                    setTags(addTags(tags, tagDraft));
+                    editTags(withTags(tags, tagDraft));
                     setTagDraft("");
                   }
                 }}
               />
             </div>
-            <div className={styles.hint}>Enter or comma adds a tag.</div>
+            <div className={styles.hint} data-testid="new-agent-tags-hint">{full ? `${TAGS_MAX} tags are the most: remove one to add another.` : "Enter or comma adds a tag."}</div>
           </Field>
           <Field label="Connect to projects">
-            <ProjectList connectable={connectable} chosen={chosen} onToggle={(id) => setChosen(chosen.includes(id) ? chosen.filter((c) => c !== id) : [...chosen, id])} />
+            <ProjectList connectable={connectable} chosen={chosen} onToggle={(id) => {
+              setChosen(chosen.includes(id) ? chosen.filter((c) => c !== id) : [...chosen, id]);
+              setTouched((t) => ({ ...t, projects: true }));
+            }} />
           </Field>
         </div>
         <aside className={styles.side} aria-label="Create will" data-testid="new-agent-create-will">

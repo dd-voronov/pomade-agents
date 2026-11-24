@@ -2,7 +2,7 @@
 // the profile it makes. Only these keys are edited here; the profile's other keys are never touched.
 // Normal is always on (DESIGN §3.4): an edit can switch only the other modes off.
 
-import { MODE_IDS, ROLE_MAX, TAG_MAX, type AgentProfile, type ModeId } from "../../shared/roster.ts";
+import { MODE_IDS, ROLE_MAX, TAG_MAX, TAGS_MAX, isRoleLine, isTagList, type AgentProfile, type ModeId } from "../../shared/roster.ts";
 
 export type ProfileEdit = {
   /** A new role line; `null` removes it. Absent: unchanged. */
@@ -15,25 +15,20 @@ export type ProfileEdit = {
   hidden?: boolean;
 };
 
-/** The most tags one agent holds. */
-export const TAGS_MAX = 20;
-
-const oneLine = (text: string): boolean => text.trim() !== "" && !/[\r\n\0]/.test(text);
-
 /** `raw` as an edit, or what is wrong with it. */
 export function checkProfileEdit(role: unknown, tags: unknown, modes?: unknown, hidden?: unknown): { ok: true; edit: ProfileEdit } | { ok: false; problem: string } {
   const edit: ProfileEdit = {};
   if (role !== undefined) {
-    if (role !== null && (typeof role !== "string" || !oneLine(role) || role.trim().length > ROLE_MAX)) {
+    if (role !== null && !isRoleLine(role)) {
       return { ok: false, problem: `"role" must be one line of at most ${ROLE_MAX} characters, or null` };
     }
     edit.role = role === null ? null : role.trim();
   }
   if (tags !== undefined) {
-    if (!Array.isArray(tags) || tags.length > TAGS_MAX || !tags.every((t) => typeof t === "string" && oneLine(t) && t.trim().length <= TAG_MAX)) {
+    if (!isTagList(tags)) {
       return { ok: false, problem: `"tags" must be a list of at most ${TAGS_MAX} tags, each one line of at most ${TAG_MAX} characters` };
     }
-    const trimmed = (tags as string[]).map((t) => t.trim());
+    const trimmed = tags.map((t) => t.trim());
     if (new Set(trimmed).size !== trimmed.length) return { ok: false, problem: '"tags" must not repeat a tag' };
     edit.tags = trimmed;
   }

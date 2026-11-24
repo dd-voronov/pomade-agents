@@ -18,6 +18,7 @@ import type { FakePomade } from "../harness/fake-pomade.ts";
 import type { Sandbox } from "../harness/sandbox.ts";
 import { ROSTER_CHANGED_EVENT, ROSTER_LAUNCH_SPEC_METHOD, ROSTER_LIST_METHOD, isRosterChanged } from "../src/shared/roster.ts";
 import { agentRoute } from "../src/ui/core/routes.ts";
+import { agentName } from "../src/backend/roster/first-sight.ts";
 import { expect, test, type Shell } from "./fixtures.ts";
 
 const ARTIFACTS = fileURLToPath(new URL("./artifacts", import.meta.url));
@@ -42,7 +43,7 @@ async function openModelTab(page: Page, openShell: (page: Page) => Promise<Shell
   const { tabFrame } = await openShell(page);
   pomade.fake.openAppTab({ projectId: "alpha", route: agentRoute(agent, "model") });
   const frame = tabFrame("alpha");
-  await expect(frame.getByTestId("agent-name")).toHaveText(agent);
+  await expect(frame.getByTestId("agent-name")).toHaveText(agentName(agent));
   await expect(frame.getByTestId("model-loading")).toHaveCount(0);
 }
 
@@ -227,7 +228,7 @@ test("screenshots: the folder agent, the built-in claude, codex, an unusable set
 
   for (const agent of ["claude", "codex"]) {
     pomade.fake.openAppTab({ projectId: "alpha", route: agentRoute(agent, "model") });
-    await expect(frame.getByTestId("agent-name")).toHaveText(agent);
+    await expect(frame.getByTestId("agent-name")).toHaveText(agentName(agent));
     await expect(frame.getByTestId("launch-line-full-autonomy")).toHaveText(/dangerously/);
     await shoot(agent === "claude" ? "builtin" : "codex");
   }

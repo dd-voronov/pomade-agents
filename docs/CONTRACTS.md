@@ -182,8 +182,9 @@ One UI bundle; `welcome.surface` and the frame's route pick the view (`src/ui/co
   it itself once Check again passes (`agentTabs.launch({ agentId, projectId: openIn })`). **Go to its
   tab** is `agentTabs.focus` of that tab; a `not-found` (it was closed) launches another the same way.
   The setup prompt is never passed as `prompt`: the agent starts logged out.
-- **Needs login** — the agent page's header (and the Roster's card) shows the chip and a notice with
-  **Copy setup prompt** for a Claude Code folder agent, not an orphan, that is missing from
+- **Needs login** — the agent page's header, the Roster's card and its list row show the chip, and the
+  page and the card a notice with **Copy setup prompt** (the row has it on its second line; the chip
+  stays at every width) for a Claude Code folder agent, not an orphan, that is missing from
   `sessions.agentCounts`' `withSessions` (`needsLogin`, `src/ui/roster/needs-login.ts`); nothing
   while the answer says `indexing`. The counts are asked again on `sessions.changed`, so the agent's
   first session clears it without a reload. The prompt (`setupPrompt`): `Use the
@@ -588,8 +589,8 @@ type AgentProfile = {
   kind: "builtin" | "folder";
   configDir: string;              // "~/…" under the home folder; relative: under the workspace; or absolute
   command: string;                // one line: the alias the shell runs
-  role?: string;                  // one line
-  tags: string[];                 // absent in the file: []
+  role?: string;                  // one line, at most ROLE_MAX (200) characters
+  tags: string[];                 // absent in the file: []; at most TAGS_MAX (20), each at most TAG_MAX (24) characters
   hidden: boolean;                // absent in the file: false
   modes: { normal?: { enabled: boolean }; "full-autonomy"?: { enabled: boolean } };
 };                                // a mode absent from `modes` is not enabled; other mode keys are ignored
@@ -792,8 +793,8 @@ the `roster.creating` notice; the shapes in `src/shared/roster.ts`, the name rul
   - **The rc file** is `$ZDOTDIR/.zshrc`, else `$HOME/.zshrc`, of the backend's own environment;
     every zsh runs with exactly that environment. A workspace path holding `'`, `"`, `$`, `` ` ``
     or `\` cannot go into the alias line: the `alias` step fails.
-  - Params: `clone` absent, or a roster id of at most 256 characters; `name` a text of at most 256 characters; `role` one line of at most 200; `tags` at
-    most 20 one-line tags of at most 40 (trimmed, each once); `projects` at most 200 project ids; `createId`
+  - Params: `clone` absent, or a roster id of at most 256 characters; `name` a text of at most 256 characters; `role` one line of at most `ROLE_MAX` (200);
+    `tags` at most `TAGS_MAX` (20) one-line tags of at most `TAG_MAX` (24), trimmed, each once; `projects` at most 200 project ids; `createId`
     the caller's id, at most 128 characters. Else `invalid-params`.
 
   ```ts
@@ -834,9 +835,11 @@ type RosterUpdateProfileResult = { profile: AgentProfile };   // as written
   `modes.<id>.enabled`, the other modes are left alone. Normal is always on: `normal: false` is
   `invalid-params`. A mode switched off leaves `roster.list` and `roster.launchSpec` refuses it
   (`invalid-params`, "the agent's Full autonomy mode is not enabled").
-- `role`: one line, at most `ROLE_MAX` (200) characters, trimmed, not blank. `tags`: at most 20,
-  each one line of at most `TAG_MAX` (24) characters, trimmed, none repeated. Anything else is
-  `invalid-params`.
+- `role`: one line, at most `ROLE_MAX` (200) characters, trimmed, not blank. `tags`: at most
+  `TAGS_MAX` (20), each one line of at most `TAG_MAX` (24) characters, trimmed, none repeated.
+  Anything else is `invalid-params`. The limits are `src/shared/roster.ts`'s, one set for
+  `roster.create`, this call and every field that edits a role line or tags: a card, the agent's
+  page and New agent stop at them.
 - An agent the roster found whose first-sight file is not written yet gets it first. Errors:
   `not-ready` (no workspace is open, so no profiles are kept); `not-found` (no such agent, or an
   orphan); `io-error` (the file cannot be used — it is never written over — or cannot be written).

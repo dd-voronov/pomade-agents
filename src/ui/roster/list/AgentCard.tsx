@@ -15,10 +15,11 @@ import { NeedsLoginChip, NeedsLoginNotice } from "../NeedsLogin.tsx";
 import { RoleLine } from "../profile-edit/RoleLine.tsx";
 import { TagList } from "../profile-edit/TagList.tsx";
 import type { ProfileEdit } from "../profile-edit/useProfileEdit.ts";
+import { stateChips } from "../state-chips.ts";
 import type { RosterActions } from "./actions.ts";
 import { ConnectedTo } from "./ConnectedTo.tsx";
 import { CARD_NAMES } from "./connected-model.ts";
-import { chipsOf, lastActiveText, modelLabel, weekText, type AgentView } from "./roster-model.ts";
+import { lastActiveText, modelLabel, weekText, type AgentView } from "./roster-model.ts";
 import controls from "./controls.module.css";
 import styles from "./AgentCard.module.css";
 
@@ -51,7 +52,16 @@ export function StateChips({ agent }: { agent: AgentView }): ReactElement {
   return (
     <>
       {agent.needsLogin && <NeedsLoginChip testId={`chip-needs-login-${agent.id}`} />}
-      {chipsOf(agent).map((chip) => (
+      <OtherChips agent={agent} />
+    </>
+  );
+}
+
+/** The state chips but Needs login: a narrow list row drops these and keeps that one. */
+export function OtherChips({ agent }: { agent: AgentView }): ReactElement {
+  return (
+    <>
+      {stateChips(agent.entry).map((chip) => (
         <span key={chip.id} className={controls.chip} data-tone={chip.tone} title={chip.title} data-testid={`chip-${chip.id}`}>
           {chip.label}
         </span>
