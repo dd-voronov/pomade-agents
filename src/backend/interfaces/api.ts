@@ -19,11 +19,18 @@ import { LIVE_NOW_LIST_METHOD } from "../../shared/live-now.ts";
 import {
   ROSTER_AGENTS_FOR_METHOD,
   ROSTER_AGENTS_METHOD,
+  ROSTER_CHECK_ALIAS_METHOD,
+  ROSTER_CHECK_NAME_METHOD,
+  ROSTER_CREATE_METHOD,
   ROSTER_LAUNCH_SPEC_METHOD,
   ROSTER_LIST_METHOD,
   ROSTER_PROJECTS_FOR_METHOD,
+  type AliasCheck,
+  type CreateAgentParams,
+  type CreateAgentResult,
   type LaunchSpec,
   type LaunchSpecParams,
+  type NameVerdict,
   type RosterAgentsForResult,
   type RosterProjectsForResult,
 } from "../../shared/roster.ts";
@@ -55,7 +62,7 @@ import type { RealPath } from "../core/real-paths.ts";
 import type { BoundTabs } from "../sessions/bound-tabs.ts";
 import { agentsFor, projectsFor, type ProjectReads } from "../roster/connections.ts";
 import { launchSpec } from "../roster/launch-spec.ts";
-import { enabledModes, type Roster } from "../roster/roster.ts";
+import { enabledModes, resolveConfigDir, type Roster } from "../roster/roster.ts";
 import { liveSessions, repoSessions } from "../sessions/for-git.ts";
 import { foundSessions } from "../sessions/for-runner.ts";
 import type { LiveNow } from "../sessions/live-now.ts";
@@ -79,6 +86,16 @@ export interface ApiSources {
   open: (id: string) => Promise<SessionsOpenResult>;
   /** The skill folders and the skills catalog (`skills-catalog.ts`). */
   skills: Pick<SkillsCatalogService, "read" | "setFolders">;
+  /** Creating agents (`create-agent.ts`), its progress published as `roster.creating`; absent or
+   *  `null` when no profiles are kept (no workspace open). */
+  creation?: AgentCreationSource | null;
+}
+
+/** What the creation methods are answered from. */
+export interface AgentCreationSource {
+  checkName(name: string): Promise<NameVerdict>;
+  create(params: CreateAgentParams): Promise<CreateAgentResult>;
+  checkAlias(agent: string, folder: string): Promise<AliasCheck>;
 }
 
 type Params = Record<string, unknown>;
@@ -184,10 +201,40 @@ function launchSpecParams(raw: unknown): LaunchSpecParams {
   return out;
 }
 
+/** The longest text `roster.checkName` looks at: anything longer is refused by its rules anyway. */
+const NAME_PARAM_MAX = 256;
+const ROLE_MAX = 200;
+const TAG_MAX = 40;
+const TAGS_MAX = 20;
+const PROJECTS_MAX = 200;
+
+const isOneLine = (v: unknown, max: number): v is string => typeof v === "string" && v.trim() !== "" && v.length <= max && !/[\r\n\0]/.test(v);
+
+function checkNameParams(raw: unknown): string {
+  const { name } = paramsOf(raw);
+  if (typeof name !== "string" || name.length > NAME_PARAM_MAX) throw new HostError("invalid-params", `"name" must be a text of at most ${NAME_PARAM_MAX} characters`);
+  return name;
+}
+
+function createParams(raw: unknown): CreateAgentParams {
+  const params = paramsOf(raw);
+  const { name, role, tags, projects, createId } = params;
+  if (typeof name !== "string" || name.length > NAME_PARAM_MAX) throw new HostError("invalid-params", `"name" must be a text of at most ${NAME_PARAM_MAX} characters`);
+  if (!isOneLine(role, ROLE_MAX)) throw new HostError("invalid-params", `"role" must be one line of at most ${ROLE_MAX} characters`);
+  if (!Array.isArray(tags) || tags.length > TAGS_MAX || !tags.every((t) => isOneLine(t, TAG_MAX))) {
+    throw new HostError("invalid-params", `"tags" must be at most ${TAGS_MAX} one-line tags of at most ${TAG_MAX} characters`);
+  }
+  if (!Array.isArray(projects) || projects.length > PROJECTS_MAX || !projects.every((p) => typeof p === "string" && p !== "")) {
+    throw new HostError("invalid-params", '"projects" must be a list of project ids');
+  }
+  if (typeof createId !== "string" || createId === "" || createId.length > 128) throw new HostError("invalid-params", '"createId" must be an id');
+  return { name, role: role.trim(), tags: [...new Set(tags.map((t) => t.trim()))], projects: projects as string[], createId };
+}
+
 /** The kit's contract shapes are interfaces, which TypeScript does not take for JSON values; they hold only JSON. */
 const json = (value: SessionsForRepoResult | SessionsLiveInResult): JsonValue => value as unknown as JsonValue;
 
-export function createApi({ info, sessions, live, tabs, liveNow, realPath, roster, projects, open, skills }: ApiSources): Record<string, ApiHandler> {
+export function createApi({ info, sessions, live, tabs, liveNow, realPath, roster, projects, open, skills, creation }: ApiSources): Record<string, ApiHandler> {
   const updated = async (changed: Promise<SessionsUpdated["sessions"]>): Promise<SessionsUpdated> => ({ sessions: await changed });
   /** The session `{ id }` names; `not-found` when no transcript of it is known. */
   const sessionOf = (raw: unknown): Session => {
@@ -203,6 +250,10 @@ export function createApi({ info, sessions, live, tabs, liveNow, realPath, roste
     return agent;
   };
   const listedIds = (): string[] => roster.list().map((a) => a.id);
+  const creating = (): AgentCreationSource => {
+    if (creation === undefined || creation === null) throw new HostError("not-ready", "No agent profiles are kept (no workspace is open), so agents cannot be created");
+    return creation;
+  };
   return {
     [APP_INFO_METHOD]: () => ({ ...info }),
     [SESSIONS_LIST_METHOD]: (params) => sessions.answer(sinceOf(params)),
@@ -269,6 +320,15 @@ export function createApi({ info, sessions, live, tabs, liveNow, realPath, roste
       const { folders } = paramsOf(raw);
       if (!Array.isArray(folders) || !folders.every((f) => typeof f === "string")) throw new HostError("invalid-params", '"folders" must be a list of workspace-relative folders');
       return skills.setFolders(folders as string[]);
+    },
+    [ROSTER_CHECK_NAME_METHOD]: (raw) => creating().checkName(checkNameParams(raw)),
+    [ROSTER_CREATE_METHOD]: (raw) => creating().create(createParams(raw)),
+    [ROSTER_CHECK_ALIAS_METHOD]: (raw) => {
+      const agent = nameOf(paramsOf(raw), "agent", "a roster id");
+      const facts = roster.agent(agent);
+      const folder = facts === undefined || facts.orphan || facts.profile.kind !== "folder" ? null : resolveConfigDir(facts.profile.configDir, null, info.workspace);
+      if (folder === null) throw new HostError("not-found", `No folder agent ${JSON.stringify(agent)} in the roster`);
+      return creating().checkAlias(agent, folder);
     },
   };
 }

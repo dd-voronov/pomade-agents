@@ -16,7 +16,16 @@ import {
 } from "./sessions.ts";
 import { LIVE_NOW_LIST_METHOD } from "./live-now.ts";
 import { SESSIONS_AGENT_COUNTS_METHOD } from "./work-sessions.ts";
-import { ROSTER_AGENTS_FOR_METHOD, ROSTER_AGENTS_METHOD, ROSTER_LAUNCH_SPEC_METHOD, ROSTER_LIST_METHOD, ROSTER_PROJECTS_FOR_METHOD } from "./roster.ts";
+import {
+  ROSTER_AGENTS_FOR_METHOD,
+  ROSTER_AGENTS_METHOD,
+  ROSTER_CHECK_ALIAS_METHOD,
+  ROSTER_CHECK_NAME_METHOD,
+  ROSTER_CREATE_METHOD,
+  ROSTER_LAUNCH_SPEC_METHOD,
+  ROSTER_LIST_METHOD,
+  ROSTER_PROJECTS_FOR_METHOD,
+} from "./roster.ts";
 import { SETTINGS_SET_SKILL_FOLDERS_METHOD, SKILLS_CATALOG_METHOD } from "./skills.ts";
 
 /** Answers `AppInfo`: which backend is running and where it keeps the app's data. */
@@ -45,6 +54,9 @@ export const API_METHODS = [
   SESSIONS_AGENT_COUNTS_METHOD,
   SKILLS_CATALOG_METHOD,
   SETTINGS_SET_SKILL_FOLDERS_METHOD,
+  ROSTER_CHECK_NAME_METHOD,
+  ROSTER_CREATE_METHOD,
+  ROSTER_CHECK_ALIAS_METHOD,
 ] as const;
 
 export interface AppInfo {

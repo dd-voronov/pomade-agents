@@ -7,6 +7,8 @@
 
 import { ROSTER_METHOD, type AgentProvider, type RosterAgent } from "pomade-kit/protocol";
 
+import type { NameProblem } from "./agent-name.ts";
+
 /** Answers `{ agents: RosterAgent[] }` — Pomade's roster read (HOST-API §4 "Platform reads of app APIs"). */
 export const ROSTER_LIST_METHOD = ROSTER_METHOD;
 
@@ -186,5 +188,140 @@ export function isLaunchSpec(value: unknown): value is LaunchSpec {
     typeof value.line === "string" &&
     (value.sessionId === null || typeof value.sessionId === "string") &&
     typeof value.exit === "string"
+  );
+}
+
+// ── Creating an agent (DESIGN §3.6) ─────────────────────────────────────────
+
+/** Whether a name can be had for a new agent; answers `NameVerdict`. */
+export const ROSTER_CHECK_NAME_METHOD = "roster.checkName";
+
+/** Create a folder agent from `Agents/Claude Agent Template`; answers `CreateAgentResult` once every step has run. */
+export const ROSTER_CREATE_METHOD = "roster.create";
+
+/** Whether an agent's alias resolves in a fresh interactive zsh; answers `AliasCheck`. */
+export const ROSTER_CHECK_ALIAS_METHOD = "roster.checkAlias";
+
+/** Published by the backend, unqualified, as each step of a `roster.create` starts and ends; payload `RosterCreating`. */
+export const ROSTER_CREATING_EVENT = "roster.creating";
+
+/** The steps of a Create from the template, in the order they run:
+ *  - `folder` — copy the template to `Agents/<name>/`
+ *  - `skills` — link every `Agents/_shared/skills/*` its `skills/` lacks
+ *  - `profile` — write `agent.yaml`
+ *  - `projects` — connect the projects (pomade:E-030)
+ *  - `alias` — append the alias line to the rc file, unless it is there
+ *  - `verify` — a fresh interactive zsh resolves the alias to the agent's folder */
+export const CREATE_STEP_IDS = ["folder", "skills", "profile", "projects", "alias", "verify"] as const;
+export type CreateStepId = (typeof CREATE_STEP_IDS)[number];
+
+/** `todo` not started · `run` running · `done` · `skip` nothing to do · `fail` (`detail` says why). */
+export type CreateStepState = "todo" | "run" | "done" | "skip" | "fail";
+
+export type CreateStep = {
+  id: CreateStepId;
+  state: CreateStepState;
+  /** One line: what the step did, or why it failed; `null` before it ends. */
+  detail: string | null;
+};
+
+export type NameVerdict = {
+  /** The name checked, as given. */
+  name: string;
+  /** Why the name cannot be had (`agent-name.ts` `NameProblem`); `null` when it can. */
+  problem: NameProblem | null;
+  /** For `shell`, what zsh says the name is (`whence -v`); for `shell-error`, what went wrong; else `null`. */
+  detail: string | null;
+};
+
+export type CreateAgentParams = {
+  name: string;
+  /** One line, not blank. */
+  role: string;
+  tags: string[];
+  /** Stable project ids, in the order to connect them. */
+  projects: string[];
+  /** The caller's id for this Create: `roster.creating` notices carry it. */
+  createId: string;
+};
+
+/** - `created` — every step done or skipped
+ *  - `incomplete` — the agent exists; connecting a project, the alias or its check failed
+ *  - `failed` — copying, linking or writing `agent.yaml` failed: what this Create wrote is removed
+ *  - `refused` — the name cannot be had (`refused`); nothing was written */
+export type CreateOutcome = "created" | "incomplete" | "failed" | "refused";
+
+export type CreateAgentResult = {
+  createId: string;
+  name: string;
+  outcome: CreateOutcome;
+  steps: CreateStep[];
+  /** The name check that refused the Create; `null` otherwise. */
+  refused: NameVerdict | null;
+  /** The agent's folder, absolute (`<workspace>/Agents/<name>`). */
+  folder: string;
+  /** The line the rc file gets: `alias <name>='CLAUDE_CONFIG_DIR="<folder>" claude'`. */
+  aliasLine: string;
+  /** The rc file, absolute: `$ZDOTDIR/.zshrc`, else `$HOME/.zshrc`; `null` when neither is set. */
+  rcFile: string | null;
+};
+
+/** `roster.creating`: the steps of one Create as they are now. */
+export type RosterCreating = { createId: string; steps: CreateStep[] };
+
+export type AliasCheckParams = { agent: string };
+
+export type AliasCheck = {
+  /** A fresh interactive zsh resolves the agent's name to its alias line's command. */
+  ok: boolean;
+  aliasLine: string;
+  rcFile: string | null;
+  /** Why not, in one line; `null` when `ok`. */
+  detail: string | null;
+};
+
+const isStep = (v: unknown): v is CreateStep =>
+  isObject(v) &&
+  (CREATE_STEP_IDS as readonly unknown[]).includes(v.id) &&
+  ["todo", "run", "done", "skip", "fail"].includes(v.state as string) &&
+  (v.detail === null || typeof v.detail === "string");
+
+const isNameVerdict = (v: unknown): v is NameVerdict =>
+  isObject(v) && typeof v.name === "string" && (v.problem === null || typeof v.problem === "string") && (v.detail === null || typeof v.detail === "string");
+
+/** True for a well-formed `roster.checkName` answer. */
+export function isNameVerdictAnswer(value: unknown): value is NameVerdict {
+  return isNameVerdict(value);
+}
+
+/** True for a well-formed `roster.create` answer. */
+export function isCreateAgentResult(value: unknown): value is CreateAgentResult {
+  return (
+    isObject(value) &&
+    typeof value.createId === "string" &&
+    typeof value.name === "string" &&
+    ["created", "incomplete", "failed", "refused"].includes(value.outcome as string) &&
+    Array.isArray(value.steps) &&
+    value.steps.every(isStep) &&
+    (value.refused === null || isNameVerdict(value.refused)) &&
+    typeof value.folder === "string" &&
+    typeof value.aliasLine === "string" &&
+    (value.rcFile === null || typeof value.rcFile === "string")
+  );
+}
+
+/** True for a well-formed `roster.creating` payload. */
+export function isRosterCreating(value: unknown): value is RosterCreating {
+  return isObject(value) && typeof value.createId === "string" && Array.isArray(value.steps) && value.steps.every(isStep);
+}
+
+/** True for a well-formed `roster.checkAlias` answer. */
+export function isAliasCheck(value: unknown): value is AliasCheck {
+  return (
+    isObject(value) &&
+    typeof value.ok === "boolean" &&
+    typeof value.aliasLine === "string" &&
+    (value.rcFile === null || typeof value.rcFile === "string") &&
+    (value.detail === null || typeof value.detail === "string")
   );
 }

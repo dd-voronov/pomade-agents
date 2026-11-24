@@ -12,13 +12,15 @@ import { stayConnected } from "pomade-kit/node";
 
 import type { AppInfo } from "../../shared/api.ts";
 import { STATUS_WINDOW_MS } from "../../shared/session-events.ts";
-import { ROSTER_CHANGED_EVENT } from "../../shared/roster.ts";
+import { ROSTER_CHANGED_EVENT, ROSTER_CREATING_EVENT, type RosterCreating } from "../../shared/roster.ts";
 import { SESSIONS_CHANGED_EVENT } from "../../shared/sessions.ts";
 import { LIVE_NOW_CHANGED_EVENT, LIVE_NOW_ICON } from "../../shared/live-now.ts";
-import { createApi } from "../interfaces/api.ts";
+import { createApi, type AgentCreationSource } from "../interfaces/api.ts";
 import { followPomade } from "../interfaces/platform.ts";
 import { SETTINGS_FILE, openRecordStore, type RecordStore } from "../records/record-store.ts";
 import type { ProjectReads } from "../roster/connections.ts";
+import { createAgentCreation } from "../roster/create-agent.ts";
+import { rcFileOf, zshOf } from "../roster/shell.ts";
 import { startRoster } from "../roster/roster.ts";
 import { keepBadge, startLiveNow } from "../sessions/live-now.ts";
 import { createBoundTabs } from "../sessions/bound-tabs.ts";
@@ -139,6 +141,7 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
   skills.onChange((changed) => {
     host?.events.publish(SKILLS_CHANGED_EVENT, changed).catch((err: unknown) => log(`could not publish ${SKILLS_CHANGED_EVENT}: ${message(err)}`));
   });
+  const creation = agentCreation();
 
   const connection = stayConnected(
     { env, role: "backend" },
@@ -157,7 +160,7 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
             },
             { sessions, live, roster, workspace: info.workspace, workspaceReal: info.workspaceReal, realPath, log },
           );
-        connected.api.serve(createApi({ info, sessions, live, tabs: bound, liveNow, realPath, roster, projects: projectReads(connected), open, skills })).then(
+        connected.api.serve(createApi({ info, sessions, live, tabs: bound, liveNow, realPath, roster, projects: projectReads(connected), open, skills, creation })).then(
           ({ methods }) => log(`serving ${methods.join(", ")}`),
           (err: unknown) => log(`could not serve the API: ${message(err)}`),
         );
@@ -201,6 +204,39 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
       },
     },
   );
+
+  /** Creating agents needs the workspace and its profiles; the rc file and the shell come from the
+   *  environment Pomade started the backend with. Projects are connected and progress published
+   *  through whichever Pomade connection is up. */
+  function agentCreation(): AgentCreationSource | null {
+    if (locations.workspace === null || locations.dataDir === null || records === null) return null;
+    const created = createAgentCreation({
+      workspace: locations.workspace,
+      dataDir: locations.dataDir,
+      profiles: records.profiles,
+      rosterIds: () => roster.answer().agents.map((a) => a.id),
+      refreshRoster: () => roster.refresh(),
+      connect: async (projectId, agent) => {
+        if (host === null) throw new Error("Pomade is not connected");
+        const { visibleAgents } = await host.project.getAgents({ projectId });
+        if (visibleAgents.includes("*")) return "offers-all";
+        if (!visibleAgents.includes(agent)) await host.project.setAgents({ projectId, visibleAgents: [...visibleAgents, agent] });
+        return "connected";
+      },
+      rcFile: rcFileOf(env),
+      zsh: zshOf(env),
+      log,
+    });
+    return {
+      checkName: (name) => created.checkName(name),
+      checkAlias: (agent, folder) => created.checkAlias(agent, folder),
+      create: (params) =>
+        created.create(params, (steps) => {
+          const payload: RosterCreating = { createId: params.createId, steps };
+          host?.events.publish(ROSTER_CREATING_EVENT, payload).catch((err: unknown) => log(`could not publish ${ROSTER_CREATING_EVENT}: ${message(err)}`));
+        }),
+    };
+  }
 
   return {
     async stop() {

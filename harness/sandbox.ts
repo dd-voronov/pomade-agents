@@ -76,6 +76,10 @@ export async function snapshotFolder(folder: string): Promise<Record<string, str
   return Object.fromEntries(Object.entries(out).sort(([a], [b]) => a.localeCompare(b)));
 }
 
+/** A fixture tree copied as it is: its symlinks (the template's shared-skill links) keep their
+ *  relative targets, so they point inside the copy. */
+const COPY = { recursive: true, verbatimSymlinks: true } as const;
+
 async function seedTranscripts(root: string): Promise<void> {
   for (const [to, from] of Object.entries(SEEDED_TRANSCRIPTS)) {
     await mkdir(dirname(join(root, to)), { recursive: true });
@@ -87,8 +91,8 @@ async function seedTranscripts(root: string): Promise<void> {
 export async function fixtureSnapshots(): Promise<{ home: Record<string, string>; workspace: Record<string, string> }> {
   const root = await mkdtemp(join(await realpath(tmpdir()), "pa-fixtures-"));
   try {
-    await cp(join(FIXTURES, "home"), join(root, "home"), { recursive: true });
-    await cp(join(FIXTURES, "workspace"), join(root, "workspace"), { recursive: true });
+    await cp(join(FIXTURES, "home"), join(root, "home"), COPY);
+    await cp(join(FIXTURES, "workspace"), join(root, "workspace"), COPY);
     await seedTranscripts(root);
     return { home: await snapshotFolder(join(root, "home")), workspace: await snapshotFolder(join(root, "workspace")) };
   } finally {
@@ -113,8 +117,8 @@ export async function createSandbox(appId: string, options: SandboxOptions = {})
     await rm(root, { recursive: true, force: true });
     throw new Error(`sandbox: ${tooLong}`);
   }
-  await cp(join(FIXTURES, "home"), home, { recursive: true });
-  await cp(join(FIXTURES, "workspace"), workspaceReal, { recursive: true });
+  await cp(join(FIXTURES, "home"), home, COPY);
+  await cp(join(FIXTURES, "workspace"), workspaceReal, COPY);
   if (workspace !== workspaceReal) await symlink(workspaceReal, workspace);
   await seedTranscripts(root);
   const appKey = randomBytes(16).toString("hex");

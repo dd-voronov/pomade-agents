@@ -10,7 +10,7 @@ import { skillProblems } from "../../scripts/build-folder.ts";
 import { createApi } from "../backend/interfaces/api.ts";
 import { API_METHODS } from "./api.ts";
 import { LIVE_NOW_CHANGED_EVENT } from "./live-now.ts";
-import { ROSTER_CHANGED_EVENT } from "./roster.ts";
+import { ROSTER_CHANGED_EVENT, ROSTER_CREATING_EVENT } from "./roster.ts";
 import { RUN_FINISHED_EVENT, RUN_STARTED_EVENT } from "./runner-events.ts";
 import { SESSION_CLOSED_EVENT, SESSION_STATUS_CHANGED_EVENT, SESSION_TURN_FINISHED_EVENT } from "./session-events.ts";
 import { SKILLS_CHANGED_EVENT } from "./skills.ts";
@@ -33,11 +33,13 @@ describe("manifest.json", () => {
     expect(parsed.manifest.outsideWorkspace).toEqual(["~/.claude/", "~/.codex/", "~/.zshrc"]);
     // The UI hears the backend's change notices through the app's own published events; other apps
     // hear the session events; the backend follows Pomade's projects and agent tabs, and Runner's
-    // runs, for project attribution, live state and event B; Live now focuses agent tabs.
-    expect(parsed.manifest.capabilities).toEqual(["project.read", "agentTabs.read", "agentTabs.write", "tabs.open", "files.read"]);
+    // runs, for project attribution, live state and event B; Live now focuses agent tabs; the
+    // Settings page picks folders; a new agent is connected to its projects, its Create's steps
+    // tick on the page.
+    expect(parsed.manifest.capabilities).toEqual(["project.read", "agentTabs.read", "agentTabs.write", "tabs.open", "files.read", "project.write"]);
     expect(parsed.manifest.events).toEqual({
-      publish: ["sessions.changed", ROSTER_CHANGED_EVENT, LIVE_NOW_CHANGED_EVENT, SESSION_TURN_FINISHED_EVENT, SESSION_CLOSED_EVENT, SESSION_STATUS_CHANGED_EVENT, SKILLS_CHANGED_EVENT],
-      subscribe: ["pomade-agents:sessions.changed", "pomade-agents:roster.changed", `pomade-agents:${LIVE_NOW_CHANGED_EVENT}`, "pomade.ready", "project.created", "project.renamed", "project.removed", "agentTab.changed", "agentTab.exited", RUN_STARTED_EVENT, RUN_FINISHED_EVENT, `pomade-agents:${SKILLS_CHANGED_EVENT}`],
+      publish: ["sessions.changed", ROSTER_CHANGED_EVENT, LIVE_NOW_CHANGED_EVENT, SESSION_TURN_FINISHED_EVENT, SESSION_CLOSED_EVENT, SESSION_STATUS_CHANGED_EVENT, SKILLS_CHANGED_EVENT, ROSTER_CREATING_EVENT],
+      subscribe: ["pomade-agents:sessions.changed", "pomade-agents:roster.changed", `pomade-agents:${LIVE_NOW_CHANGED_EVENT}`, "pomade.ready", "project.created", "project.renamed", "project.removed", "agentTab.changed", "agentTab.exited", RUN_STARTED_EVENT, RUN_FINISHED_EVENT, `pomade-agents:${SKILLS_CHANGED_EVENT}`, `pomade-agents:${ROSTER_CREATING_EVENT}`],
     });
   });
 

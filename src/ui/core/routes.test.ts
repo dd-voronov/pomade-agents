@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { selectedSessionOf, sessionsRoute, viewFor } from "./routes.ts";
+import { NEW_AGENT_ROUTE, createdAgentRoute, isNewAgentRoute, selectedSessionOf, sessionsRoute, viewFor } from "./routes.ts";
 
 describe("viewFor", () => {
   it("shows Live now in the panel, whatever the route", () => {
@@ -37,5 +37,18 @@ describe("the Sessions route's selection", () => {
 
   it("selects nothing on any other route", () => {
     for (const route of ["sessions", "", "sessions/", "roster/x", "sessions/a/b", "sessions/%E0", "sessionsx/a"]) expect(selectedSessionOf(route)).toBeNull();
+  });
+});
+
+describe("the New agent route", () => {
+  it("is `roster/new` exactly, in the Roster view", () => {
+    expect(NEW_AGENT_ROUTE).toBe("roster/new");
+    expect(isNewAgentRoute("roster/new")).toBe(true);
+    expect(viewFor("tab", "roster/new")).toBe("roster");
+    for (const route of ["roster", "roster/new/x", "roster/newer", "roster/claude-libra", "sessions/new"]) expect(isNewAgentRoute(route), route).toBe(false);
+  });
+
+  it("leads, once the agent is created, to its Overview", () => {
+    expect(createdAgentRoute("claude-tax")).toBe("roster/claude-tax/overview");
   });
 });

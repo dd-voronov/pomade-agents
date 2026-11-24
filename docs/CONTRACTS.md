@@ -26,14 +26,14 @@ folder without a `SKILL.md` whose frontmatter `name` is the folder's and whose `
 |---|---|
 | `id` · `name` | `pomade-agents` · Agents |
 | `hostApi` | `0` |
-| `capabilities` | `project.read` (projects, their stable ids, names and folders, their visible agents) · `agentTabs.read` (each agent tab's session, folder, title and live state) · `agentTabs.write` (an agent tab's title, the unnamed mark) — the backend's project attribution, live state, tab titles and the project ↔ agent connection; the Sessions tab's and Live now's project names · `tabs.open` — Live now focuses agent tabs (`agentTabs.focus`) and opens a Runner run's attached terminal (`tabs.openAttached`); the backend's `sessions.open` does the same and resumes sessions (`agentTabs.resume`) · `files.read` — the Settings page's **Add folder…** asks Pomade's folder picker (`files.pickFolder`) |
+| `capabilities` | `project.read` (projects, their stable ids, names and folders, their visible agents) · `agentTabs.read` (each agent tab's session, folder, title and live state) · `agentTabs.write` (an agent tab's title, the unnamed mark) — the backend's project attribution, live state, tab titles and the project ↔ agent connection; the Sessions tab's and Live now's project names · `tabs.open` — Live now focuses agent tabs (`agentTabs.focus`) and opens a Runner run's attached terminal (`tabs.openAttached`); the backend's `sessions.open` does the same and resumes sessions (`agentTabs.resume`) · `files.read` — the Settings page's **Add folder…** asks Pomade's folder picker (`files.pickFolder`) · `project.write` — a new agent is connected to the projects chosen for it (`project.setAgents`, `roster.create`) |
 | `strip` | one icon, `agents` — action `panel` |
-| `events` | publishes `sessions.changed`, `roster.changed` and `liveNow.changed` (for its own UI frames) and `session.turnFinished` (declared, never published), `session.closed`, `session.statusChanged` ("Published events" below); subscribes to `pomade-agents:sessions.changed`, `pomade-agents:roster.changed` and `pomade-agents:liveNow.changed` (its own, for its UI frames), `project.created`, `project.renamed` and `project.removed` (the backend, and the UI frames for project names) and, for the backend, `pomade.ready`, `agentTab.changed`, `agentTab.exited` and Runner's `pomade-runner:run.started`, `pomade-runner:run.finished` ("Subscribed events" below); publishes `skills.changed` and subscribes to `pomade-agents:skills.changed` (its own, for the Settings page; "Skills" below) |
+| `events` | publishes `sessions.changed`, `roster.changed`, `liveNow.changed` and `roster.creating` (for its own UI frames) and `session.turnFinished` (declared, never published), `session.closed`, `session.statusChanged` ("Published events" below); subscribes to `pomade-agents:sessions.changed`, `pomade-agents:roster.changed`, `pomade-agents:liveNow.changed` and `pomade-agents:roster.creating` (its own, for its UI frames), `project.created`, `project.renamed` and `project.removed` (the backend, and the UI frames for project names) and, for the backend, `pomade.ready`, `agentTab.changed`, `agentTab.exited` and Runner's `pomade-runner:run.started`, `pomade-runner:run.finished` ("Subscribed events" below); publishes `skills.changed` and subscribes to `pomade-agents:skills.changed` (its own, for the Settings page; "Skills" below) |
 | `backend` | `backend/main.mjs`, mode `with-pomade` |
 | `api` | the methods of "Published API" below — `sessions.forRepo`, `sessions.liveIn` and `roster.list` among them, which Pomade reads (HOST-API §4, "Platform reads of app APIs") |
 | `commands` | one, `pomade-agents` — entry `cli/pomade-agents.mjs` ("Command" below) |
 | `skills` | one, `skills/pomade-agents-sessions` — the session-data format skill ("Command" below) |
-| `outsideWorkspace` | `~/.claude/`, `~/.codex/`, `~/.zshrc` — the paths outside the workspace the backend uses; Pomade shows them at install (HOST-API §1) |
+| `outsideWorkspace` | `~/.claude/`, `~/.codex/`, `~/.zshrc` — the paths outside the workspace the backend uses (`~/.zshrc`: a new agent's alias is appended there, "Creating an agent" below); Pomade shows them at install (HOST-API §1) |
 
 ## Surfaces and routes
 
@@ -46,6 +46,7 @@ One UI bundle; `welcome.surface` and the frame's route pick the view (`src/ui/co
 | tab | `sessions/<id>` | Sessions — the list with the detail panel, session `<id>` selected |
 | tab | `roster`, `roster/…` | Roster |
 | tab | `settings` | the app's Settings — the skill folders ("Skills" below) |
+| tab | `roster/new` | Roster — the New agent page (`NEW_AGENT_ROUTE`) |
 
 - `sessions` is the route Pomade's History icon opens (HOST-API §4 `apps`, "Platform reads of app
   APIs").
@@ -100,6 +101,10 @@ One UI bundle; `welcome.surface` and the frame's route pick the view (`src/ui/co
   its tab (Pomade switches to the tab's project); a group header's is `agentTabs.focus` of the
   group's first row, since the Host API has no call that only switches project. Its rows come from
   `liveNow.list` ("Live now" below).
+- **`roster/new` wins over `roster/<agent>`**: no agent is ever named `new` (the name rules refuse
+  it, "Creating an agent" below). The page's Roster crumb, Cancel and Back to Roster go to `roster`;
+  Open its page goes to `roster/<agent>/overview` (`createdAgentRoute`). All are the tab navigating
+  by itself.
 - The app has one tab per project — Pomade's icon-less app tab. `tabs.openApp({ route })` opens it
   or navigates it (the panel's Sessions and Roster); the frame follows `route.changed`. The tab's
   Sessions | Roster switch is the tab navigating by itself (`navigate`, `tabs.setRoute`), as the
@@ -137,6 +142,9 @@ it the same way. Method names and shapes are in `src/shared/api.ts`, `src/shared
 | `sessions.agentCounts` | `AgentCountsParams` `{ weekFrom, projectsFrom }` | `AgentCountsAnswer` (the app's own frames) |
 | `skills.catalog` | — | `SkillsCatalog` (the app's own frames) |
 | `settings.setSkillFolders` | `SetSkillFoldersParams` `{ folders: string[] }` | `SetSkillFoldersResult` (the app's own frames) |
+| `roster.checkName` | `{ name }` | `NameVerdict` `{ name, problem, detail }` (the app's own frames) |
+| `roster.create` | `CreateAgentParams` `{ name, role, tags, projects, createId }` | `CreateAgentResult` (the app's own frames) |
+| `roster.checkAlias` | `AliasCheckParams` `{ agent }` | `AliasCheck` `{ ok, aliasLine, rcFile, detail }` (the app's own frames) |
 
 ```ts
 interface AppInfo {
@@ -607,6 +615,76 @@ would answer differently. The roster is small: a frame behind it asks `roster.ag
 A profile changed on disk is seen at once (the data folder's watch); agent folders,
 `.pomade/agents.json` and the providers' configs are read again every 2 s.
 
+**Creating an agent** (DESIGN §3.6) — `roster.checkName`, `roster.create`, `roster.checkAlias` and
+the `roster.creating` notice; the shapes in `src/shared/roster.ts`, the name rules in
+`src/shared/agent-name.ts`, the work in `src/backend/roster/create-agent.ts` and
+`src/backend/roster/shell.ts`. Without a workspace (no profiles kept) all three are `not-ready`.
+
+- **The name** is checked in this order; the first problem found answers:
+
+  | `problem` | When |
+  |---|---|
+  | `empty` | `""` |
+  | `leading-dash` | starts with `-` |
+  | `characters` | anything but `[a-z0-9-]` |
+  | `too-long` | more than 64 characters (`AGENT_NAME_MAX`) |
+  | `reserved` | `new` (the New agent route), or holding `template` (the agent scan skips such folders) |
+  | `folder` | `<workspace>/Agents/<name>` exists (any entry), or a Create of the name is running |
+  | `agent` | the roster holds the id, or a profile of it exists (a built-in; a profile whose folder is elsewhere) |
+  | `shell` | a fresh `zsh -ilc` resolves it (`whence -v`): `detail` is zsh's line, `ls is /bin/ls` |
+  | `shell-error` | zsh could not be run or gave no answer within 15 s: `detail` says which |
+
+  The first five need only the name; the page applies them as typed and asks `roster.checkName`
+  after a 300 ms pause in typing, dropping any answer whose `name` is no longer the one typed.
+
+  ```ts
+  type NameVerdict = { name: string; problem: NameProblem | null; detail: string | null };
+  ```
+
+- **`roster.create`** runs the steps `CREATE_STEP_IDS` in order and answers when all have run
+  (the caller's `apps.call` waits up to 60 s). It checks the name again first: a refused name
+  answers `outcome: "refused"` with `refused` set and every step `todo` — nothing is written.
+
+  | Step | What it does |
+  |---|---|
+  | `folder` | copies `Agents/Claude Agent Template` (symlinks as they are) into a staging folder `Agents/.<name>.creating-from-template` (the scan skips it: "template"); the template must hold a `CLAUDE.md` |
+  | `skills` | in the staging folder's `skills/`, a symlink `../../_shared/skills/<skill>` for every folder (or link to one) in `Agents/_shared/skills/` it lacks; dot-entries skipped |
+  | `profile` | writes `agent.yaml` (`id`, `provider: claude`, `kind: folder`, `configDir: Agents/<name>`, `command: <name>`, `role`, `tags`, `hidden: false`, both modes enabled), then renames the staging folder to `Agents/<name>` and reads the roster again |
+  | `projects` | per project id, in order: `project.getAgents`; a list holding `"*"` offers every agent already; else `project.setAgents` with the name appended. `skip` with no projects |
+  | `alias` | appends `alias <name>='CLAUDE_CONFIG_DIR="<workspace>/Agents/<name>" claude'` to the rc file, on its own line, unless a line of the file is exactly that; creates the file when missing |
+  | `verify` | a fresh `zsh -ilc` defines the alias with exactly that command |
+
+  - **Outcomes:** `created` (every step `done` or `skip`); `failed` — `folder`, `skills` or
+    `profile` failed: the staging folder and the `agent.yaml` this Create wrote are removed, so the
+    roster never sees half an agent; `incomplete` — the agent exists and `projects`, `alias` or
+    `verify` failed (each failure marks its step; the steps after it still run).
+  - **The rc file** is `$ZDOTDIR/.zshrc`, else `$HOME/.zshrc`, of the backend's own environment;
+    every zsh runs with exactly that environment. A workspace path holding `'`, `"`, `$`, `` ` ``
+    or `\` cannot go into the alias line: the `alias` step fails.
+  - Params: `name` a text of at most 256 characters; `role` one line of at most 200; `tags` at
+    most 20 one-line tags of at most 40 (trimmed, each once); `projects` project ids; `createId`
+    the caller's id, at most 128 characters. Else `invalid-params`.
+
+  ```ts
+  type CreateStep = { id: CreateStepId; state: "todo" | "run" | "done" | "skip" | "fail"; detail: string | null };
+  type CreateAgentResult = {
+    createId: string; name: string;
+    outcome: "created" | "incomplete" | "failed" | "refused";
+    steps: CreateStep[];             // CREATE_STEP_IDS order
+    refused: NameVerdict | null;     // set for "refused"
+    folder: string;                  // <workspace>/Agents/<name>, absolute
+    aliasLine: string;               // the line the rc file gets
+    rcFile: string | null;           // absolute; null when neither ZDOTDIR nor HOME is set
+  };
+  ```
+
+- **`roster.creating`** `{ createId, steps }` — published, unqualified, each time a step of a
+  Create starts or ends; the page shows the steps ticking from it and takes the final ones from
+  `roster.create`'s answer.
+- **`roster.checkAlias({ agent })`** → `AliasCheck` `{ ok, aliasLine, rcFile, detail }`: whether a
+  fresh zsh defines `agent` as the alias of its config folder; never writes. `not-found` for an id
+  that is not a folder agent the roster holds (or is an orphan). The page's **Check again**.
+
 Adding a method: its name in the manifest's `api` and in `API_METHODS`, its shapes in
 `src/shared/`, its handler in `src/backend/interfaces/api.ts`.
 
@@ -934,6 +1012,8 @@ type AgentRunFinished = AgentRunStarted & {
   - `POMADE_SOCKET`, `POMADE_APP_ID`, `POMADE_APP_KEY_FILE`, `POMADE_CLIENT` — the connection to Pomade,
     taken by the kit's `stayConnected` (`pomade-kit/node`).
   - `HOME` — where the built-in agents' stores are.
+  - `ZDOTDIR`, else `HOME` — where the rc file a new agent's alias goes into is; with `SHELL` (a
+    zsh, else `/bin/zsh`) and `PATH`, the environment every zsh the backend asks runs with.
 - **App data** (`src/backend/records/`) — `<workspace>/Apps/pomade-agents/`; session records and
   agent profiles are two sets of files kept by one machinery (`FileSet`), with one set of
   guarantees:
@@ -1010,7 +1090,10 @@ type AgentRunFinished = AgentRunStarted & {
   workspaceReal, userData, socketPath, appKey, backendEnv(), snapshot(folder), cleanup() }`. `home`
   and the workspace start as copies of `harness/fixtures/`, their stores seeded with three of the
   synthetic transcripts in `harness/fixtures/transcripts/` (`SEEDED_TRANSCRIPTS`), which the unit
-  tests read too. `workspaceReal` is where the workspace's files are; `workspace` is what Pomade
+  tests read too. The fixtures are copied with their symlinks as they are. The fixture workspace
+  holds a look-alike `Agents/Claude Agent Template` (`CLAUDE.md`, `settings.json`, an own skill and
+  a link to a shared one) and `Agents/_shared/skills/` (two skills); both are skipped by the agent
+  scan. `workspaceReal` is where the workspace's files are; `workspace` is what Pomade
   and the backend are given — the same folder, or with `workspaceLink` a symlink to it.
 - `startFakePomade({ manifest, socketPath, appKey, host })` (`harness/fake-pomade.ts`) —
   `{ fake, shellSocketUrl, env(role?), backendCount(), close() }`: pomade-kit's fake host, reached

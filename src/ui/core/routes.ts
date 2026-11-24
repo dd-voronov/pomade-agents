@@ -36,3 +36,16 @@ export function selectedSessionOf(route: string): string | null {
 
 /** The app's own Settings page (DESIGN §3.8), opened by the gear of the tab's bar. */
 export const SETTINGS_ROUTE = "settings";
+
+/** The New agent page's route (DESIGN §3.6). It wins over `roster/<agent>`: `new` never names an
+ *  agent (`agent-name.ts`). */
+export const NEW_AGENT_ROUTE = `${ROSTER_ROUTE}/new`;
+
+export function isNewAgentRoute(route: string): boolean {
+  return route === NEW_AGENT_ROUTE;
+}
+
+/** The Overview of the agent a Create made, `roster/<agent>/overview`. */
+export function createdAgentRoute(agent: string): string {
+  return `${ROSTER_ROUTE}/${encodeURIComponent(agent)}/overview`;
+}
