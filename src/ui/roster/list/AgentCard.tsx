@@ -1,11 +1,14 @@
 // One agent as a card (DESIGN §3.3): name and state chips, provider and model, the role line, the
 // tags, Connected to, Last active, This week, and the actions. The role line and the tags each have
 // their space reserved (two lines, one row), so editing them in place moves nothing; the actions
-// stay inside the card at every width.
+// stay inside the card at every width. An agent that has never run a session shows Needs login and,
+// as the card's notice, the setup prompt to copy.
 
-import type { ReactElement } from "react";
+import { useRef, useState, type ReactElement } from "react";
 
 import { CaretIcon, ChevronIcon, MoreIcon, ResumeIcon, SessionsIcon, WarningIcon } from "../../core/icons.tsx";
+import { Menu, type MenuAnchor, type MenuEntry } from "../../core/Menu.tsx";
+import { NeedsLoginChip, NeedsLoginNotice } from "../NeedsLogin.tsx";
 import type { RosterActions } from "./actions.ts";
 import { ConnectedTo } from "./ConnectedTo.tsx";
 import { CARD_NAMES } from "./connected-model.ts";
@@ -36,6 +39,7 @@ export function ModelLine({ agent }: { agent: AgentView }): ReactElement {
 export function StateChips({ agent }: { agent: AgentView }): ReactElement {
   return (
     <>
+      {agent.needsLogin && <NeedsLoginChip testId={`chip-needs-login-${agent.id}`} />}
       {chipsOf(agent).map((chip) => (
         <span key={chip.id} className={controls.chip} data-tone={chip.tone} title={chip.title} data-testid={`chip-${chip.id}`}>
           {chip.label}
@@ -59,6 +63,32 @@ export function OrphanActions({ agent, small }: { agent: AgentView; small?: bool
       <button type="button" className={`${controls.btn} ${size}`} data-testid={`agent-remove-${agent.id}`}>
         Remove
       </button>
+    </>
+  );
+}
+
+/** The ⋯ button and its menu: the agent's page, and Clone… for an agent that can be cloned. */
+export function MoreButton({ agent, actions, className }: { agent: AgentView; actions: RosterActions; className: string }): ReactElement {
+  const [menu, setMenu] = useState<MenuAnchor | null>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const entries: MenuEntry[] = [{ kind: "item", id: "open-agent", label: "Open agent page", run: () => actions.openAgent(agent.id) }];
+  if (agent.cloneable) entries.push({ kind: "item", id: "clone", label: "Clone…", run: () => actions.cloneAgent(agent.id) });
+  return (
+    <>
+      <button
+        ref={button}
+        type="button"
+        className={className}
+        title="More"
+        aria-label={`More for ${agent.name}`}
+        aria-haspopup="menu"
+        aria-expanded={menu !== null}
+        data-testid={`agent-more-${agent.id}`}
+        onClick={() => setMenu(button.current?.getBoundingClientRect() ?? { x: 0, y: 0 })}
+      >
+        <MoreIcon />
+      </button>
+      {menu !== null && <Menu entries={entries} anchor={menu} onClose={() => setMenu(null)} label={`${agent.name} actions`} testId={`agent-menu-${agent.id}`} />}
     </>
   );
 }
@@ -87,6 +117,7 @@ function Notice({ agent }: { agent: AgentView }): ReactElement | null {
       </div>
     );
   }
+  if (agent.needsLogin) return <NeedsLoginNotice prompt={agent.setupPrompt} testId={`agent-needs-login-${agent.id}`} />;
   return null;
 }
 
@@ -100,11 +131,7 @@ export function AgentCard({ agent, actions, projects, now }: AgentCardProps): Re
         </button>
         <StateChips agent={agent} />
         <span className={styles.spacer} />
-        {!orphan && (
-          <button type="button" className={`${controls.iconBtn} ${styles.more}`} title="More" aria-label={`More for ${agent.name}`} data-testid={`agent-more-${agent.id}`}>
-            <MoreIcon />
-          </button>
-        )}
+        {!orphan && <MoreButton agent={agent} actions={actions} className={`${controls.iconBtn} ${styles.more}`} />}
       </div>
       <div className={styles.sub}>
         {agent.providerLabel}

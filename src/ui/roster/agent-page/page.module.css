@@ -149,6 +149,11 @@
   color: var(--warning);
 }
 
+/* A notice from a shared component, set at the header's notice spacing. */
+.noticeSlot {
+  margin-top: var(--space-3);
+}
+
 /* ── Buttons and links ── */
 
 .btn,

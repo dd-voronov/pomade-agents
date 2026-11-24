@@ -198,6 +198,7 @@ describe("the API's params", () => {
       revision: 0,
       indexing: false,
       agents: [{ agent: "claude", lastActiveAt: "2026-11-17T10:05:00.000Z", week: { sessions: 2, costUsd: null }, projects: [{ project: "__workspace__", sessions: 2, lastAt: "2026-11-17T10:05:00.000Z" }] }],
+      withSessions: ["claude"],
     });
   });
 

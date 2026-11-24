@@ -65,6 +65,9 @@ export type AgentCountsAnswer = {
   indexing: boolean;
   /** Every agent with a work session, by roster id. An agent missing here has none: zero, no time. */
   agents: AgentCounts[];
+  /** Every agent with at least one session of any status, Skip/Failed included, by roster id: one
+   *  missing here has never run a session (Needs login, DESIGN §3.6). */
+  withSessions: string[];
 };
 
 /** When a session was last active, in ms: its last record, else its start; `null` with neither. */
@@ -119,6 +122,13 @@ export function agentCounts(sessions: Iterable<Session>, params: AgentCountsPara
   }));
 }
 
+/** The roster ids with at least one session, of any status, in id order. */
+export function agentsWithSessions(sessions: Iterable<Session>): string[] {
+  const ids = new Set<string>();
+  for (const session of sessions) ids.add(session.summary.agent);
+  return [...ids].sort();
+}
+
 // ── Checks for values that crossed the broker ───────────────────────────────
 
 type Shape = Record<string, unknown>;
@@ -153,7 +163,9 @@ export function isAgentCountsAnswer(value: unknown): value is AgentCountsAnswer 
     isCount(value.revision) &&
     typeof value.indexing === "boolean" &&
     Array.isArray(value.agents) &&
-    value.agents.every(isAgentCounts)
+    value.agents.every(isAgentCounts) &&
+    Array.isArray(value.withSessions) &&
+    value.withSessions.every((id) => typeof id === "string" && id !== "")
   );
 }
 

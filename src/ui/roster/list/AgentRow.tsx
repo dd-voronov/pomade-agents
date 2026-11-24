@@ -4,9 +4,9 @@
 
 import type { ReactElement } from "react";
 
-import { CaretIcon, MoreIcon, ResumeIcon } from "../../core/icons.tsx";
+import { CaretIcon, ResumeIcon } from "../../core/icons.tsx";
 import type { RosterActions } from "./actions.ts";
-import { ModelLine, OrphanActions, StateChips } from "./AgentCard.tsx";
+import { ModelLine, MoreButton, OrphanActions, StateChips } from "./AgentCard.tsx";
 import { ConnectedTo } from "./ConnectedTo.tsx";
 import { ROW_NAMES } from "./connected-model.ts";
 import { lastActiveText, weekText, type AgentView } from "./roster-model.ts";
@@ -68,9 +68,7 @@ export function AgentRow({ agent, actions, projects, now }: AgentRowProps): Reac
                 <CaretIcon />
               </span>
             </button>
-            <button type="button" className={`${controls.iconBtn} ${styles.more}`} title="More" aria-label={`More for ${agent.name}`} data-testid={`agent-more-${agent.id}`}>
-              <MoreIcon />
-            </button>
+            <MoreButton agent={agent} actions={actions} className={`${controls.iconBtn} ${styles.more}`} />
           </>
         )}
       </div>

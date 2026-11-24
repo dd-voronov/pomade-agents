@@ -3,8 +3,9 @@
 // characters, the folder, then zsh — and `claude-pm` and `ls` are refused before anything is
 // written; Create ticks its steps, makes the folder with the shared skill links and `agent.yaml`,
 // connects the chosen project, appends the alias to the sandbox's `.zshrc` exactly once and finds
-// it resolving, and the agent is in `roster.list`; a rc file that cannot be written marks the
-// alias, keeps the agent and shows the line, and Check again passes once the line is there; a slow
+// it resolving, the agent is in `roster.list`, and its tab opens in that project with the setup
+// prompt to copy; a rc file that cannot be written marks the alias, keeps the agent, shows the line
+// and opens no tab, and Check again passes once the line is there and opens the tab then; a slow
 // shell never blocks typing nor leaves a verdict about a name no longer typed.
 //
 // The backend's environment is the sandbox's (`backendEnv`): its HOME is the sandbox home and no
@@ -16,7 +17,7 @@ import { chmod, lstat, mkdir, readFile, readdir, readlink, writeFile } from "nod
 import { join, sep } from "node:path";
 
 import type { FrameLocator, Page } from "@playwright/test";
-import { checkRosterList } from "pomade-kit/protocol";
+import { checkRosterList, type RosterAgent } from "pomade-kit/protocol";
 
 import type { Sandbox } from "../harness/sandbox.ts";
 import type { FakePomade } from "../harness/fake-pomade.ts";
@@ -65,7 +66,14 @@ async function typeName(tab: FrameLocator, name: string): Promise<void> {
 
 const nameMessage = (tab: FrameLocator) => tab.getByTestId("new-agent-name-message");
 
+/** The fake Pomade's roster for `agentTabs.launch`: the agents a test creates (Pomade reads the app's
+ *  `roster.list` on each launch; the fake holds a fixed one). */
+const launchable = (...ids: string[]): RosterAgent[] => ids.map((id) => ({ id, name: id, command: id, provider: "claude" }));
+
 test.describe("from the template", () => {
+  // The fake Pomade launches in a project folder its own files hold.
+  test.use({ pomadeSeed: { roster: launchable(NAME), files: { "Projects/beta/README.md": "" } } });
+
   test("Create makes the agent: its folder and skill links, agent.yaml, its project, the alias once and resolving; it is in roster.list", async ({ page, openShell, pomade, sandbox, backend }) => {
     await rosterReady(pomade);
     // Beta lists its agents; Alpha offers every agent (the fixture's default).
@@ -93,6 +101,7 @@ test.describe("from the template", () => {
       `Write Apps/pomade-agents/agents/${NAME}/agent.yaml`,
       "Connect to Beta",
       `Append alias ${NAME}=… to ~/.zshrc and check it resolves`,
+      `Open a ${NAME} tab in Beta`,
     ]);
 
     await tab.getByTestId("new-agent-create").click();
@@ -104,9 +113,20 @@ test.describe("from the template", () => {
       "Connect to Beta",
       "Append the alias to ~/.zshrc",
       `Check that ${NAME} resolves in a fresh zsh`,
+      `Open a ${NAME} tab in Beta`,
     ]);
-    for (const step of ["folder", "skills", "profile", "projects", "alias", "verify"]) await expect(tab.getByTestId(`new-agent-step-${step}`)).toHaveAttribute("data-state", "done");
+    for (const step of ["folder", "skills", "profile", "projects", "alias", "verify", "open"]) await expect(tab.getByTestId(`new-agent-step-${step}`)).toHaveAttribute("data-state", "done");
     await expect(tab.getByTestId("new-agent-done")).toContainText(`${NAME} is ready`);
+
+    // Its tab: opened by Pomade in the first project connected, with no prompt typed (it starts logged out).
+    expect(pomade.fake.openedAgentTabs).toEqual([expect.objectContaining({ kind: "agent", agentId: NAME, projectId: "beta", mode: "normal" })]);
+    expect(pomade.fake.openedAgentTabs[0]?.prompt).toBeUndefined();
+    await expect(tab.getByTestId("new-agent-done-text")).toContainText("Its tab is open in Beta.");
+    await expect(tab.getByTestId("new-agent-setup-prompt")).toHaveText(`Use the creating-claude-agent skill to set up ${NAME}: role “${ROLE}”, tags tax, personal.`);
+    await tab.getByTestId("new-agent-copy-prompt").click();
+    await expect(tab.getByTestId("new-agent-copy-prompt")).toHaveText("Copied");
+    await tab.getByTestId("new-agent-go-to-tab").click();
+    await expect.poll(() => pomade.fake.focusedAgentTabs).toEqual([pomade.fake.openedAgentTabs[0]?.tabId]);
 
     // The folder: the template, its own skill, its shared link, and the shared skill it lacked.
     const folder = join(sandbox.workspace, "Agents", NAME);
@@ -193,7 +213,7 @@ test.describe("refused names", () => {
       const result = await pomade.fake.callApi(ROSTER_CREATE_METHOD, { name, role: ROLE, tags: [], projects: ["beta"], createId: name });
       expect(isCreateAgentResult(result), name).toBe(true);
       expect(result, name).toMatchObject({ outcome: "refused", refused: { name, problem } });
-      expect((result as { steps: { state: string }[] }).steps.map((s) => s.state), name).toEqual(["todo", "todo", "todo", "todo", "todo", "todo"]);
+      expect((result as { steps: { state: string }[] }).steps.map((s) => s.state), name).toEqual(["todo", "todo", "todo", "todo", "todo", "todo", "todo"]);
     }
     expect(await sandbox.snapshot(join(sandbox.workspace, "Agents"))).toEqual(agentsBefore);
     expect((await readdir(join(sandbox.workspace, "Agents"))).sort()).toEqual([TEMPLATE, "_shared", "claude-libra", "claude-pm"]);
@@ -209,9 +229,10 @@ test.describe("a rc file that cannot be written", () => {
         await chmod(rcOf(sandbox), 0o444);
       },
     },
+    pomadeSeed: { roster: launchable("claude-writer") },
   });
 
-  test("marks the alias, keeps the agent, shows the line to add; Check again passes once it is there", async ({ page, openShell, pomade, sandbox, backend }) => {
+  test("marks the alias, keeps the agent, shows the line to add and opens no tab; Check again passes once it is there and opens the tab", async ({ page, openShell, pomade, sandbox, backend }) => {
     await rosterReady(pomade);
     const tab = await openNewAgent(page, openShell, pomade);
     await typeName(tab, "claude-writer");
@@ -230,7 +251,11 @@ test.describe("a rc file that cannot be written", () => {
     const line = aliasFor(sandbox, "claude-writer");
     await expect(tab.getByTestId("new-agent-alias-line")).toHaveText(line);
     await expect(tab.getByTestId("new-agent-alias-failed")).toContainText(`Add this line to ${rcOf(sandbox)}`);
+    await expect(tab.getByTestId("new-agent-alias-failed")).toContainText("its tab opens once it resolves");
     await expect(tab.getByTestId("new-agent-done")).toHaveCount(0);
+    // No tab: it would run a command zsh does not know.
+    await expect(tab.getByTestId("new-agent-step-open")).toHaveAttribute("data-state", "todo");
+    expect(pomade.fake.openedAgentTabs).toEqual([]);
 
     // Everything else is there: the folder, and the agent on the roster.
     expect((await readdir(join(sandbox.workspace, "Agents", "claude-writer"))).sort()).toEqual(["CLAUDE.md", "settings.json", "skills"]);
@@ -248,6 +273,11 @@ test.describe("a rc file that cannot be written", () => {
     await expect(tab.getByTestId("new-agent-alias-failed")).toHaveCount(0);
     await expect(tab.getByTestId("new-agent-step-verify")).toHaveAttribute("data-state", "done");
     await expect(tab.getByTestId("new-agent-step-alias")).toHaveAttribute("data-state", "done");
+    // Now the tab opens — in the Workspace, as no project was connected.
+    await expect(tab.getByTestId("new-agent-step-open")).toHaveAttribute("data-state", "done");
+    await expect(tab.getByTestId("new-agent-step-open")).toHaveText("Open a claude-writer tab in the Workspace");
+    expect(pomade.fake.openedAgentTabs).toEqual([expect.objectContaining({ agentId: "claude-writer", projectId: "__workspace__", mode: "normal" })]);
+    await expect(tab.getByTestId("new-agent-done-text")).toContainText("Its tab is open in the Workspace.");
     expect(backend.running()).toBe(true);
   });
 });

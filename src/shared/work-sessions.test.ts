@@ -3,7 +3,7 @@ import type { SessionStatus } from "pomade-kit/protocol";
 
 import type { Session } from "./sessions.ts";
 import { testSession, testSummary } from "./test-sessions.ts";
-import { agentCounts, isAgentCountsAnswer, isWorkSession, type AgentCountsParams } from "./work-sessions.ts";
+import { agentCounts, agentsWithSessions, isAgentCountsAnswer, isWorkSession, type AgentCountsParams } from "./work-sessions.ts";
 
 const WINDOWS: AgentCountsParams = { weekFrom: "2026-11-23T00:00:00.000Z", projectsFrom: "2026-08-26T00:00:00.000Z" };
 
@@ -110,12 +110,20 @@ describe("agent counts", () => {
     expect(claude?.projects[0]?.sessions).toBe(1);
   });
 
+  it("names every agent with a session of any status, a Skip/Failed one included", () => {
+    expect(agentsWithSessions([session("a", { agent: "codex" }), session("s", { agent: "claude-tax", status: "done-skip" }), session("b", { agent: "codex" })])).toEqual(["claude-tax", "codex"]);
+    expect(agentsWithSessions([])).toEqual([]);
+  });
+
   it("checks an answer", () => {
     const agents = agentCounts([session("a", { projects: ["alpha"], cost: 1 })], WINDOWS);
-    expect(isAgentCountsAnswer({ epoch: "e", revision: 3, indexing: false, agents })).toBe(true);
-    expect(isAgentCountsAnswer({ epoch: "e", revision: 3, indexing: false, agents: [] })).toBe(true);
-    expect(isAgentCountsAnswer({ epoch: "e", revision: -1, indexing: false, agents })).toBe(false);
-    expect(isAgentCountsAnswer({ epoch: "e", revision: 3, indexing: false, agents: [{ ...agents[0], week: { sessions: 1 } }] })).toBe(false);
-    expect(isAgentCountsAnswer({ epoch: "e", revision: 3, indexing: false, agents: [{ ...agents[0], projects: [{ project: "", sessions: 1, lastAt: null }] }] })).toBe(false);
+    const base = { epoch: "e", revision: 3, indexing: false, withSessions: ["claude"] };
+    expect(isAgentCountsAnswer({ ...base, agents })).toBe(true);
+    expect(isAgentCountsAnswer({ ...base, agents: [], withSessions: [] })).toBe(true);
+    expect(isAgentCountsAnswer({ ...base, revision: -1, agents })).toBe(false);
+    expect(isAgentCountsAnswer({ ...base, agents: [{ ...agents[0], week: { sessions: 1 } }] })).toBe(false);
+    expect(isAgentCountsAnswer({ ...base, agents: [{ ...agents[0], projects: [{ project: "", sessions: 1, lastAt: null }] }] })).toBe(false);
+    expect(isAgentCountsAnswer({ epoch: "e", revision: 3, indexing: false, agents })).toBe(false);
+    expect(isAgentCountsAnswer({ ...base, agents, withSessions: [""] })).toBe(false);
   });
 });

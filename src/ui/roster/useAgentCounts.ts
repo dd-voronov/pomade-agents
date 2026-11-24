@@ -20,6 +20,8 @@ export interface AgentCountsView {
   byAgent: ReadonlyMap<string, AgentCounts>;
   /** The first walk of the stores is still running: the counts are partial. */
   indexing: boolean;
+  /** Every agent with at least one session of any status (`AgentCountsAnswer.withSessions`). */
+  withSessions: ReadonlySet<string>;
 }
 
 /** The counts within `windows` (`rosterWindows`); `null` until the first answer. */
@@ -48,7 +50,7 @@ export function useAgentCounts(host: HostClient, windows: AgentCountsParams): Ag
         if (cancelled) return;
         if (!isAgentCountsAnswer(answer)) throw new Error("malformed answer");
         current.current = answer;
-        setView({ byAgent: countsByAgent(answer), indexing: answer.indexing });
+        setView({ byAgent: countsByAgent(answer), indexing: answer.indexing, withSessions: new Set(answer.withSessions) });
       } catch {
         if (!cancelled) retry = setTimeout(() => void ask(), RETRY_MS);
       } finally {

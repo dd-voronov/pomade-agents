@@ -119,4 +119,22 @@ describe("how values read", () => {
     expect(chipsOf(broken!)).toEqual([{ id: "unreadable", label: "agent.yaml can't be read", tone: "warn", title: "bad" }]);
     expect(chipsOf(hidden!).map((c) => c.id)).toEqual(["hidden"]);
   });
+
+  it("offers Clone… for a Claude Code folder agent only, and says which agents need login", () => {
+    const agents = answer([
+      entry("claude", { kind: "builtin" }),
+      entry("codex", { provider: "codex", kind: "builtin" }),
+      entry("claude-libra"),
+      entry("claude-new"),
+      entry("claude-gone", { orphan: true }),
+      entry("claude-bad", { profile: null, problem: "bad" }),
+    ]);
+    const views = agentViews(agents, new Map(), new Map(), NO_NAMES, { indexing: false, withSessions: new Set(["claude", "codex", "claude-libra"]) });
+    expect(views.filter((v) => v.cloneable).map((v) => v.id)).toEqual(["claude-libra", "claude-new"]);
+    expect(views.filter((v) => v.needsLogin).map((v) => v.id)).toEqual(["claude-new"]);
+    expect(views.find((v) => v.id === "claude-new")?.setupPrompt).toBe("Use the creating-claude-agent skill to set up claude-new: tags a, b.");
+    // Until the counts are in, or while the stores are first walked, no agent is said to need login.
+    expect(agentViews(agents, new Map(), new Map(), NO_NAMES).some((v) => v.needsLogin)).toBe(false);
+    expect(agentViews(agents, new Map(), new Map(), NO_NAMES, { indexing: true, withSessions: new Set() }).some((v) => v.needsLogin)).toBe(false);
+  });
 });

@@ -66,7 +66,7 @@ import {
   type SessionsSince,
   type SessionsUpdated,
 } from "../../shared/sessions.ts";
-import { SESSIONS_AGENT_COUNTS_METHOD, agentCounts, type AgentCountsAnswer } from "../../shared/work-sessions.ts";
+import { SESSIONS_AGENT_COUNTS_METHOD, agentCounts, agentsWithSessions, type AgentCountsAnswer } from "../../shared/work-sessions.ts";
 import type { RealPath } from "../core/real-paths.ts";
 import type { BoundTabs } from "../sessions/bound-tabs.ts";
 import { agentsFor, connectionsOf, projectsFor, type ProjectReads } from "../roster/connections.ts";
@@ -238,7 +238,9 @@ function createParams(raw: unknown): CreateAgentParams {
     throw new HostError("invalid-params", '"projects" must be a list of project ids');
   }
   if (typeof createId !== "string" || createId === "" || createId.length > 128) throw new HostError("invalid-params", '"createId" must be an id');
-  return { name, role: role.trim(), tags: [...new Set(tags.map((t) => t.trim()))], projects: projects as string[], createId };
+  const { clone } = params;
+  if (clone !== undefined && (typeof clone !== "string" || clone === "" || clone.length > NAME_PARAM_MAX)) throw new HostError("invalid-params", '"clone" must be a roster id');
+  return { name, role: role.trim(), tags: [...new Set(tags.map((t) => t.trim()))], projects: projects as string[], createId, ...(clone === undefined ? {} : { clone }) };
 }
 
 /** The longest model name `roster.setModel` takes. */
@@ -345,7 +347,7 @@ export function createApi({ info, sessions, live, tabs, liveNow, realPath, roste
       const params = paramsOf(raw);
       const windows = { weekFrom: timeOf(params, "weekFrom"), projectsFrom: timeOf(params, "projectsFrom") };
       const { epoch, revision, indexing, sessions: all } = sessions.answer();
-      return { epoch, revision, indexing, agents: agentCounts(all, windows) };
+      return { epoch, revision, indexing, agents: agentCounts(all, windows), withSessions: agentsWithSessions(all) };
     },
     [SKILLS_CATALOG_METHOD]: () => skills.read(),
     [SETTINGS_SET_SKILL_FOLDERS_METHOD]: (raw) => {

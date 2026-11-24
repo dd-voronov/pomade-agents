@@ -1,7 +1,10 @@
 // The New agent page's conversations with the backend and Pomade: the name checked as it is typed
 // (`roster.checkName`, debounced; an answer about a name no longer typed is dropped), the projects
-// a new agent can be connected to (`project.list`, `project.getAgents`), and the Create with its
-// steps ticking (`roster.create`, `roster.creating`) and Check again (`roster.checkAlias`).
+// a new agent can be connected to (`project.list`, `project.getAgents`), the Create with its
+// steps ticking (`roster.create`, `roster.creating`) and Check again (`roster.checkAlias`), and the
+// new agent's tab: the backend opens it at the end of the Create; when the alias needed fixing,
+// the page opens it once Check again passes (`agentTabs.launch`); Go to its tab focuses it
+// (`agentTabs.focus`), or opens another when it was closed.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { HostError, type HostClient } from "pomade-kit/sdk";
@@ -21,7 +24,7 @@ import {
   type CreateStep,
   type NameVerdict,
 } from "../../../shared/roster.ts";
-import { NAME_CHECK_DELAY_MS, aliasChecked, answeredName, phaseOf, typedName, type NameState, type Phase } from "./new-agent-model.ts";
+import { NAME_CHECK_DELAY_MS, aliasChecked, answeredName, phaseOf, settledPhase, typedName, withOpen, type NameState, type Phase } from "./new-agent-model.ts";
 
 /** A zsh that reads heavy rc files may take seconds; the backend gives it 15 s. */
 const CHECK_TIMEOUT_MS = 20_000;
@@ -67,6 +70,8 @@ export interface ConnectableProject {
   root: string;
   /** Its sidebar group's path, "Building tools / Tools"; "" when ungrouped. */
   group: string;
+  /** The agents its "+" menu lists (`project.getAgents`' `visibleAgents`). */
+  agents: string[];
 }
 
 export interface Connectable {
@@ -91,7 +96,7 @@ export function useConnectable(host: HostClient): Connectable | null {
         const next: Connectable = { projects: [], offerEvery: [] };
         projects.forEach((p, i) => {
           if (visible[i]?.includes("*") === true) next.offerEvery.push(p.name);
-          else next.projects.push({ id: p.id, name: p.name, root: p.root, group: p.groupPath.join(" / ") });
+          else next.projects.push({ id: p.id, name: p.name, root: p.root, group: p.groupPath.join(" / "), agents: visible[i] ?? [] });
         });
         setAnswer(next);
       } catch {
@@ -118,16 +123,22 @@ export interface CreateState {
   checking: boolean;
   /** What the last Check again found, when the alias still does not resolve. */
   checkDetail: string | null;
+  /** The new agent's tab; `null` until one is open. */
+  tabId: string | null;
+  /** Why Go to its tab found no tab to go to; `null` when it did. */
+  tabProblem: string | null;
 }
 
 const NOT_STARTED: CreateStep[] = CREATE_STEP_IDS.map((id) => ({ id, state: "todo", detail: null }));
-const INITIAL: CreateState = { phase: "edit", steps: NOT_STARTED, result: null, lost: null, checking: false, checkDetail: null };
+const INITIAL: CreateState = { phase: "edit", steps: NOT_STARTED, result: null, lost: null, checking: false, checkDetail: null, tabId: null, tabProblem: null };
 
 export interface CreateAgent {
   state: CreateState;
   /** Run a Create; resolves with its answer, or `null` when none came. */
   create(params: Omit<CreateAgentParams, "createId">): Promise<CreateAgentResult | null>;
   checkAgain(): Promise<void>;
+  /** Bring the new agent's tab to the front; open another when it is gone. */
+  goToTab(): Promise<void>;
   /** Back to the form, its values kept. */
   edit(): void;
 }
@@ -157,7 +168,7 @@ export function useCreateAgent(host: HostClient): CreateAgent {
       try {
         const answer = await host.apps.call(host.welcome.appId, ROSTER_CREATE_METHOD, { ...params, createId }, { timeoutMs: CREATE_TIMEOUT_MS });
         if (!isCreateAgentResult(answer)) throw new Error("the app gave a malformed answer");
-        update((s) => ({ ...s, phase: phaseOf(answer), steps: answer.steps, result: answer }));
+        update((s) => ({ ...s, phase: phaseOf(answer), steps: answer.steps, result: answer, tabId: answer.tabId }));
         return answer;
       } catch (err) {
         update((s) => ({ ...s, phase: "failed", lost: reasonOf(err) }));
@@ -169,24 +180,64 @@ export function useCreateAgent(host: HostClient): CreateAgent {
     [host, update],
   );
 
+  const name = state.result?.name;
+  const openIn = state.result?.openIn;
+
+  /** Open the agent's tab in the project the Create chose; its id. */
+  const launch = useCallback(async (): Promise<string> => {
+    if (name === undefined || openIn === undefined) throw new Error("no agent was created");
+    return (await host.agentTabs.launch({ agentId: name, projectId: openIn })).tabId;
+  }, [host, name, openIn]);
+
   const checkAgain = useCallback(async (): Promise<void> => {
-    const name = state.result?.name;
     if (name === undefined) return;
     update((s) => ({ ...s, checking: true }));
+    let resolves = false;
     try {
       const answer = await host.apps.call(host.welcome.appId, ROSTER_CHECK_ALIAS_METHOD, { agent: name }, { timeoutMs: CHECK_TIMEOUT_MS });
       if (!isAliasCheck(answer)) throw new Error("the app gave a malformed answer");
-      update((s) => {
-        if (!answer.ok) return { ...s, checking: false, checkDetail: answer.detail };
-        const steps = aliasChecked(s.steps);
-        return { ...s, checking: false, checkDetail: null, steps, phase: steps.some((step) => step.state === "fail") ? "incomplete" : "done" };
-      });
+      resolves = answer.ok;
+      update((s) => (answer.ok ? { ...s, checking: false, checkDetail: null, steps: withOpen(aliasChecked(s.steps), "run") } : { ...s, checking: false, checkDetail: answer.detail }));
     } catch (err) {
       update((s) => ({ ...s, checking: false, checkDetail: reasonOf(err) }));
     }
-  }, [host, state.result?.name, update]);
+    if (!resolves) return;
+    // The alias resolves now: the tab the Create held back opens.
+    try {
+      const tabId = await launch();
+      update((s) => {
+        const steps = withOpen(s.steps, "done", "Opened");
+        return { ...s, steps, tabId, phase: settledPhase(steps) };
+      });
+    } catch (err) {
+      update((s) => {
+        const steps = withOpen(s.steps, "fail", `The tab did not open: ${reasonOf(err)}`);
+        return { ...s, steps, phase: settledPhase(steps) };
+      });
+    }
+  }, [host, name, launch, update]);
+
+  const goToTab = useCallback(async (): Promise<void> => {
+    update((s) => ({ ...s, tabProblem: null }));
+    const tabId = state.tabId;
+    try {
+      if (tabId !== null) {
+        try {
+          await host.agentTabs.focus(tabId);
+          return;
+        } catch (err) {
+          // Closed since: open another.
+          if (!(err instanceof HostError && err.code === "not-found")) throw err;
+        }
+      }
+      const opened = await launch();
+      update((s) => ({ ...s, tabId: opened }));
+    } catch (err) {
+      update((s) => ({ ...s, tabProblem: reasonOf(err) }));
+    }
+  }, [host, state.tabId, launch, update]);
 
   const edit = useCallback(() => update(() => INITIAL), [update]);
 
-  return { state, create, checkAgain, edit };
+  return { state, create, checkAgain, goToTab, edit };
 }

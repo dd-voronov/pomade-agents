@@ -63,7 +63,7 @@ export function RosterList({ host, actions }: { host: HostClient; actions: Roste
 
   const names = useMemo(() => new Map([...(projects ?? [])].map(([id, p]) => [id, p.name])), [projects]);
   const agents = useMemo(
-    () => (answer === null || connections === null || counts === null ? null : agentViews(answer, counts.byAgent, connections, names)),
+    () => (answer === null || connections === null || counts === null ? null : agentViews(answer, counts.byAgent, connections, names, counts)),
     [answer, connections, counts, names],
   );
 

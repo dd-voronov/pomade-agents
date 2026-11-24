@@ -28,9 +28,10 @@ interface Fixtures {
   /** Pomade names the sandbox's workspace through a symlink (`test.use({ workspaceLink: true })`). */
   workspaceLink: boolean;
   /** What the fake Pomade has at start besides the fixture projects — its agent tabs, the sessions
-   *  `agentTabs.resume` finds, the workspace's files and its projects with the agents each offers
-   *  (`test.use({ pomadeSeed: { agentTabs: [...] } })`); nothing by default, the projects `alpha` and `beta`. */
-  pomadeSeed: Pick<FakeHostOptions, "agentTabs" | "sessions" | "files" | "projects" | "activeProject">;
+   *  `agentTabs.resume` finds, the workspace's files, its projects with the agents each offers and
+   *  the roster `agentTabs.launch` accepts (`test.use({ pomadeSeed: { agentTabs: [...] } })`);
+   *  nothing by default, the projects `alpha` and `beta`. */
+  pomadeSeed: Pick<FakeHostOptions, "agentTabs" | "sessions" | "files" | "projects" | "activeProject" | "roster">;
   manifest: AppManifest;
   sandbox: Sandbox;
   pomade: FakePomade;

@@ -1,0 +1,63 @@
+/* Needs login: an accent chip beside the agent's name, and an accent notice with the link that
+   copies the setup prompt. Sized like the agent page's chips and notices. */
+
+.chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--badge-fg);
+  font-size: 10.5px;
+  font-weight: var(--fw-medium);
+  line-height: 14px;
+  white-space: nowrap;
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  max-width: 760px;
+  padding: 7px 10px;
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  line-height: 17px;
+}
+
+.notice > svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--badge-fg);
+}
+
+.notice > span {
+  flex: 1;
+  min-width: 0;
+}
+
+.notice code {
+  padding: 1px 4px;
+  border-radius: var(--radius-sm);
+  background: var(--active-bg);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  line-height: 16px;
+}
+
+.link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--badge-fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.link:hover {
+  text-decoration: underline;
+}

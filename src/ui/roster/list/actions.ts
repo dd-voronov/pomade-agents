@@ -9,4 +9,6 @@ export interface RosterActions {
   openProjects(agent: string): void;
   /** The New agent page. */
   newAgent(): void;
+  /** The New agent page as a clone of `agent`. */
+  cloneAgent(agent: string): void;
 }

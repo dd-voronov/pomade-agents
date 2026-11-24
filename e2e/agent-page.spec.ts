@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 import type { Locator, Page } from "@playwright/test";
 
 import type { Sandbox } from "../harness/sandbox.ts";
-import { claudeFolderName } from "../src/shared/roster.ts";
+import { ROSTER_AGENTS_METHOD, claudeFolderName, isRosterAgentsAnswer } from "../src/shared/roster.ts";
 import { agentRoute, type AgentTab } from "../src/ui/core/routes.ts";
 import { expect, test, type Shell } from "./fixtures.ts";
 import { answer, projectFolder, prompt, seedIntoProject } from "./transcripts.ts";
@@ -215,6 +215,14 @@ test("role and tags are edited in place into agent.yaml, and hovering or editing
   await tagField.press("Escape");
   await expect(tagField).toHaveCount(0);
   await expect.poll(() => readFile(profileOf(sandbox, LIBRA), "utf8")).toMatch(/tags:\n {2}- vault\n {2}- ops\n/);
+  // The roster has read both saves back: no answer still on its way can show the first one alone.
+  await expect
+    .poll(async () => {
+      const roster = await pomade.fake.callApi(ROSTER_AGENTS_METHOD).catch(() => null);
+      return isRosterAgentsAnswer(roster) ? roster.agents.find((a) => a.id === LIBRA)?.profile?.tags : null;
+    })
+    .toEqual(["vault", "ops"]);
+  await expect(tags.getByTestId("agent-tags-tag")).toHaveText(["vault", "ops"]);
 
   const firstTag = tags.getByTestId("agent-tags-tag").first();
   await expect(firstTag.getByTestId("agent-tags-remove")).toBeVisible();
@@ -306,12 +314,12 @@ test("Open CLAUDE.md, agent.yaml, settings.json and a memory file open in Pomade
   expect(opened()).toHaveLength(6);
 });
 
-test("Start session, Hide and Clone… show in their places, disabled; the page has no Start session for an orphan", async ({ page, openShell, pomade }) => {
+test("Start session and Hide show in their places, disabled, Clone… is there for a folder agent only; the page has no Start session for an orphan", async ({ page, openShell, pomade }) => {
   await openPage(page, openShell, pomade, LIBRA, "overview");
   const frame = frameOf(page);
   await expect(frame.getByTestId("agent-start-session")).toBeDisabled();
   await frame.getByTestId("agent-more").click();
-  await expect(frame.getByTestId("menu-item-clone")).toBeDisabled();
+  await expect(frame.getByTestId("menu-item-clone")).toBeEnabled();
   await expect(frame.getByTestId("menu-item-hide")).toHaveText("Hide from the “+” menu");
   await expect(frame.getByTestId("menu-item-hide")).toBeDisabled();
   await expect(frame.getByTestId("menu-item-open-claude-md")).toBeEnabled();

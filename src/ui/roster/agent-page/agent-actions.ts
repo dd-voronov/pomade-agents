@@ -1,7 +1,9 @@
-// The header's actions that belong to later tickets — Start session (T-021), Hide / Show in the
-// "+" menu (T-021) and Clone… (T-026). Each is `null` until its ticket wires it: the control shows
-// in its place, disabled. A ticket replaces its entry here and nothing else on the page.
+// The header's actions that belong to later tickets — Start session (T-021) and Hide / Show in the
+// "+" menu (T-021) — and Clone…, which opens the New agent page with this agent as its source. An
+// entry still `null` shows its control in place, disabled. A ticket replaces its entry here and
+// nothing else on the page.
 
+import { newAgentRoute } from "../../core/routes.ts";
 import type { AgentContext } from "./agent-context.ts";
 
 export interface AgentActions {
@@ -14,6 +16,6 @@ export interface AgentActions {
 }
 
 export function useAgentActions(context: AgentContext): AgentActions {
-  void context;
-  return { startSession: null, setHidden: null, clone: null };
+  const { navigate, entry } = context;
+  return { startSession: null, setHidden: null, clone: () => navigate(newAgentRoute(entry.id)) };
 }

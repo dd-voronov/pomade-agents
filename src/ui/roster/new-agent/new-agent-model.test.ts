@@ -1,7 +1,23 @@
 import { describe, expect, it } from "vitest";
 
-import { CREATE_STEP_IDS, type CreateAgentResult, type CreateStep } from "../../../shared/roster.ts";
-import { addTags, aliasChecked, aliasFailed, answeredName, createWill, nameMessage, pageTitle, phaseOf, stepLabel, typedName, type Part } from "./new-agent-model.ts";
+import { CREATE_STEP_IDS, type AgentProfile, type CreateAgentResult, type CreateStep, type RosterEntry } from "../../../shared/roster.ts";
+import {
+  addTags,
+  aliasChecked,
+  aliasFailed,
+  answeredName,
+  clonePrefill,
+  cloneable,
+  createWill,
+  nameMessage,
+  pageTitle,
+  phaseOf,
+  settledPhase,
+  stepLabel,
+  typedName,
+  withOpen,
+  type Part,
+} from "./new-agent-model.ts";
 
 const text = (parts: readonly Part[]): string => parts.map((p) => (typeof p === "string" ? p : `\`${p.code}\``)).join("");
 
@@ -51,7 +67,15 @@ describe("Create will", () => {
       "Write `Apps/pomade-agents/agents/claude-tax/agent.yaml`",
       "Connect to Alpha, Beta",
       "Append `alias claude-tax=…` to `~/.zshrc` and check it resolves",
+      "Open a `claude-tax` tab in Alpha",
     ]);
+  });
+
+  it("copies from the clone source, and opens the tab in the Workspace with no project", () => {
+    const items = createWill("claude-tax", [], { kind: "clone", source: "claude-libra" }).map((item) => text(item.parts));
+    expect(items[0]).toBe("Copy from `claude-libra`: `CLAUDE.md`, `settings.json`, its skill links, the `plugins` link");
+    expect(items[5]).toBe("Open a `claude-tax` tab in the Workspace");
+    expect(text(createWill("", [], { kind: "clone", source: null })[0]?.parts ?? [])).toBe("Copy the picked agent’s `CLAUDE.md`, `settings.json`, skill links and `plugins` link");
   });
 
   it("names a placeholder before the name is typed, and says when no project is chosen", () => {
@@ -72,26 +96,71 @@ describe("the steps", () => {
       "No projects to connect",
       "Append the alias to ~/.zshrc",
       "Check that claude-tax resolves in a fresh zsh",
+      "Open a claude-tax tab in the Workspace",
     ]);
     expect(stepLabel("projects", "x", ["Alpha"])).toBe("Connect to Alpha");
+    expect(stepLabel("open", "x", ["Alpha", "Beta"])).toBe("Open a x tab in Alpha");
+    expect(stepLabel("folder", "x", [], "claude-libra")).toBe("Copy claude-libra’s CLAUDE.md, settings.json, skill links and plugins link");
   });
 
   it("show the alias to fix when the alias or its check failed, and both done once Check again passes", () => {
-    expect(aliasFailed(steps("dddsdd"))).toBe(false);
-    expect(aliasFailed(steps("dddsdf"))).toBe(true);
-    expect(aliasFailed(steps("dddsfd"))).toBe(true);
-    expect(aliasFailed(steps("dddfdd"))).toBe(false);
-    expect(aliasChecked(steps("dddsff")).map((s) => s.state)).toEqual(["done", "done", "done", "skip", "done", "done"]);
-    expect(aliasChecked(steps("dddfdf")).map((s) => s.state)).toEqual(["done", "done", "done", "fail", "done", "done"]);
+    expect(aliasFailed(steps("dddsddd"))).toBe(false);
+    expect(aliasFailed(steps("dddsdft"))).toBe(true);
+    expect(aliasFailed(steps("dddsfdt"))).toBe(true);
+    expect(aliasFailed(steps("dddfddd"))).toBe(false);
+    expect(aliasChecked(steps("dddsfft")).map((s) => s.state)).toEqual(["done", "done", "done", "skip", "done", "done", "todo"]);
+    expect(aliasChecked(steps("dddfdft")).map((s) => s.state)).toEqual(["done", "done", "done", "fail", "done", "done", "todo"]);
+  });
+
+  it("take the tab the page opened after Check again, and settle on done only when every step is done or skipped", () => {
+    const checked = aliasChecked(steps("dddsfft"));
+    expect(settledPhase(checked)).toBe("incomplete");
+    expect(withOpen(checked, "run").at(-1)).toEqual({ id: "open", state: "run", detail: null });
+    const opened = withOpen(checked, "done", "Opened in the Workspace");
+    expect(settledPhase(opened)).toBe("done");
+    expect(settledPhase(withOpen(checked, "fail", "The tab did not open: not-found"))).toBe("incomplete");
+    expect(settledPhase(steps("dddfddd"))).toBe("incomplete");
   });
 
   it("leave the page where the Create's outcome says", () => {
-    const result = (outcome: CreateAgentResult["outcome"]): CreateAgentResult => ({ createId: "c", name: "x", outcome, steps: [], refused: null, folder: "/w/Agents/x", aliasLine: "", rcFile: null });
+    const result = (outcome: CreateAgentResult["outcome"]): CreateAgentResult => ({ createId: "c", name: "x", outcome, steps: [], refused: null, folder: "/w/Agents/x", aliasLine: "", rcFile: null, openIn: "__workspace__", tabId: null });
     expect(phaseOf(result("created"))).toBe("done");
     expect(phaseOf(result("incomplete"))).toBe("incomplete");
     expect(phaseOf(result("failed"))).toBe("failed");
     expect(phaseOf(result("refused"))).toBe("edit");
     expect(["edit", "creating", "done", "incomplete", "failed"].map((p) => pageTitle(p as "edit", "claude-tax"))).toEqual(["New agent", "Creating claude-tax", "claude-tax created", "claude-tax created", "claude-tax not created"]);
+    expect(pageTitle("edit", "", "claude-libra")).toBe("New agent — clone of claude-libra");
+  });
+});
+
+describe("a clone", () => {
+  const profile = (id: string, over: Partial<AgentProfile> = {}): AgentProfile => ({ id, provider: "claude", kind: "folder", configDir: `Agents/${id}`, command: id, role: "The librarian.", tags: ["vault"], hidden: false, modes: {}, ...over });
+  const entry = (id: string, over: Partial<RosterEntry> = {}, p: Partial<AgentProfile> = {}): RosterEntry => {
+    const value = profile(id, p);
+    return { id, name: id, profile: value, problem: null, orphan: false, configDir: `/w/Agents/${id}`, model: null, effort: null, provider: value.provider, kind: value.kind, hidden: value.hidden, ...over };
+  };
+
+  it("starts only from a Claude Code folder agent with a readable profile that is not an orphan", () => {
+    const agents = [
+      entry("claude", {}, { kind: "builtin" }),
+      entry("codex", {}, { provider: "codex", kind: "builtin" }),
+      entry("claude-libra"),
+      entry("claude-gone", { orphan: true }),
+      entry("claude-bad", { profile: null, problem: "bad" }),
+      entry("claude-hidden", {}, { hidden: true }),
+    ];
+    expect(cloneable(agents).map((a) => a.id)).toEqual(["claude-libra", "claude-hidden"]);
+  });
+
+  it("pre-fills the role, the tags and the projects that list the source", () => {
+    const projects = [
+      { id: "alpha", agents: ["claude", "claude-libra"] },
+      { id: "beta", agents: ["claude"] },
+      { id: "gamma", agents: ["claude-libra"] },
+    ];
+    expect(clonePrefill(entry("claude-libra"), projects)).toEqual({ role: "The librarian.", tags: ["vault"], projects: ["alpha", "gamma"] });
+    const bare: AgentProfile = { id: "claude-bare", provider: "claude", kind: "folder", configDir: "Agents/claude-bare", command: "claude-bare", tags: [], hidden: false, modes: {} };
+    expect(clonePrefill(entry("claude-bare", { profile: bare }), [])).toEqual({ role: "", tags: [], projects: [] });
   });
 });
 

@@ -1,32 +1,45 @@
-// The New agent page, route `roster/new` (DESIGN §3.6; the agreed layout is
-// `prototypes/roster/`'s): the form with "Create will" beside it, then the Create in place — its
-// steps ticking — and where it ends: done, the alias to fix with Check again, or nothing kept.
+// The New agent page, route `roster/new` — `roster/new?clone=<id>` starts it as a clone of that
+// agent (DESIGN §3.6; the agreed layout is `prototypes/roster/`'s): the form with "Create will"
+// beside it, then the Create in place — its steps ticking — and where it ends: done, with the new
+// agent's tab open and its setup prompt to copy; the alias to fix with Check again; or nothing kept.
 
-import { useState, type KeyboardEvent, type ReactElement, type ReactNode } from "react";
+import { useRef, useState, type KeyboardEvent, type ReactElement, type ReactNode } from "react";
+import { WORKSPACE_PROJECT_ID } from "pomade-kit/protocol";
 import type { HostClient } from "pomade-kit/sdk";
 
 import type { CreateStep } from "../../../shared/roster.ts";
 import { copyText } from "../../core/clipboard.ts";
-import { CheckIcon, CloseIcon, WarningIcon } from "../../core/icons.tsx";
+import { CaretIcon, CheckIcon, CloseIcon, TerminalIcon, WarningIcon } from "../../core/icons.tsx";
+import { Menu, type MenuAnchor, type MenuEntry } from "../../core/Menu.tsx";
 import { ROSTER_ROUTE, agentRoute } from "../../core/routes.ts";
+import { useRoster } from "../useRoster.ts";
+import { setupPrompt } from "../needs-login.ts";
 import { BackGlyph, CopyGlyph, SpinnerGlyph } from "./glyphs.tsx";
 import {
+  NEVER_CLONED,
   RC_FILE_LABEL,
   TEMPLATE_PATH,
+  WORKSPACE_LABEL,
   addTags,
   aliasFailed,
+  clonePrefill,
+  cloneable,
   createWill,
   nameMessage,
+  openInLabel,
   pageTitle,
   stepLabel,
   type Part,
+  type StartFrom,
 } from "./new-agent-model.ts";
 import styles from "./NewAgentPage.module.css";
 import { useConnectable, useCreateAgent, useNameCheck, type Connectable } from "./useNewAgent.ts";
 
-/** Where a new agent starts from, by id. The template is the one choice now; cloning an agent
- *  joins it as a second option, with its source picker under the control. */
-const START_FROM: readonly { id: string; label: string }[] = [{ id: "template", label: "Blank template" }];
+/** The Start from choices, in order. */
+const START_FROM: readonly { kind: StartFrom["kind"]; label: string }[] = [
+  { kind: "template", label: "Blank template" },
+  { kind: "clone", label: "Clone an agent" },
+];
 
 const ROLE_MAX = 140;
 const TAG_MAX = 24;
@@ -39,17 +52,23 @@ function Parts({ parts }: { parts: readonly Part[] }): ReactElement {
   );
 }
 
-/** Copy `text`; the button shows a tick for a moment. */
-function CopyButton({ text, testId }: { text: string; testId: string }): ReactElement {
+/** Copy `text`; the button shows a tick for a moment. `label` shows the word beside the glyph. */
+function CopyButton({ text, testId, label = false }: { text: string; testId: string; label?: boolean }): ReactElement {
   const [copied, setCopied] = useState(false);
   const copy = async (): Promise<void> => {
     await copyText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
-  return (
+  const glyph = copied ? <CheckIcon size={14} /> : <CopyGlyph />;
+  return label ? (
+    <button type="button" className={`${styles.button} ${styles.small}`} data-testid={testId} onClick={() => void copy()}>
+      {glyph}
+      {copied ? "Copied" : "Copy"}
+    </button>
+  ) : (
     <button type="button" className={styles.iconButton} title={copied ? "Copied" : "Copy"} aria-label={copied ? "Copied" : "Copy"} data-testid={testId} onClick={() => void copy()}>
-      {copied ? <CheckIcon size={14} /> : <CopyGlyph />}
+      {glyph}
     </button>
   );
 }
@@ -69,41 +88,62 @@ function Field({ label, htmlFor, children }: { label: string; htmlFor?: string; 
 
 interface Props {
   host: HostClient;
+  /** The agent the page starts as a clone of; `null` for the blank template. */
+  clone: string | null;
   navigate: (route: string) => void;
 }
 
-export function NewAgentPage({ host, navigate }: Props): ReactElement {
+export function NewAgentPage({ host, clone, navigate }: Props): ReactElement {
   const [name, setName] = useState("");
   const [role, setRole] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [tagDraft, setTagDraft] = useState("");
   const [chosen, setChosen] = useState<string[]>([]);
-  const [startFrom, setStartFrom] = useState("template");
+  const [startFrom, setStartFrom] = useState<StartFrom>(clone === null ? { kind: "template" } : { kind: "clone", source: clone });
+  /** The source whose role, tags and projects the form took. */
+  const [prefilled, setPrefilled] = useState<string | null>(null);
+  const [sourceMenu, setSourceMenu] = useState<MenuAnchor | null>(null);
+  const sourceButton = useRef<HTMLButtonElement>(null);
   const [tried, setTried] = useState(false);
   const { state: nameState, refuse } = useNameCheck(host, name);
   const connectable = useConnectable(host);
-  const { state: run, create, checkAgain, edit } = useCreateAgent(host);
+  const { answer: roster } = useRoster(host);
+  const { state: run, create, checkAgain, goToTab, edit } = useCreateAgent(host);
 
   const projects = connectable?.projects ?? [];
+  const sources = roster === null ? [] : cloneable(roster.agents);
+  const source = startFrom.kind === "clone" ? startFrom.source : null;
+  const sourceEntry = source === null ? undefined : sources.find((a) => a.id === source);
+  // A clone takes its source's role, tags and projects once both are known; the user changes them freely after.
+  if (sourceEntry !== undefined && source !== prefilled && connectable !== null) {
+    const fill = clonePrefill(sourceEntry, connectable.projects);
+    setPrefilled(source);
+    setRole(fill.role);
+    setTags(fill.tags);
+    setChosen(fill.projects);
+  }
   /** The checked projects, in sidebar order. */
   const checked = projects.filter((p) => chosen.includes(p.id));
   const checkedNames = checked.map((p) => p.name);
   const roleOk = role.trim() !== "";
   const nameOk = nameState.status === "ok" || nameState.status === "checking";
-  const formOk = nameOk && roleOk;
+  const sourceOk = startFrom.kind === "template" || sourceEntry !== undefined;
+  const formOk = nameOk && roleOk && sourceOk;
   const shownName = run.result?.name ?? name;
+  /** The project the Create chose for the first tab, by name. */
+  const openIn = run.result === null ? openInLabel(checkedNames) : run.result.openIn === WORKSPACE_PROJECT_ID ? WORKSPACE_LABEL : (projects.find((p) => p.id === run.result?.openIn)?.name ?? run.result.openIn);
 
   const submit = async (): Promise<void> => {
     setTried(true);
     if (!formOk) {
       // The fields turn red on the next render: focus the first of them then.
-      setTimeout(() => document.querySelector<HTMLElement>('input[aria-invalid="true"]')?.focus(), 0);
+      setTimeout(() => document.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus(), 0);
       return;
     }
     const allTags = addTags(tags, tagDraft);
     setTags(allTags);
     setTagDraft("");
-    const result = await create({ name, role: role.trim(), tags: allTags, projects: checked.map((p) => p.id) });
+    const result = await create({ name, role: role.trim(), tags: allTags, projects: checked.map((p) => p.id), ...(source === null ? {} : { clone: source }) });
     if (result?.outcome === "refused" && result.refused !== null) {
       refuse(result.refused);
       edit();
@@ -128,6 +168,18 @@ export function NewAgentPage({ host, navigate }: Props): ReactElement {
     }
   };
 
+  const sourceEntries: MenuEntry[] =
+    sources.length === 0
+      ? [{ kind: "item", id: "clone-source-none", label: "No folder agent to clone", disabled: { why: "Only Claude Code folder agents are cloned" }, run: () => undefined }]
+      : sources.map((a) => ({
+          kind: "item",
+          id: `clone-source-${a.id}`,
+          label: a.id,
+          ...(a.profile?.role === undefined ? {} : { detail: a.profile.role }),
+          checked: a.id === source,
+          run: () => setStartFrom({ kind: "clone", source: a.id }),
+        }));
+  const sourceInvalid = tried && startFrom.kind === "clone" && sourceEntry === undefined;
   const message = nameMessage(nameState, tried);
   const nameInvalid = nameState.status === "bad" || (tried && nameState.status === "empty");
   const roleInvalid = tried && !roleOk;
@@ -139,14 +191,48 @@ export function NewAgentPage({ host, navigate }: Props): ReactElement {
           <Field label="Start from">
             <div className={styles.seg} role="group" aria-label="Start from" data-testid="new-agent-start-from">
               {START_FROM.map((option) => (
-                <button key={option.id} type="button" aria-pressed={startFrom === option.id} onClick={() => setStartFrom(option.id)}>
+                <button
+                  key={option.kind}
+                  type="button"
+                  aria-pressed={startFrom.kind === option.kind}
+                  data-testid={`new-agent-from-${option.kind}`}
+                  onClick={() => startFrom.kind !== option.kind && setStartFrom(option.kind === "template" ? { kind: "template" } : { kind: "clone", source: null })}
+                >
                   {option.label}
                 </button>
               ))}
             </div>
-            <div className={styles.hint}>
-              From <code>{TEMPLATE_PATH}</code>: a blank <code>CLAUDE.md</code> its first session fills in.
-            </div>
+            {startFrom.kind === "clone" ? (
+              <div className={styles.clone}>
+                <button
+                  ref={sourceButton}
+                  type="button"
+                  className={`${styles.button} ${styles.select}`}
+                  aria-haspopup="menu"
+                  aria-expanded={sourceMenu !== null}
+                  aria-invalid={sourceInvalid}
+                  data-testid="new-agent-clone-source"
+                  onClick={() => setSourceMenu(sourceButton.current?.getBoundingClientRect() ?? { x: 0, y: 0 })}
+                >
+                  <span className={styles.selectText}>{source ?? "Pick an agent"}</span>
+                  <CaretIcon size={12} />
+                </button>
+                <span className={sourceInvalid ? styles.error : styles.hint} data-testid="new-agent-clone-hint">
+                  {sourceEntry !== undefined
+                    ? `Role, tags and projects are prefilled from ${sourceEntry.id}; change them freely.`
+                    : sourceInvalid
+                      ? source === null
+                        ? "Pick the agent to clone."
+                        : `${source} is not a folder agent that can be cloned.`
+                      : `${sources.length === 1 ? "1 folder agent" : `${sources.length} folder agents`} can be cloned.`}
+                </span>
+              </div>
+            ) : (
+              <div className={styles.hint}>
+                From <code>{TEMPLATE_PATH}</code>: a blank <code>CLAUDE.md</code> its first session fills in.
+              </div>
+            )}
+            {sourceMenu !== null && <Menu entries={sourceEntries} anchor={sourceMenu} onClose={() => setSourceMenu(null)} label="Agent to clone" testId="new-agent-clone-menu" />}
           </Field>
           <Field label="Name" htmlFor="new-agent-name">
             <div className={styles.inputWrap}>
@@ -240,12 +326,17 @@ export function NewAgentPage({ host, navigate }: Props): ReactElement {
         <aside className={styles.side} aria-label="Create will" data-testid="new-agent-create-will">
           <div className={styles.label}>Create will</div>
           <ol className={styles.willSteps}>
-            {createWill(name, checkedNames).map((item, i) => (
+            {createWill(name, checkedNames, startFrom).map((item, i) => (
               <li key={i} className={item.faint === true ? styles.faint : undefined}>
                 <Parts parts={item.parts} />
               </li>
             ))}
           </ol>
+          {sourceEntry === undefined ? null : (
+            <p className={styles.never} data-testid="new-agent-never-cloned">
+              <Parts parts={NEVER_CLONED} />
+            </p>
+          )}
         </aside>
       </div>
       <div className={styles.foot}>
@@ -268,7 +359,7 @@ export function NewAgentPage({ host, navigate }: Props): ReactElement {
           Roster
         </button>
         <div className={styles.title}>
-          <h1>{pageTitle(run.phase, shownName)}</h1>
+          <h1>{pageTitle(run.phase, shownName, sourceEntry?.id ?? null)}</h1>
         </div>
       </header>
       <div className={styles.body}>
@@ -280,6 +371,12 @@ export function NewAgentPage({ host, navigate }: Props): ReactElement {
               name={shownName}
               steps={run.steps}
               projectNames={checkedNames}
+              clone={source}
+              openIn={openIn}
+              prompt={setupPrompt(shownName, role, tags)}
+              tabId={run.tabId}
+              tabProblem={run.tabProblem}
+              onGoToTab={() => void goToTab()}
               phase={run.phase}
               aliasLine={run.result?.aliasLine ?? null}
               rcFile={run.result?.rcFile ?? null}
@@ -344,6 +441,17 @@ interface ProgressProps {
   name: string;
   steps: CreateStep[];
   projectNames: readonly string[];
+  /** The clone source; `null` for the template. */
+  clone: string | null;
+  /** Where the first tab opens, by name. */
+  openIn: string;
+  /** The setup prompt to paste after `/login`. */
+  prompt: string;
+  /** The new agent's tab; `null` while none is open. */
+  tabId: string | null;
+  /** Why Go to its tab found no tab. */
+  tabProblem: string | null;
+  onGoToTab: () => void;
   phase: "creating" | "done" | "incomplete" | "failed";
   aliasLine: string | null;
   rcFile: string | null;
@@ -356,7 +464,7 @@ interface ProgressProps {
 }
 
 function Progress(props: ProgressProps): ReactElement {
-  const { name, steps, projectNames, phase, aliasLine, navigate } = props;
+  const { name, steps, projectNames, phase, aliasLine, openIn, navigate } = props;
   const back = (
     <button type="button" className={styles.button} onClick={() => navigate(ROSTER_ROUTE)}>
       Back to Roster
@@ -367,7 +475,7 @@ function Progress(props: ProgressProps): ReactElement {
     <>
       <ol className={styles.steps} data-testid="new-agent-steps">
         {steps.map((step) => (
-          <StepRow key={step.id} step={step} label={stepLabel(step.id, name, projectNames)} />
+          <StepRow key={step.id} step={step} label={stepLabel(step.id, name, projectNames, props.clone, openIn)} />
         ))}
       </ol>
       {phase === "failed" ? (
@@ -405,7 +513,7 @@ function Progress(props: ProgressProps): ReactElement {
             <b>
               <code>{name}</code> doesn’t resolve in a fresh zsh.
             </b>{" "}
-            Everything else is created. Add this line to <code>{props.rcFile ?? RC_FILE_LABEL}</code> (something later in the file may override it), then check again:
+            Everything else is created; its tab opens once it resolves. Add this line to <code>{props.rcFile ?? RC_FILE_LABEL}</code> (something later in the file may override it), then check again:
             <div className={styles.spec}>
               <code className={styles.specLine} data-testid="new-agent-alias-line" title={aliasLine}>
                 {aliasLine}
@@ -433,15 +541,35 @@ function Progress(props: ProgressProps): ReactElement {
             <CheckIcon size={14} stroke={2} />
             {name} is ready
           </h2>
-          <p>
-            It’s on the Roster and in the “+” menu. It starts logged out: its first session asks for <code>/login</code>.
+          <p data-testid="new-agent-done-text">
+            {props.tabId === null ? (
+              <>Its tab did not open: Go to its tab opens one. It starts logged out: run </>
+            ) : (
+              <>
+                Its tab is open in <b>{openIn}</b>. It starts logged out: run{" "}
+              </>
+            )}
+            <code>/login</code> there, then paste this prompt so the <code>creating-claude-agent</code> skill writes its identity.
           </p>
+          <div className={styles.prompt}>
+            <p data-testid="new-agent-setup-prompt">{props.prompt}</p>
+            <CopyButton text={props.prompt} testId="new-agent-copy-prompt" label />
+          </div>
           <div className={styles.actions}>
-            <button type="button" className={styles.primary} data-testid="new-agent-open-page" onClick={() => navigate(agentRoute(name))}>
+            <button type="button" className={styles.primary} data-testid="new-agent-go-to-tab" onClick={props.onGoToTab}>
+              <TerminalIcon size={14} />
+              Go to its tab
+            </button>
+            <button type="button" className={styles.button} data-testid="new-agent-open-page" onClick={() => navigate(agentRoute(name))}>
               Open its page
             </button>
             {back}
           </div>
+          {props.tabProblem === null ? null : (
+            <div className={styles.error} data-testid="new-agent-tab-problem">
+              No tab to go to: {props.tabProblem}.
+            </div>
+          )}
         </div>
       ) : null}
     </>

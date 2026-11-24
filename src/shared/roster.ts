@@ -207,7 +207,7 @@ export function isLaunchSpec(value: unknown): value is LaunchSpec {
 /** Whether a name can be had for a new agent; answers `NameVerdict`. */
 export const ROSTER_CHECK_NAME_METHOD = "roster.checkName";
 
-/** Create a folder agent from `Agents/Claude Agent Template`; answers `CreateAgentResult` once every step has run. */
+/** Create a folder agent from `Agents/Claude Agent Template`, or as a clone of a folder agent; answers `CreateAgentResult` once every step has run. */
 export const ROSTER_CREATE_METHOD = "roster.create";
 
 /** Whether an agent's alias resolves in a fresh interactive zsh; answers `AliasCheck`. */
@@ -216,14 +216,21 @@ export const ROSTER_CHECK_ALIAS_METHOD = "roster.checkAlias";
 /** Published by the backend, unqualified, as each step of a `roster.create` starts and ends; payload `RosterCreating`. */
 export const ROSTER_CREATING_EVENT = "roster.creating";
 
-/** The steps of a Create from the template, in the order they run:
- *  - `folder` — copy the template to `Agents/<name>/`
+/** The steps of a Create, in the order they run:
+ *  - `folder` — copy the template, or the clone source's allowed entries (`CLONED_ENTRIES`), to `Agents/<name>/`
  *  - `skills` — link every `Agents/_shared/skills/*` its `skills/` lacks
  *  - `profile` — write `agent.yaml`
  *  - `projects` — connect the projects (pomade:E-030)
  *  - `alias` — append the alias line to the rc file, unless it is there
- *  - `verify` — a fresh interactive zsh resolves the alias to the agent's folder */
-export const CREATE_STEP_IDS = ["folder", "skills", "profile", "projects", "alias", "verify"] as const;
+ *  - `verify` — a fresh interactive zsh resolves the alias to the agent's folder
+ *  - `open` — an agent tab with the new agent in `openIn` (`agentTabs.launch`); stays `todo` when the
+ *    alias does not resolve, since the tab would run a command zsh does not know */
+export const CREATE_STEP_IDS = ["folder", "skills", "profile", "projects", "alias", "verify", "open"] as const;
+
+/** What a clone copies of its source's config folder, and nothing else: `skills/` only as the
+ *  symlinks in it, `plugins` only as a symlink. Sessions (`projects/`), memory, history, caches and
+ *  `.claude.json` are never among them. */
+export const CLONED_ENTRIES = ["CLAUDE.md", "settings.json", "skills", "plugins"] as const;
 export type CreateStepId = (typeof CREATE_STEP_IDS)[number];
 
 /** `todo` not started · `run` running · `done` · `skip` nothing to do · `fail` (`detail` says why). */
@@ -254,6 +261,8 @@ export type CreateAgentParams = {
   projects: string[];
   /** The caller's id for this Create: `roster.creating` notices carry it. */
   createId: string;
+  /** A folder agent to clone (its roster id); absent: from the template. */
+  clone?: string;
 };
 
 /** - `created` — every step done or skipped
@@ -275,6 +284,10 @@ export type CreateAgentResult = {
   aliasLine: string;
   /** The rc file, absolute: `$ZDOTDIR/.zshrc`, else `$HOME/.zshrc`; `null` when neither is set. */
   rcFile: string | null;
+  /** The project the agent's first tab opens in: the first project connected, else `"__workspace__"`. */
+  openIn: string;
+  /** The agent tab the `open` step opened; `null` when it did not run or failed. */
+  tabId: string | null;
 };
 
 /** `roster.creating`: the steps of one Create as they are now. */
@@ -317,7 +330,9 @@ export function isCreateAgentResult(value: unknown): value is CreateAgentResult 
     (value.refused === null || isNameVerdict(value.refused)) &&
     typeof value.folder === "string" &&
     typeof value.aliasLine === "string" &&
-    (value.rcFile === null || typeof value.rcFile === "string")
+    (value.rcFile === null || typeof value.rcFile === "string") &&
+    typeof value.openIn === "string" &&
+    (value.tabId === null || typeof value.tabId === "string")
   );
 }
 

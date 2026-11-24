@@ -21,7 +21,7 @@ import { SETTINGS_FILE, openRecordStore, type RecordStore } from "../records/rec
 import type { ProjectReads } from "../roster/connections.ts";
 import { createAgentCreation } from "../roster/create-agent.ts";
 import { rcFileOf, zshOf } from "../roster/shell.ts";
-import { startRoster } from "../roster/roster.ts";
+import { resolveConfigDir, startRoster } from "../roster/roster.ts";
 import { keepBadge, startLiveNow } from "../sessions/live-now.ts";
 import { createBoundTabs } from "../sessions/bound-tabs.ts";
 import { createLiveState, followTabs } from "../sessions/live-state.ts";
@@ -222,6 +222,18 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
         if (visibleAgents.includes("*")) return "offers-all";
         if (!visibleAgents.includes(agent)) await host.project.setAgents({ projectId, visibleAgents: [...visibleAgents, agent] });
         return "connected";
+      },
+      cloneSource: (id) => {
+        const facts = roster.agent(id);
+        if (facts === undefined) return `${id} is not in the roster`;
+        const { profile, orphan } = facts;
+        if (profile.kind !== "folder" || profile.provider !== "claude") return `${id} is not a Claude Code folder agent: only those are cloned`;
+        const folder = orphan ? null : resolveConfigDir(profile.configDir, home, locations.workspace);
+        return folder === null ? `${id}’s config folder is gone` : { profile, folder };
+      },
+      launch: async (agent, projectId) => {
+        if (host === null) throw new Error("Pomade is not connected");
+        return (await host.agentTabs.launch({ agentId: agent, projectId })).tabId;
       },
       rcFile: rcFileOf(env),
       zsh: zshOf(env),

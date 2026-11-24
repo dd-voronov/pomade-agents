@@ -1,13 +1,14 @@
-// Creating a folder agent from the template (DESIGN §3.6): the name check and the Create, as steps
-// that report as they start and end (`CREATE_STEP_IDS`).
+// Creating a folder agent from the template or as a clone of one (DESIGN §3.6): the name check and
+// the Create, as steps that report as they start and end (`CREATE_STEP_IDS`).
 //
 // - **The name** is checked in order: its own rules (`nameRuleProblem`), then the disk (the folder
 //   `Agents/<name>`, an agent of that id in the roster, a Create of it running), then a fresh
 //   interactive zsh (`whence -v`). Create runs the whole check again first; a refused name writes
 //   nothing.
 // - **The agent itself** — folder, shared skill links, `agent.yaml` — appears whole or not at all.
-//   The template is copied to a staging folder beside the others whose name holds "template", so
-//   the agent scan skips it (DESIGN §3.1); the links go in there; `agent.yaml` is written; then
+//   The template — or a clone source's allowed entries (`CLONED_ENTRIES`, `copyCloned`) — is copied
+//   to a staging folder beside the others whose name holds "template", so the agent scan skips it
+//   (DESIGN §3.1); the links go in there; `agent.yaml` is written; then
 //   the staging folder is renamed into place. A failure on the way removes the staging folder and
 //   the `agent.yaml` this Create wrote, and the Create ends `failed`: the roster never sees a
 //   folder without its profile, nor a profile it would read as an orphan for longer than the
@@ -15,12 +16,17 @@
 // - **Its attachments** — the project connections and the alias — come after. A failure there
 //   marks its step and keeps the agent (`incomplete`); the alias check can be run again
 //   (`checkAlias`).
+// - **Its first tab** opens last, in the first project connected (the Workspace when none), and
+//   only once the alias resolves: a tab running a command zsh does not know dies at once.
 
-import { cp, lstat, mkdir, readdir, rename, rm, stat, symlink } from "node:fs/promises";
-import { join } from "node:path";
+import { copyFile, cp, lstat, mkdir, readdir, readlink, rename, rm, stat, symlink } from "node:fs/promises";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+
+import { WORKSPACE_PROJECT_ID } from "pomade-kit/protocol";
 
 import { nameRuleProblem } from "../../shared/agent-name.ts";
 import {
+  CLONED_ENTRIES,
   CREATE_STEP_IDS,
   MODE_IDS,
   type AgentProfile,
@@ -53,6 +59,11 @@ export interface CreationOptions {
   refreshRoster(): Promise<void>;
   /** Have `project` offer `agent` (pomade:E-030); `offers-all` when it offers every agent already. */
   connect(project: string, agent: string): Promise<"connected" | "offers-all">;
+  /** The folder agent `id` names, to clone: its profile and its config folder (absolute); a text
+   *  saying why not when it is no folder agent the roster holds, or an orphan. */
+  cloneSource(id: string): { profile: AgentProfile; folder: string } | string;
+  /** Open an agent tab with `agent` in `project` (`agentTabs.launch`); resolves with its tab id. */
+  launch(agent: string, project: string): Promise<string>;
   /** The rc file the alias goes in; `null` when it cannot be known. */
   rcFile: string | null;
   zsh: Zsh;
@@ -106,6 +117,50 @@ export function stepBoard(emit: (steps: CreateStep[]) => void): StepBoard {
 /** The staging folder a Create copies into: beside the agents, skipped by their scan ("template"). */
 export const stagingName = (name: string): string => `.${name}.creating-from-template`;
 
+/** A link to what `link` points at, made at `at` — which ends up at `final`: an absolute target as
+ *  it is, a relative one rewritten so it still reaches the same place from `final`. */
+async function relink(link: string, at: string, final: string): Promise<void> {
+  const target = await readlink(link);
+  await symlink(isAbsolute(target) ? target : relative(dirname(final), resolve(dirname(link), target)), at);
+}
+
+/** Copy into `target` (empty, made by the caller) what a clone takes of the config folder `source`
+ *  (`CLONED_ENTRIES`), and nothing else: `CLAUDE.md` and `settings.json` as files (a link stays a
+ *  link), every symlink directly in `skills/` (an own skill folder is not a link and stays behind),
+ *  and `plugins` when it is a link. `final` is where `target` will be renamed to. Answers the
+ *  entries copied, `skills/<name>` for each skill link. */
+export async function copyCloned(source: string, target: string, final: string): Promise<string[]> {
+  const copied: string[] = [];
+  const kind = async (path: string): Promise<"file" | "dir" | "link" | null> => {
+    try {
+      const info = await lstat(path);
+      return info.isSymbolicLink() ? "link" : info.isDirectory() ? "dir" : info.isFile() ? "file" : null;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
+      throw err;
+    }
+  };
+  for (const entry of CLONED_ENTRIES) {
+    const from = join(source, entry);
+    const what = await kind(from);
+    if (what === "link") {
+      await relink(from, join(target, entry), join(final, entry));
+      copied.push(entry);
+    } else if (what === "file" && (entry === "CLAUDE.md" || entry === "settings.json")) {
+      await copyFile(from, join(target, entry));
+      copied.push(entry);
+    } else if (what === "dir" && entry === "skills") {
+      await mkdir(join(target, entry));
+      for (const skill of (await readdir(from)).sort()) {
+        if ((await kind(join(from, skill))) !== "link") continue;
+        await relink(join(from, skill), join(target, entry, skill), join(final, entry, skill));
+        copied.push(`${entry}/${skill}`);
+      }
+    }
+  }
+  return copied;
+}
+
 const list = (names: readonly string[]): string => names.join(", ");
 
 export function createAgentCreation(options: CreationOptions): AgentCreation {
@@ -143,14 +198,25 @@ export function createAgentCreation(options: CreationOptions): AgentCreation {
       }
     };
     let step: CreateStepId = "folder";
+    let modes: AgentProfile["modes"] = Object.fromEntries(MODE_IDS.map((id) => [id, { enabled: true }]));
     try {
       board.start("folder");
-      const template = join(agentsDir, TEMPLATE_FOLDER);
-      if (!(await stat(template).then((s) => s.isDirectory(), () => false))) throw new Error(`${AGENTS_FOLDER}/${TEMPLATE_FOLDER} is not there`);
       await rm(staging, { recursive: true, force: true });
-      await cp(template, staging, { recursive: true, verbatimSymlinks: true, errorOnExist: true, force: false });
-      if (!(await exists(join(staging, AGENT_MARKER)))) throw new Error(`the template has no ${AGENT_MARKER}`);
-      board.end("folder", "done", `Copied ${AGENTS_FOLDER}/${TEMPLATE_FOLDER} to ${AGENTS_FOLDER}/${name}`);
+      if (params.clone === undefined) {
+        const template = join(agentsDir, TEMPLATE_FOLDER);
+        if (!(await stat(template).then((s) => s.isDirectory(), () => false))) throw new Error(`${AGENTS_FOLDER}/${TEMPLATE_FOLDER} is not there`);
+        await cp(template, staging, { recursive: true, verbatimSymlinks: true, errorOnExist: true, force: false });
+        if (!(await exists(join(staging, AGENT_MARKER)))) throw new Error(`the template has no ${AGENT_MARKER}`);
+        board.end("folder", "done", `Copied ${AGENTS_FOLDER}/${TEMPLATE_FOLDER} to ${AGENTS_FOLDER}/${name}`);
+      } else {
+        const source = options.cloneSource(params.clone);
+        if (typeof source === "string") throw new Error(source);
+        await mkdir(staging);
+        const copied = await copyCloned(source.folder, staging, folderOf(name));
+        if (!(await exists(join(staging, AGENT_MARKER)))) throw new Error(`${params.clone} has no ${AGENT_MARKER}`);
+        modes = structuredClone(source.profile.modes);
+        board.end("folder", "done", `Copied ${list(copied)} from ${params.clone}`);
+      }
 
       step = "skills";
       board.start("skills");
@@ -168,7 +234,7 @@ export function createAgentCreation(options: CreationOptions): AgentCreation {
         role: params.role.trim(),
         tags: params.tags,
         hidden: false,
-        modes: Object.fromEntries(MODE_IDS.map((id) => [id, { enabled: true }])),
+        modes,
       };
       if (profiles.get(name) !== undefined) throw new Error(`a profile for ${name} exists already`);
       await profiles.create(profile);
@@ -209,24 +275,40 @@ export function createAgentCreation(options: CreationOptions): AgentCreation {
     return linked;
   };
 
-  const connectProjects = async (params: CreateAgentParams, board: StepBoard): Promise<boolean> => {
+  /** Connect each project; answers the ones connected, in order. */
+  const connectProjects = async (params: CreateAgentParams, board: StepBoard): Promise<string[]> => {
     const projects = [...new Set(params.projects)];
     if (projects.length === 0) {
       board.end("projects", "skip", "No projects to connect");
-      return true;
+      return [];
     }
     board.start("projects");
     const failed: string[] = [];
+    const connected: string[] = [];
     for (const project of projects) {
       try {
         await options.connect(project, params.name);
+        connected.push(project);
       } catch (err) {
         failed.push(`${project} (${message(err)})`);
       }
     }
     if (failed.length === 0) board.end("projects", "done", `Connected to ${projects.length === 1 ? "1 project" : `${projects.length} projects`}`);
     else board.end("projects", "fail", `Not connected: ${list(failed)}`);
-    return failed.length === 0;
+    return connected;
+  };
+
+  /** The `open` step: a tab with the agent in `project`; its tab id, or `null` when it failed. */
+  const openTab = async (name: string, project: string, board: StepBoard): Promise<string | null> => {
+    board.start("open");
+    try {
+      const tabId = await options.launch(name, project);
+      board.end("open", "done", project === WORKSPACE_PROJECT_ID ? "Opened in the Workspace" : `Opened in ${project}`);
+      return tabId;
+    } catch (err) {
+      board.end("open", "fail", `The tab did not open: ${message(err)}`);
+      return null;
+    }
   };
 
   const askAlias = async (name: string, folder: string): Promise<{ ok: boolean; detail: string | null }> => {
@@ -265,6 +347,8 @@ export function createAgentCreation(options: CreationOptions): AgentCreation {
       const board = stepBoard(progress);
       const folder = folderOf(name);
       const line = aliasLine(name, folder);
+      let openIn: string = WORKSPACE_PROJECT_ID;
+      let tabId: string | null = null;
       const result = (outcome: CreateAgentResult["outcome"], refused: NameVerdict | null = null): CreateAgentResult => ({
         createId: params.createId,
         name,
@@ -274,6 +358,8 @@ export function createAgentCreation(options: CreationOptions): AgentCreation {
         folder,
         aliasLine: line ?? `alias ${name}='${aliasCommand(folder)}'`,
         rcFile,
+        openIn,
+        tabId,
       });
 
       const check = await checkName(name);
@@ -283,10 +369,12 @@ export function createAgentCreation(options: CreationOptions): AgentCreation {
         if (!(await makeAgent(params, board))) return result("failed");
         await options.refreshRoster();
         const connected = await connectProjects(params, board);
+        openIn = connected[0] ?? WORKSPACE_PROJECT_ID;
         await addAlias(name, line, board);
-        const aliased = board.steps().every((s) => s.state !== "fail");
-        log(`create: ${name} created in ${folder}${connected && aliased ? "" : " (incomplete)"}`);
-        return result(connected && aliased ? "created" : "incomplete");
+        if (board.steps().find((s) => s.id === "verify")?.state === "done") tabId = await openTab(name, openIn, board);
+        const whole = board.steps().every((s) => s.state === "done" || s.state === "skip");
+        log(`create: ${name} created in ${folder}${params.clone === undefined ? "" : ` as a clone of ${params.clone}`}${whole ? "" : " (incomplete)"}`);
+        return result(whole ? "created" : "incomplete");
       } finally {
         creating.delete(name);
       }

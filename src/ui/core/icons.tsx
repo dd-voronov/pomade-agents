@@ -266,3 +266,23 @@ export function DocIcon({ size = 16 }: IconProps): ReactElement {
     </Glyph>
   );
 }
+
+/** A key — an agent that is not logged in yet. */
+export function KeyIcon({ size = 16 }: IconProps): ReactElement {
+  return (
+    <Glyph size={size}>
+      <circle cx="5.5" cy="10.5" r="2.5" />
+      <path d="M7.3 8.7L13 3M11 5l1.5 1.5M9.5 6.5L11 8" />
+    </Glyph>
+  );
+}
+
+/** A terminal window — an agent tab. */
+export function TerminalIcon({ size = 16 }: IconProps): ReactElement {
+  return (
+    <Glyph size={size}>
+      <rect x="2" y="3" width="12" height="10" rx="1.5" />
+      <path d="M4.75 6.5L6.75 8l-2 1.5M8.25 10h3" />
+    </Glyph>
+  );
+}

@@ -26,7 +26,7 @@ describe("reading the counts", () => {
   const coder = { agent: "claude-coder", lastActiveAt: null, week: { sessions: 1, costUsd: null }, projects: [] };
 
   it("by agent, and zero for an agent with no work session", () => {
-    const byAgent = countsByAgent({ epoch: "e", revision: 1, indexing: false, agents: [claude, coder] });
+    const byAgent = countsByAgent({ epoch: "e", revision: 1, indexing: false, agents: [claude, coder], withSessions: ["claude", "coder"] });
     expect(byAgent.get("claude")).toBe(claude);
     expect(byAgent.get("codex") ?? noCounts("codex")).toEqual({ agent: "codex", lastActiveAt: null, week: { sessions: 0, costUsd: null }, projects: [] });
   });

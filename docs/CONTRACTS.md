@@ -46,6 +46,7 @@ One UI bundle; `welcome.surface` and the frame's route pick the view (`src/ui/co
 | tab | `sessions/<id>` | Sessions — the list with the detail panel, session `<id>` selected |
 | tab | `roster` | Roster |
 | tab | `roster/new` | Roster — the New agent page (`NEW_AGENT_ROUTE`) |
+| tab | `roster/new?clone=<id>` | Roster — the New agent page as a clone of agent `<id>` (`newAgentRoute`, `cloneSourceOf`) |
 | tab | `roster/<agent>`, `roster/<agent>/<tab>` | Roster — the agent's page on `<tab>` (below) |
 | tab | any other `roster/…` | Roster |
 | tab | `settings` | the app's Settings — the skill folders ("Skills" below) |
@@ -128,8 +129,22 @@ One UI bundle; `welcome.surface` and the frame's route pick the view (`src/ui/co
   `liveNow.list` ("Live now" below).
 - **`roster/new` wins over `roster/<agent>`**: no agent is ever named `new` (the name rules refuse
   it, "Creating an agent" below). The page's Roster crumb, Cancel and Back to Roster go to `roster`;
-  Open its page goes to `roster/<agent>/overview` (`createdAgentRoute`). All are the tab navigating
-  by itself.
+  Open its page goes to `roster/<agent>/overview` (`agentRoute`). All are the tab navigating
+  by itself. **Clone…** — in the agent page's ⋯ menu and the Roster card's, for a Claude Code folder
+  agent only — navigates the tab to `roster/new?clone=<id>` (`newAgentRoute(id)`, the id
+  URL-encoded); a route naming no cloneable agent opens the clone form with no source picked.
+- **The new agent's tab** — `roster.create`'s `open` step launches it from the backend
+  (`agentTabs.launch`, "Creating an agent" below). When the alias needed fixing, the page launches
+  it itself once Check again passes (`agentTabs.launch({ agentId, projectId: openIn })`). **Go to its
+  tab** is `agentTabs.focus` of that tab; a `not-found` (it was closed) launches another the same way.
+  The setup prompt is never passed as `prompt`: the agent starts logged out.
+- **Needs login** — the agent page's header (and the Roster's card) shows the chip and a notice with
+  **Copy setup prompt** for a Claude Code folder agent, not an orphan, that is missing from
+  `sessions.agentCounts`' `withSessions` (`needsLogin`, `src/ui/roster/needs-login.ts`); nothing
+  while the answer says `indexing`. The counts are asked again on `sessions.changed`, so the agent's
+  first session clears it without a reload. The prompt (`setupPrompt`): `Use the
+  creating-claude-agent skill to set up <name>: role “<role>”, tags <a>, <b>.` — a part the profile
+  lacks is left out.
 - The app has one tab per project — Pomade's icon-less app tab. `tabs.openApp({ route })` opens it
   or navigates it (the panel's Sessions and Roster); the frame follows `route.changed`. The tab's
   Sessions | Roster switch is the tab navigating by itself (`navigate`, `tabs.setRoute`), as the
@@ -168,7 +183,7 @@ it the same way. Method names and shapes are in `src/shared/api.ts`, `src/shared
 | `skills.catalog` | — | `SkillsCatalog` (the app's own frames) |
 | `settings.setSkillFolders` | `SetSkillFoldersParams` `{ folders: string[] }` | `SetSkillFoldersResult` (the app's own frames) |
 | `roster.checkName` | `{ name }` | `NameVerdict` `{ name, problem, detail }` (the app's own frames) |
-| `roster.create` | `CreateAgentParams` `{ name, role, tags, projects, createId }` | `CreateAgentResult` (the app's own frames) |
+| `roster.create` | `CreateAgentParams` `{ name, role, tags, projects, createId, clone? }` | `CreateAgentResult` (the app's own frames) |
 | `roster.checkAlias` | `AliasCheckParams` `{ agent }` | `AliasCheck` `{ ok, aliasLine, rcFile, detail }` (the app's own frames) |
 | `roster.updateProfile` | `RosterUpdateProfileParams` `{ agent, role?: string \| null, tags?: string[], modes?: { [mode]: boolean } }` | `RosterUpdateProfileResult` `{ profile: AgentProfile }` (the app's own frames) |
 | `roster.permissions` | `{ agent }` | `AgentPermissions` (the app's own frames) |
@@ -706,21 +721,30 @@ the `roster.creating` notice; the shapes in `src/shared/roster.ts`, the name rul
 
   | Step | What it does |
   |---|---|
-  | `folder` | copies `Agents/Claude Agent Template` (symlinks as they are) into a staging folder `Agents/.<name>.creating-from-template` (the scan skips it: "template"); the template must hold a `CLAUDE.md` |
+  | `folder` | copies `Agents/Claude Agent Template` (symlinks as they are) into a staging folder `Agents/.<name>.creating-from-template` (the scan skips it: "template"); the template must hold a `CLAUDE.md`. With `clone`: only the source's `CLONED_ENTRIES` (below) go into the staging folder |
   | `skills` | in the staging folder's `skills/`, a symlink `../../_shared/skills/<skill>` for every folder (or link to one) in `Agents/_shared/skills/` it lacks; dot-entries skipped |
   | `profile` | writes `agent.yaml` (`id`, `provider: claude`, `kind: folder`, `configDir: Agents/<name>`, `command: <name>`, `role`, `tags`, `hidden: false`, both modes enabled), then renames the staging folder to `Agents/<name>` and reads the roster again |
   | `projects` | per project id, in order: `project.getAgents`; a list holding `"*"` offers every agent already; else `project.setAgents` with the name appended. `skip` with no projects |
   | `alias` | appends `alias <name>='CLAUDE_CONFIG_DIR="<workspace>/Agents/<name>" claude'` to the rc file, on its own line, unless a line of the file is exactly that; creates the file when missing |
   | `verify` | a fresh `zsh -ilc` defines the alias with exactly that command |
+  | `open` | `agentTabs.launch({ agentId: <name>, projectId: openIn })`, normal mode, no prompt; `openIn` is the first of `projects` that connected, else `"__workspace__"`. Runs only when `verify` is `done`; otherwise it stays `todo` (the page opens the tab after Check again). A refusal fails the step and keeps the agent |
 
+  - **A clone** (`clone: <id>`) copies of the source's config folder exactly `CLONED_ENTRIES`:
+    `CLAUDE.md` and `settings.json` (a file is copied, a link stays a link), every symlink directly in
+    `skills/` (an own skill folder stays behind), and `plugins` when it is a symlink. A relative link
+    is rewritten to reach the same target from the new folder. Never `projects/`, sessions, memory,
+    history, caches, credentials or `.claude.json`. The profile takes the source's `modes`; role and
+    tags are the params'. A source that is not a Claude Code folder agent the roster holds, or an
+    orphan, fails `folder` (nothing kept).
   - **Outcomes:** `created` (every step `done` or `skip`); `failed` — `folder`, `skills` or
     `profile` failed: the staging folder and the `agent.yaml` this Create wrote are removed, so the
     roster never sees half an agent; `incomplete` — the agent exists and `projects`, `alias` or
-    `verify` failed (each failure marks its step; the steps after it still run).
+    `verify` failed, or `open` failed or did not run (each failure marks its step; the steps after
+    it still run).
   - **The rc file** is `$ZDOTDIR/.zshrc`, else `$HOME/.zshrc`, of the backend's own environment;
     every zsh runs with exactly that environment. A workspace path holding `'`, `"`, `$`, `` ` ``
     or `\` cannot go into the alias line: the `alias` step fails.
-  - Params: `name` a text of at most 256 characters; `role` one line of at most 200; `tags` at
+  - Params: `clone` absent, or a roster id of at most 256 characters; `name` a text of at most 256 characters; `role` one line of at most 200; `tags` at
     most 20 one-line tags of at most 40 (trimmed, each once); `projects` project ids; `createId`
     the caller's id, at most 128 characters. Else `invalid-params`.
 
@@ -734,6 +758,8 @@ the `roster.creating` notice; the shapes in `src/shared/roster.ts`, the name rul
     folder: string;                  // <workspace>/Agents/<name>, absolute
     aliasLine: string;               // the line the rc file gets
     rcFile: string | null;           // absolute; null when neither ZDOTDIR nor HOME is set
+    openIn: string;                  // the first tab's project id: first connected, else "__workspace__"
+    tabId: string | null;            // the tab `open` opened; null when it did not run or failed
   };
   ```
 
@@ -874,6 +900,7 @@ type AgentCountsAnswer = {
   revision: number;
   indexing: boolean;     // the first walk of the stores is still running: the counts are partial
   agents: AgentCounts[]; // every agent with a work session; one missing has none
+  withSessions: string[]; // every agent with a session of any status, Skip/Failed included, by id
 };
 
 type AgentCounts = {

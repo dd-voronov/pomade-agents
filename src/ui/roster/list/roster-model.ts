@@ -5,6 +5,7 @@
 import type { AgentProvider, RosterAgentsAnswer } from "../../../shared/roster.ts";
 import type { AgentCounts } from "../../../shared/work-sessions.ts";
 import { noCounts } from "../agent-counts-model.ts";
+import { needsLogin, setupPromptOf, type SessionFacts } from "../needs-login.ts";
 import { formatAgo, formatMoney } from "../../sessions/table-model.ts";
 import { rankConnected, type ConnectedProject } from "./connected-model.ts";
 
@@ -42,6 +43,12 @@ export type AgentView = {
   connected: ConnectedProject[];
   lastActiveAt: string | null;
   week: AgentCounts["week"];
+  /** A Claude Code folder agent with a usable profile, not an orphan: ⋯ offers Clone…. */
+  cloneable: boolean;
+  /** No session of it exists yet (`needsLogin`): the chip and the notice with the setup prompt. */
+  needsLogin: boolean;
+  /** The prompt the notice copies (`setupPromptOf`). */
+  setupPrompt: string;
 };
 
 /** The roster's id and display name of a model for the card's second line: `claude-opus-4-8` is
@@ -56,6 +63,7 @@ export function agentViews(
   counts: ReadonlyMap<string, AgentCounts>,
   connections: ReadonlyMap<string, readonly string[]>,
   names: ReadonlyMap<string, string>,
+  sessions: SessionFacts | null = null,
 ): AgentView[] {
   return answer.agents.map((entry): AgentView => {
     const mine = counts.get(entry.id) ?? noCounts(entry.id);
@@ -77,6 +85,9 @@ export function agentViews(
       connected: rankConnected(connections.get(entry.id) ?? [], mine.projects, names),
       lastActiveAt: mine.lastActiveAt,
       week: mine.week,
+      cloneable: entry.profile !== null && entry.provider === "claude" && entry.kind === "folder" && !entry.orphan,
+      needsLogin: needsLogin(entry, sessions),
+      setupPrompt: setupPromptOf(entry),
     };
   });
 }

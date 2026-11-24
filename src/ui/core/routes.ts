@@ -41,8 +41,21 @@ export const SETTINGS_ROUTE = "settings";
  *  agent (`agent-name.ts`). */
 export const NEW_AGENT_ROUTE = `${ROSTER_ROUTE}/new`;
 
+/** True for the New agent page: `roster/new`, and `roster/new?clone=<id>` (`newAgentRoute`). */
 export function isNewAgentRoute(route: string): boolean {
-  return route === NEW_AGENT_ROUTE;
+  return route === NEW_AGENT_ROUTE || route.startsWith(`${NEW_AGENT_ROUTE}?`);
+}
+
+/** The New agent page's route; with `clone`, the page starts as a clone of that agent: `roster/new?clone=<id>`. */
+export function newAgentRoute(clone?: string): string {
+  return clone === undefined ? NEW_AGENT_ROUTE : `${NEW_AGENT_ROUTE}?${new URLSearchParams({ clone }).toString()}`;
+}
+
+/** The agent a New agent route starts the clone of; `null` for none, or a route that is not the New agent page's. */
+export function cloneSourceOf(route: string): string | null {
+  if (!route.startsWith(`${NEW_AGENT_ROUTE}?`)) return null;
+  const clone = new URLSearchParams(route.slice(NEW_AGENT_ROUTE.length + 1)).get("clone");
+  return clone === null || clone === "" ? null : clone;
 }
 
 /** The tabs of an agent's page, in the order the page shows them. */
@@ -57,6 +70,7 @@ export function agentRoute(agent: string, tab: AgentTab = "overview"): string {
 /** The agent and tab an agent-page route names; `null` for the Roster itself and for `roster/new…`, since `new` never names an agent.
  *  A route with no tab, or one this build does not know, opens Overview. */
 export function agentPageOf(route: string): { agent: string; tab: AgentTab } | null {
+  if (isNewAgentRoute(route)) return null;
   const [head, id, tab, ...rest] = route.split("/");
   if (head !== ROSTER_ROUTE || id === undefined || id === "" || rest.length > 0) return null;
   if (id === "new") return null;

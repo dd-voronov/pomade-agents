@@ -1,12 +1,15 @@
 // The agent page's header: ← Roster, the name with its state chips, Start session ▾ and the ⋯
 // menu; then the provider, the model and the launch command; then a notice for what needs the
-// user's attention; the tab bar closes it (`children`). Start session, Hide and Clone… belong to other tickets (`agent-actions.ts`):
+// user's attention — an orphan, an unreadable profile, Needs login with its setup prompt; the tab
+// bar closes it (`children`). Start session and Hide belong to other tickets (`agent-actions.ts`):
 // they show here, disabled, until those are wired.
 
 import { useRef, useState, type ReactElement, type ReactNode } from "react";
 
 import { BackIcon, CaretIcon, DocIcon, MoreIcon, ResumeIcon, WarningIcon } from "../../core/icons.tsx";
 import { Menu, type MenuAnchor, type MenuEntry } from "../../core/Menu.tsx";
+import { needsLogin, setupPromptOf } from "../needs-login.ts";
+import { NeedsLoginChip, NeedsLoginNotice } from "../NeedsLogin.tsx";
 import type { AgentActions } from "./agent-actions.ts";
 import type { AgentContext } from "./agent-context.ts";
 import { PROVIDER_LABELS, chipsOf, claudeMdOf, isEditable, modelText, profileFileOf, providerOf } from "./agent-model.ts";
@@ -15,7 +18,7 @@ import styles from "./page.module.css";
 const LATER = { why: "Not available yet" };
 
 export function AgentHeader({ context, actions, children }: { context: AgentContext; actions: AgentActions; children: ReactNode }): ReactElement {
-  const { entry, openFile, navigate, dataDir } = context;
+  const { entry, openFile, navigate, dataDir, counts } = context;
   const { profile } = entry;
   const [menu, setMenu] = useState<MenuAnchor | null>(null);
   const more = useRef<HTMLButtonElement>(null);
@@ -24,6 +27,7 @@ export function AgentHeader({ context, actions, children }: { context: AgentCont
   const profileFile = profileFileOf(dataDir, entry.id);
   const model = modelText(entry);
   const chips = chipsOf(entry);
+  const loggedOut = needsLogin(entry, counts);
   const hidden = profile?.hidden === true;
   const cloneable = profile !== null && profile.provider === "claude" && profile.kind === "folder" && !entry.orphan;
 
@@ -51,8 +55,9 @@ export function AgentHeader({ context, actions, children }: { context: AgentCont
         <h1 className={styles.name} title={entry.id} data-testid="agent-name">
           {entry.id}
         </h1>
-        {chips.length > 0 && (
+        {(chips.length > 0 || loggedOut) && (
           <div className={styles.chips}>
+            {loggedOut && <NeedsLoginChip testId="agent-chip-needs-login" />}
             {chips.map((chip) => (
               <span key={chip.key} className={styles.chip} data-tone={chip.tone} title={chip.title} data-testid={`agent-chip-${chip.key}`}>
                 {chip.label}
@@ -119,6 +124,11 @@ export function AgentHeader({ context, actions, children }: { context: AgentCont
           <span>
             <code>agent.yaml</code> {entry.problem}. The agent runs on its first-sight values; the file is never written over.
           </span>
+        </div>
+      )}
+      {loggedOut && (
+        <div className={styles.noticeSlot}>
+          <NeedsLoginNotice prompt={setupPromptOf(entry)} testId="agent-needs-login" />
         </div>
       )}
       {children}

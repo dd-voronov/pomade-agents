@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { NEW_AGENT_ROUTE, agentPageOf, agentRoute, isNewAgentRoute, selectedSessionOf, sessionsFilterRoute, sessionsPresetOf, sessionsRoute, viewFor } from "./routes.ts";
+import { NEW_AGENT_ROUTE, agentPageOf, agentRoute, cloneSourceOf, isNewAgentRoute, newAgentRoute, selectedSessionOf, sessionsFilterRoute, sessionsPresetOf, sessionsRoute, viewFor } from "./routes.ts";
 
 describe("viewFor", () => {
   it("shows Live now in the panel, whatever the route", () => {
@@ -46,6 +46,17 @@ describe("the New agent route", () => {
     expect(isNewAgentRoute("roster/new")).toBe(true);
     expect(viewFor("tab", "roster/new")).toBe("roster");
     for (const route of ["roster", "roster/new/x", "roster/newer", "roster/claude-libra", "sessions/new"]) expect(isNewAgentRoute(route), route).toBe(false);
+  });
+
+  it("names the agent to clone after `?clone=`, never as an agent's page", () => {
+    expect(newAgentRoute()).toBe("roster/new");
+    expect(newAgentRoute("claude-libra")).toBe("roster/new?clone=claude-libra");
+    expect(newAgentRoute("a b&c")).toBe("roster/new?clone=a+b%26c");
+    expect(cloneSourceOf(newAgentRoute("a b&c"))).toBe("a b&c");
+    expect(isNewAgentRoute("roster/new?clone=claude-libra")).toBe(true);
+    expect(agentPageOf("roster/new?clone=claude-libra")).toBeNull();
+    expect(viewFor("tab", "roster/new?clone=claude-libra")).toBe("roster");
+    for (const route of ["roster/new", "roster/new?clone=", "roster/new?x=1", "roster/claude-libra", "sessions?clone=x"]) expect(cloneSourceOf(route), route).toBeNull();
   });
 });
 
