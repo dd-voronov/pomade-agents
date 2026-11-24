@@ -32,6 +32,9 @@ export interface LiveEntry {
   state: Exclude<SessionLiveState, "closed">;
   /** A run's job name; `null` for a tab. */
   job: string | null;
+  /** A run's session in Runner's keeper — what its attached terminal shows; `null` for a tab, or a
+   *  run whose run started did not name it. */
+  terminal: string | null;
   /** When the backend saw it enter `state` with this session (ISO 8601). */
   since: string;
 }
@@ -153,7 +156,7 @@ export function createLiveState(now: () => Date): LiveState {
 /** An agent tab as a live entry; `null` when no agent runs in it (`exited`). */
 export function tabEntry(tab: AgentTabInfo): LiveFacts | null {
   if (tab.state === "exited") return null;
-  return { sessionId: tab.sessionId, agent: tab.agentId, cwd: tab.cwd, projectId: tab.projectId, state: tab.state, job: null };
+  return { sessionId: tab.sessionId, agent: tab.agentId, cwd: tab.cwd, projectId: tab.projectId, state: tab.state, job: null, terminal: null };
 }
 
 /** The agent tabs as a live source: a full listing, or one tab as it is now (`closed`: it left the list). */

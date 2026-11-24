@@ -1,8 +1,9 @@
 // Runner's agent runs in the session data (DESIGN §2.4, §5, §6; docs/CONTRACTS.md "Subscribed
 // events"), from its `run.started` / `run.finished` — the app never calls Runner (PLATFORM rule 4).
 //
-// - **Run started** — the run is a live entry (`source: "run"`, Working, the job's name), so
-//   `sessions.liveIn` lists it and its session is live; the session's record gets
+// - **Run started** — the run is a live entry (`source: "run"`, Working, the job's name, its
+//   attached terminal when the payload names it), so `sessions.liveIn` lists it, Live now shows it
+//   and its session is live; the session's record gets
 //   `startedByRunner: { job }`. A run without a session id (Codex, until Runner finds it) is placed
 //   by its start: the earliest session of its agent started exactly in its folder from
 //   `PLACE_BEFORE_MS` before its `startedAt` to `PLACE_AFTER_MS` after, not run by another run and
@@ -19,7 +20,7 @@
 
 import { WORKSPACE_PROJECT_ID } from "pomade-kit/protocol";
 
-import { readRunFinished, readRunStarted, type AgentRunStarted } from "../../shared/runner-events.ts";
+import { readRunFinished, readRunStarted, runTerminal, type AgentRunStarted } from "../../shared/runner-events.ts";
 import type { RealPath } from "../core/real-paths.ts";
 import { foundSessions } from "./for-runner.ts";
 import type { LiveFacts, LiveState } from "./live-state.ts";
@@ -55,7 +56,14 @@ interface Run {
   sessionId: string | null;
 }
 
-const runKey = (job: string, run: string): string => `${job}\0${run}`;
+/** A run's live entry key: its job's id and its run id. */
+export const runKey = (job: string, run: string): string => `${job}\0${run}`;
+
+/** The job's id and the run id a run's live entry key names. */
+export function runOfKey(key: string): { job: string; run: string } {
+  const at = key.lastIndexOf("\0");
+  return { job: key.slice(0, at), run: key.slice(at + 1) };
+}
 
 const entryOf = ({ started, sessionId }: Run): LiveFacts => ({
   sessionId,
@@ -64,6 +72,7 @@ const entryOf = ({ started, sessionId }: Run): LiveFacts => ({
   projectId: started.project ?? WORKSPACE_PROJECT_ID,
   state: "working",
   job: started.name,
+  terminal: runTerminal(started),
 });
 
 export function startRunnerRuns({ live, sessions, events, realPath, log }: RunnerRunsOptions): RunnerRuns {

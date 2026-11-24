@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { RUN_FINISHED_EVENT, RUN_STARTED_EVENT, readRunFinished, readRunStarted, type AgentRunFinished, type AgentRunStarted } from "./runner-events.ts";
+import { RUN_FINISHED_EVENT, RUN_STARTED_EVENT, readRunFinished, readRunStarted, runTerminal, type AgentRunFinished, type AgentRunStarted } from "./runner-events.ts";
 
 const STARTED: AgentRunStarted = {
   job: "nightly-review",
@@ -30,6 +30,15 @@ describe("Runner's run events", () => {
     expect(readRunStarted({ ...STARTED, startedAt: "2026-11-21T04:00:01+01:00" })).toHaveProperty("agent");
     expect(readRunFinished(FINISHED)).toEqual({ agent: FINISHED });
     expect(readRunFinished({ ...FINISHED, result: "stopped-by-you", exitCode: null })).toHaveProperty("agent");
+  });
+
+  it("name the run's attached terminal when the payload carries a keeper session id, else none", () => {
+    expect(runTerminal({ terminal: "run:nightly-review:20261121-030000-a1b2c3" })).toBe("run:nightly-review:20261121-030000-a1b2c3");
+    expect(runTerminal({})).toBeNull();
+    expect(runTerminal({ terminal: null })).toBeNull();
+    expect(runTerminal({ terminal: "" })).toBeNull();
+    expect(runTerminal({ terminal: "has space" })).toBeNull();
+    expect(readRunStarted({ ...STARTED, terminal: "has space" })).toHaveProperty("agent");
   });
 
   it("set apart the runs that are not the app's: script, service and git runs", () => {

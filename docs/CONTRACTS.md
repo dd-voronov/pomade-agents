@@ -21,7 +21,7 @@ and the backend's handlers in step with it.
 |---|---|
 | `id` · `name` | `pomade-agents` · Agents |
 | `hostApi` | `0` |
-| `capabilities` | `project.read` (projects, their stable ids, names and folders, their visible agents) · `agentTabs.read` (each agent tab's session, folder, title and live state) · `agentTabs.write` (an agent tab's title, the unnamed mark) — the backend's project attribution, live state, tab titles and the project ↔ agent connection; the Sessions tab's and Live now's project names · `tabs.open` — Live now focuses agent tabs (`agentTabs.focus`) |
+| `capabilities` | `project.read` (projects, their stable ids, names and folders, their visible agents) · `agentTabs.read` (each agent tab's session, folder, title and live state) · `agentTabs.write` (an agent tab's title, the unnamed mark) — the backend's project attribution, live state, tab titles and the project ↔ agent connection; the Sessions tab's and Live now's project names · `tabs.open` — Live now focuses agent tabs (`agentTabs.focus`) and opens a Runner run's attached terminal (`tabs.openAttached`) |
 | `strip` | one icon, `agents` — action `panel` |
 | `events` | publishes `sessions.changed`, `roster.changed` and `liveNow.changed` (for its own UI frames) and `session.turnFinished` (declared, never published), `session.closed`, `session.statusChanged` ("Published events" below); subscribes to `pomade-agents:sessions.changed`, `pomade-agents:roster.changed` and `pomade-agents:liveNow.changed` (its own, for its UI frames), `project.created`, `project.renamed` and `project.removed` (the backend, and the UI frames for project names) and, for the backend, `pomade.ready`, `agentTab.changed`, `agentTab.exited` and Runner's `pomade-runner:run.started`, `pomade-runner:run.finished` ("Subscribed events" below) |
 | `backend` | `backend/main.mjs`, mode `with-pomade` |
@@ -276,13 +276,31 @@ type LiveTabRow = {
   name: string | null;        // the session record's name; null: unnamed, or no session
   firstMessage: string | null; // the session's first message, whitespace folded to one line
 };
-type LiveRow = LiveTabRow;
+type LiveRunRow = {
+  kind: "run";
+  job: string;                // the job's id
+  run: string;                // the run's id, within its job
+  name: string;               // the job's name: the row's title
+  project: string;            // the job's project id; "__workspace__" for a workspace job
+  sessionId: string | null;   // the session it runs; null while not known
+  agent: string;              // roster id
+  agentName: string;          // as LiveTabRow's
+  state: "working";           // a run is Working from its run started to its run finished
+  since: string;              // ISO 8601: when the backend heard it start
+  terminal: string | null;    // its session in Runner's keeper: what a click attaches to; null: not named
+};
+type LiveRow = LiveTabRow | LiveRunRow;
 type LiveNowAnswer = { epoch: string; revision: number; rows: LiveRow[] };  // every row, whole
 ```
 
 - **Rows** — one per live agent-tab entry (a tab whose `state` is not `exited`), bound to a
-  session or not. Runner's runs are not rows. The answer is unordered; the panel groups and orders
-  (`src/ui/sessions/live-now-model.ts`).
+  session or not, and one per Runner agent run from its run started to its run finished ("Subscribed
+  events" below). The answer is unordered; the panel groups and orders
+  (`src/ui/sessions/live-now-model.ts`); runs count in "N running" and never in Needs you.
+- **Clicks** — a tab row: `agentTabs.focus`. A run row: `tabs.openAttached({ session: { app:
+  "pomade-runner", session: terminal }, title: name, projectId: project })`; a run whose `terminal`
+  is `null` is not clickable. A group header: its first tab row's click, else its first run row with
+  a terminal.
 - **Change notice — `liveNow.changed`** `{ epoch, revision }`: the rows are built again whenever the
   live entries, the sessions (`sessions.changed`) or the roster change; an answer that differs is a
   new revision, published at once. A frame behind it asks `liveNow.list` again; it asks once its
@@ -605,6 +623,8 @@ type AgentRunStarted = {
   cwd: string;             // absolute, symlinks resolved
   startedByRunner: true;
   startedAt: string;       // ISO 8601 with a zone (Z or ±hh:mm): when the run's session started
+  terminal?: string | null; // optional: the run's session in Runner's keeper (`run:<encoded job>:<run>`),
+                            // what Live now's click attaches to; absent, null or not a keeper session id: none
 };
 // pomade-runner:run.finished
 type AgentRunFinished = AgentRunStarted & {
@@ -613,11 +633,11 @@ type AgentRunFinished = AgentRunStarted & {
 };                         // sessionId: the one Runner found by then, else null
 ```
 
-- **Which payloads count.** Only `kind: "agent"` with every field above well-formed; extra fields
+- **Which payloads count.** Only `kind: "agent"` with every field above well-formed (`terminal` is optional and never refuses a payload); extra fields
   are ignored. Another `kind` (script, service, git) is not the app's: ignored silently. A payload
   with no `kind`, or an agent run missing a field, is logged (one line per event, naming the
   field) and ignored.
-- **Run started** — a live entry for the run ("Live state" above), and the session's record gets
+- **Run started** — a live entry for the run ("Live state" above) and a Live now row, and the session's record gets
   `startedByRunner: { job: name }` through the record machinery (only that key and `updated`
   change; a later job's run of the same session takes its name). With `sessionId`, at once, or
   when the session's record is written — a session whose transcript is not read yet is marked on

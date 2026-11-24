@@ -1,16 +1,19 @@
 // The Live now panel — what the Agents strip icon fills Pomade's side panel with (DESIGN §2.8):
-// every agent running now across projects, grouped by project, the active one first. A row's click
-// focuses its agent tab (Pomade switches to its project); a group header's click switches to its
-// project by focusing that group's first tab. The two buttons open or focus the app's wide tab at
+// every agent running now across projects, grouped by project, the active one first. A tab row's
+// click focuses its agent tab (Pomade switches to its project); an unattended run's (⏱, its job's
+// name) opens its attached terminal tab in its project. A group header's click switches to its
+// project through the group's first tab, else its first run. The two buttons open or focus the app's wide tab at
 // Sessions and at the Roster. The rows are the backend's (`liveNow.list`); so is the icon's badge.
 
 import type { ReactElement } from "react";
 import type { ProjectRef } from "pomade-kit/protocol";
 import type { HostClient } from "pomade-kit/sdk";
 
-import type { LiveTabRow } from "../../shared/live-now.ts";
+import { RUNNER_APP_ID } from "../../shared/runner-events.ts";
+import type { LiveRow, LiveRunRow, LiveTabRow } from "../../shared/live-now.ts";
+import { liveRowKey } from "../../shared/live-now.ts";
 import { BackendStatus } from "../core/BackendStatus.tsx";
-import { RosterIcon, SessionsIcon } from "../core/icons.tsx";
+import { RosterIcon, SessionsIcon, TimerIcon } from "../core/icons.tsx";
 import { LIVE_LABELS } from "../core/live.ts";
 import { LiveMark } from "../core/LiveMark.tsx";
 import { openTab } from "../core/openTab.ts";
@@ -18,7 +21,7 @@ import { ROSTER_ROUTE, SESSIONS_ROUTE } from "../core/routes.ts";
 import { useActiveProject } from "../core/useActiveProject.ts";
 import { useNow } from "../core/useNow.ts";
 import { useProjects } from "../core/useProjects.ts";
-import { groupRows, headerCount, rowTitle } from "./live-now-model.ts";
+import { groupRows, groupTarget, headerCount, rowTitle } from "./live-now-model.ts";
 import styles from "./LiveNowPanel.module.css";
 import { formatAgo, formatStamp } from "./table-model.ts";
 import { useLiveNow } from "./useLiveNow.ts";
@@ -28,7 +31,13 @@ const CLOCK_MS = 30_000;
 
 const NO_PROJECTS: ReadonlyMap<string, ProjectRef> = new Map();
 
-function TabRow({ row, now, focus }: { row: LiveTabRow; now: Date; focus: () => void }): ReactElement {
+/** What a row's click does, in its tooltip. */
+function clickWords(row: LiveRow): string {
+  if (row.kind === "tab") return "switches project and focuses the tab";
+  return row.terminal === null ? "Runner did not say which terminal it runs in" : "opens the run’s terminal tab";
+}
+
+function Row({ row, now, open }: { row: LiveRow; now: Date; open: (() => void) | null }): ReactElement {
   const title = rowTitle(row);
   const label = LIVE_LABELS[row.state];
   return (
@@ -36,16 +45,23 @@ function TabRow({ row, now, focus }: { row: LiveTabRow; now: Date; focus: () => 
       type="button"
       className={styles.row}
       data-testid="live-row"
-      data-tab={row.tabId}
+      data-tab={row.kind === "tab" ? row.tabId : undefined}
+      data-run={row.kind === "run" ? row.run : undefined}
       data-state={row.state}
-      title={`${label} since ${formatStamp(row.since, now)} — switches project and focuses the tab`}
-      onClick={focus}
+      title={`${label} since ${formatStamp(row.since, now)} — ${clickWords(row)}`}
+      disabled={open === null}
+      onClick={open ?? undefined}
     >
       <span className={styles.lead}>
         <LiveMark state={row.state} title={label} />
       </span>
       <span className={styles.text}>
         <span className={styles.line1}>
+          {row.kind === "run" && (
+            <span className={styles.runIcon} data-testid="live-row-run" title="Unattended run">
+              <TimerIcon size={14} />
+            </span>
+          )}
           <span className={styles.name} data-unnamed={title.unnamed || undefined} data-testid="live-row-name">
             {title.text}
           </span>
@@ -59,7 +75,7 @@ function TabRow({ row, now, focus }: { row: LiveTabRow; now: Date; focus: () => 
           </span>
           <span>·</span>
           <span className={styles.agent} data-testid="live-row-agent">
-            {row.agent}
+            {row.kind === "run" ? `unattended · ${row.agent}` : row.agent}
           </span>
         </span>
       </span>
@@ -74,8 +90,17 @@ export function LiveNowPanel({ host }: { host: HostClient }): ReactElement {
   const now = useNow(CLOCK_MS);
   const rows = answer?.rows ?? [];
   const groups = groupRows(rows, active.id, projects);
-  const focus = (tabId: string): void => {
-    host.agentTabs.focus(tabId).catch(() => undefined);
+  const focus = (row: LiveTabRow): void => {
+    host.agentTabs.focus(row.tabId).catch(() => undefined);
+  };
+  const attach = (row: LiveRunRow, terminal: string): void => {
+    host.tabs.openAttached({ session: { app: RUNNER_APP_ID, session: terminal }, title: row.name, projectId: row.project }).catch(() => undefined);
+  };
+  /** What a row's click does; `null`: nothing (a run whose terminal is not known). */
+  const opener = (row: LiveRow): (() => void) | null => {
+    if (row.kind === "tab") return () => focus(row);
+    const { terminal } = row;
+    return terminal === null ? null : () => attach(row, terminal);
   };
 
   return (
@@ -111,8 +136,8 @@ export function LiveNowPanel({ host }: { host: HostClient }): ReactElement {
               data-testid="live-group-head"
               title={`Switch to ${group.name}`}
               onClick={() => {
-                const [first] = group.rows;
-                if (first !== undefined) focus(first.tabId);
+                const target = groupTarget(group);
+                if (target !== null) opener(target)?.();
               }}
             >
               <span className={styles.groupName}>{group.name}</span>
@@ -124,7 +149,7 @@ export function LiveNowPanel({ host }: { host: HostClient }): ReactElement {
               <span className={styles.groupCount}>{group.rows.length}</span>
             </button>
             {group.rows.map((row) => (
-              <TabRow key={row.tabId} row={row} now={now} focus={() => focus(row.tabId)} />
+              <Row key={liveRowKey(row)} row={row} now={now} open={opener(row)} />
             ))}
           </section>
         ))}

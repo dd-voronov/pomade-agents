@@ -85,7 +85,7 @@ describe("the live state", () => {
   it("lists an agent tab not prompted yet as live with no session, and leaves out one whose agent exited", () => {
     const { state, tabs, heard } = setup();
     tabs.list([tab({ tabId: "t1" }), tab({ tabId: "t2", state: "exited", sessionId: "old" })]);
-    expect(state.entries()).toEqual([{ source: "tab", key: "t1", sessionId: null, agent: "claude", cwd: "/w/alpha", projectId: "alpha", state: "idle", job: null, since: T0 }]);
+    expect(state.entries()).toEqual([{ source: "tab", key: "t1", sessionId: null, agent: "claude", cwd: "/w/alpha", projectId: "alpha", state: "idle", job: null, terminal: null, since: T0 }]);
     expect(state.ofSession("old")).toEqual({ live: "closed", liveSince: null });
     expect(heard).toEqual([]);
   });
@@ -112,7 +112,7 @@ describe("the live state", () => {
 
   it("takes a session's state from a tab bound to it over a run of it, and from the run once the tab goes", () => {
     const { state, tabs } = setup();
-    state.put("run", "r1", { sessionId: "s", agent: "claude", cwd: "/w", projectId: "alpha", state: "working", job: "Nightly" });
+    state.put("run", "r1", { sessionId: "s", agent: "claude", cwd: "/w", projectId: "alpha", state: "working", job: "Nightly", terminal: null });
     expect(state.ofSession("s").live).toBe("working");
     tabs.list([tab({ tabId: "t1", sessionId: "s", state: "idle" })]);
     expect(state.ofSession("s").live).toBe("idle");
@@ -122,10 +122,10 @@ describe("the live state", () => {
 
   it("keeps each source's entries apart: replacing the tabs leaves the runs", () => {
     const { state, tabs } = setup();
-    state.put("run", "r1", { sessionId: "s9", agent: "claude", cwd: "/w", projectId: "alpha", state: "working", job: "Nightly" });
+    state.put("run", "r1", { sessionId: "s9", agent: "claude", cwd: "/w", projectId: "alpha", state: "working", job: "Nightly", terminal: null });
     tabs.list([tab({ tabId: "t1" })]);
     tabs.list([]);
-    expect(state.entries()).toEqual([{ source: "run", key: "r1", sessionId: "s9", agent: "claude", cwd: "/w", projectId: "alpha", state: "working", job: "Nightly", since: T0 }]);
+    expect(state.entries()).toEqual([{ source: "run", key: "r1", sessionId: "s9", agent: "claude", cwd: "/w", projectId: "alpha", state: "working", job: "Nightly", terminal: null, since: T0 }]);
     expect(state.ofSession("s9").live).toBe("working");
   });
 

@@ -93,10 +93,10 @@ describe("the answers for git", () => {
 
   it("answers what runs in the folder and below — a tab not prompted yet too — passing the kit's check unchanged", async () => {
     const entries: LiveEntry[] = [
-      { source: "tab", key: "t1", projectId: "alpha", sessionId: null, agent: "claude", cwd: worktree, state: "idle", job: null, since: "2026-11-21T10:00:00.000Z" },
-      { source: "tab", key: "t2", projectId: "alpha", sessionId: "s1", agent: "claude-libra", cwd: join(link, ".worktrees"), state: "working", job: null, since: "2026-11-21T10:00:00.000Z" },
-      { source: "tab", key: "t3", projectId: "alpha", sessionId: "s2", agent: "codex", cwd: other, state: "needs-you", job: null, since: "2026-11-21T10:00:00.000Z" },
-      { source: "tab", key: "t4", projectId: "alpha", sessionId: "s3", agent: "codex", cwd: null, state: "idle", job: null, since: "2026-11-21T10:00:00.000Z" },
+      { source: "tab", key: "t1", projectId: "alpha", sessionId: null, agent: "claude", cwd: worktree, state: "idle", job: null, terminal: null, since: "2026-11-21T10:00:00.000Z" },
+      { source: "tab", key: "t2", projectId: "alpha", sessionId: "s1", agent: "claude-libra", cwd: join(link, ".worktrees"), state: "working", job: null, terminal: null, since: "2026-11-21T10:00:00.000Z" },
+      { source: "tab", key: "t3", projectId: "alpha", sessionId: "s2", agent: "codex", cwd: other, state: "needs-you", job: null, terminal: null, since: "2026-11-21T10:00:00.000Z" },
+      { source: "tab", key: "t4", projectId: "alpha", sessionId: "s3", agent: "codex", cwd: null, state: "idle", job: null, terminal: null, since: "2026-11-21T10:00:00.000Z" },
     ];
     const answer = await liveSessions(entries, { folder: link }, real);
     expect(answer).toEqual({

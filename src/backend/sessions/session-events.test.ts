@@ -199,7 +199,7 @@ describe("the session events", () => {
 
   it("publishes one B for a run's session a tab is attached to: the run's, not the tab's while the run runs or just after", async () => {
     sessions.put(inAlpha("r"));
-    live.put("run", "j\0r1", { sessionId: "r", agent: "claude", cwd: "/ws/Projects/alpha", projectId: "alpha", state: "working", job: "Nightly" });
+    live.put("run", "j\0r1", { sessionId: "r", agent: "claude", cwd: "/ws/Projects/alpha", projectId: "alpha", state: "working", job: "Nightly", terminal: null });
     events.tabExited(exited("r", "tab-closed"));
     live.put("run", "j\0r1", null);
     events.runFinished("r", "Nightly");

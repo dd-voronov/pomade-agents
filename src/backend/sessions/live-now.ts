@@ -1,6 +1,7 @@
 // The Live now panel's rows and the Agents icon's badge (DESIGN §2.8; docs/CONTRACTS.md "Live
 // now"), from the live state the backend already keeps: one row per live agent tab, with its
-// session's name and first message and the agent's roster name. The backend keeps the badge — the
+// session's name and first message and the agent's roster name, and one per Runner agent run while
+// it runs, with its job and its attached terminal (`runner-runs.ts`). The backend keeps the badge — the
 // number of Needs you rows — because it runs from Pomade's start, while the panel's frame exists
 // only once its icon was shown.
 //
@@ -10,9 +11,10 @@
 import { randomUUID } from "node:crypto";
 
 import type { LiveNowAnswer, LiveNowChanged, LiveRow } from "../../shared/live-now.ts";
-import { needsYouCount } from "../../shared/live-now.ts";
+import { liveRowKey, needsYouCount } from "../../shared/live-now.ts";
 import type { Roster } from "../roster/roster.ts";
 import type { LiveEntry, LiveState } from "./live-state.ts";
+import { runOfKey } from "./runner-runs.ts";
 import type { SessionData } from "./session-data.ts";
 
 export interface LiveNowOptions {
@@ -41,6 +43,21 @@ export function startLiveNow({ live, sessions, roster }: LiveNowOptions): LiveNo
   const listeners = new Set<(changed: LiveNowChanged) => void>();
 
   const rowOf = (entry: LiveEntry, names: ReadonlyMap<string, string>): LiveRow => {
+    const agentName = names.get(entry.agent) ?? entry.agent;
+    if (entry.source === "run") {
+      return {
+        kind: "run",
+        ...runOfKey(entry.key),
+        name: entry.job ?? "",
+        project: entry.projectId,
+        sessionId: entry.sessionId,
+        agent: entry.agent,
+        agentName,
+        state: "working",
+        since: entry.since,
+        terminal: entry.terminal,
+      };
+    }
     const session = entry.sessionId === null ? undefined : sessions.get(entry.sessionId);
     const first = session?.summary.firstMessage?.text;
     return {
@@ -49,7 +66,7 @@ export function startLiveNow({ live, sessions, roster }: LiveNowOptions): LiveNo
       project: entry.projectId,
       sessionId: entry.sessionId,
       agent: entry.agent,
-      agentName: names.get(entry.agent) ?? entry.agent,
+      agentName,
       state: entry.state,
       since: entry.since,
       name: session?.record?.name ?? null,
@@ -61,9 +78,10 @@ export function startLiveNow({ live, sessions, roster }: LiveNowOptions): LiveNo
     const names = new Map(roster.answer().agents.map((agent) => [agent.id, agent.name]));
     const next = live
       .entries()
-      .filter((entry) => entry.source === "tab")
       .map((entry) => rowOf(entry, names))
-      .sort((a, b) => (a.tabId < b.tabId ? -1 : a.tabId > b.tabId ? 1 : 0));
+      .map((row) => [liveRowKey(row), row] as const)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([, row]) => row);
     const json = JSON.stringify(next);
     if (json === held) return;
     held = json;

@@ -1,10 +1,10 @@
 import type { ProjectRef } from "pomade-kit/protocol";
 import { describe, expect, it } from "vitest";
 
-import type { LiveRow } from "../../shared/live-now.ts";
-import { groupRows, headerCount, rowTitle } from "./live-now-model.ts";
+import type { LiveRunRow, LiveTabRow } from "../../shared/live-now.ts";
+import { groupRows, groupTarget, headerCount, rowTitle } from "./live-now-model.ts";
 
-const row = (tabId: string, patch: Partial<LiveRow> = {}): LiveRow => ({
+const row = (tabId: string, patch: Partial<LiveTabRow> = {}): LiveTabRow => ({
   kind: "tab",
   tabId,
   project: "alpha",
@@ -15,6 +15,21 @@ const row = (tabId: string, patch: Partial<LiveRow> = {}): LiveRow => ({
   since: "2026-11-24T10:00:00.000Z",
   name: null,
   firstMessage: null,
+  ...patch,
+});
+
+const run = (id: string, patch: Partial<LiveRunRow> = {}): LiveRunRow => ({
+  kind: "run",
+  job: "nightly",
+  run: id,
+  name: "Nightly review",
+  project: "alpha",
+  sessionId: null,
+  agent: "claude",
+  agentName: "Claude Code",
+  state: "working",
+  since: "2026-11-24T10:00:00.000Z",
+  terminal: `run:nightly:${id}`,
   ...patch,
 });
 
@@ -43,7 +58,21 @@ describe("Live now's groups", () => {
       row("working-new", { state: "working", since: "2026-11-24T10:01:00.000Z" }),
       row("idle-old"),
     ];
-    expect(groupRows(rows, "alpha", PROJECTS)[0]?.rows.map((r) => r.tabId)).toEqual(["needs", "working-new", "working-old", "idle-new", "idle-old"]);
+    expect(groupRows(rows, "alpha", PROJECTS)[0]?.rows.map((r) => (r.kind === "tab" ? r.tabId : r.run))).toEqual(["needs", "working-new", "working-old", "idle-new", "idle-old"]);
+  });
+
+  it("places a run among the Working rows by its start", () => {
+    const rows = [row("idle"), run("r-new", { since: "2026-11-24T10:03:00.000Z" }), row("needs", { state: "needs-you" }), row("working", { state: "working", since: "2026-11-24T10:02:00.000Z" })];
+    expect(groupRows(rows, "alpha", PROJECTS)[0]?.rows.map((r) => (r.kind === "tab" ? r.tabId : r.run))).toEqual(["needs", "r-new", "working", "idle"]);
+  });
+
+  it("switches to a group's project through its first tab, else its first run with a terminal, else nothing", () => {
+    const [mixed] = groupRows([run("r1"), row("idle")], "alpha", PROJECTS);
+    expect(mixed && groupTarget(mixed)).toMatchObject({ kind: "tab", tabId: "idle" });
+    const [runs] = groupRows([run("r1", { terminal: null }), run("r2", { since: "2026-11-24T09:00:00.000Z" })], "alpha", PROJECTS);
+    expect(runs && groupTarget(runs)).toMatchObject({ kind: "run", run: "r2" });
+    const [none] = groupRows([run("r1", { terminal: null })], "alpha", PROJECTS);
+    expect(none && groupTarget(none)).toBeNull();
   });
 });
 
@@ -53,11 +82,13 @@ describe("Live now's texts", () => {
     expect(headerCount([row("a"), row("b", { state: "working" })])).toBe("2 running");
     expect(headerCount([row("a", { state: "needs-you" }), row("b")])).toBe("2 running · 1 needs you");
     expect(headerCount([row("a", { state: "needs-you" }), row("b", { state: "needs-you" }), row("c")])).toBe("3 running · 2 need you");
+    expect(headerCount([run("r1"), row("a", { state: "needs-you" })])).toBe("2 running · 1 needs you");
   });
 
   it("names a row by its session's name, else its first message in grey, else the agent", () => {
     expect(rowTitle(row("a", { sessionId: "s", name: "G4 tickets", firstMessage: "hi" }))).toEqual({ text: "G4 tickets", unnamed: false });
     expect(rowTitle(row("a", { sessionId: "s", firstMessage: "why does it flicker" }))).toEqual({ text: "why does it flicker", unnamed: true });
     expect(rowTitle(row("a"))).toEqual({ text: "Claude Code", unnamed: false });
+    expect(rowTitle(run("r1", { sessionId: "s" }))).toEqual({ text: "Nightly review", unnamed: false });
   });
 });

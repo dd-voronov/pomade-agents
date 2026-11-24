@@ -143,12 +143,23 @@
   transition: background var(--dur-fast) var(--ease);
 }
 
-.row:hover {
+.row:hover:enabled {
   background: var(--hover-bg);
 }
 
-.row:active {
+.row:active:enabled {
   background: var(--active-bg);
+}
+
+.row:disabled {
+  color: inherit;
+  cursor: default;
+}
+
+.runIcon {
+  display: flex;
+  flex: none;
+  color: var(--badge-fg);
 }
 
 .lead {

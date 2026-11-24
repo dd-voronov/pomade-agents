@@ -1,11 +1,12 @@
 // What the Live now panel shows of the backend's rows (DESIGN §2.8): one group per project — the
 // active project first with a "current" tag, then the projects in Projects panel order, the
-// Workspace last — and in each, Needs you → Working → Idle, then the most recent.
+// Workspace last — and in each, Needs you → Working → Idle, then the most recent. Unattended runs
+// are rows like the tabs (always Working) and count in "N running"; they never need you.
 
 import { WORKSPACE_PROJECT_ID, type ProjectRef } from "pomade-kit/protocol";
 
 import type { LiveRow, LiveRowState } from "../../shared/live-now.ts";
-import { needsYouCount } from "../../shared/live-now.ts";
+import { liveRowKey, needsYouCount } from "../../shared/live-now.ts";
 
 export interface LiveGroup {
   project: string;
@@ -17,9 +18,10 @@ export interface LiveGroup {
 
 const URGENCY: Record<LiveRowState, number> = { "needs-you": 0, working: 1, idle: 2 };
 
-/** Needs you → Working → Idle, then the latest `since` first; ties by tab. */
+/** Needs you → Working → Idle, then the latest `since` first; ties by tab or run. */
 export function byUrgency(a: LiveRow, b: LiveRow): number {
-  return URGENCY[a.state] - URGENCY[b.state] || Date.parse(b.since) - Date.parse(a.since) || (a.tabId < b.tabId ? -1 : a.tabId > b.tabId ? 1 : 0);
+  const [ka, kb] = [liveRowKey(a), liveRowKey(b)];
+  return URGENCY[a.state] - URGENCY[b.state] || Date.parse(b.since) - Date.parse(a.since) || (ka < kb ? -1 : ka > kb ? 1 : 0);
 }
 
 /** A project's name: Pomade's, "Workspace" for the Workspace, else its id. */
@@ -51,8 +53,15 @@ export function headerCount(rows: readonly LiveRow[]): string {
   return needs === 0 ? `${rows.length} running` : `${rows.length} running · ${needs} ${needs === 1 ? "needs" : "need"} you`;
 }
 
-/** A row's first line: the session's name; unnamed, its first message in grey; no session or no message yet, the agent's name. */
+/** What a group header's click opens to switch to its project: its first agent tab, else its first
+ *  run that has a terminal to open; `null` when it has neither. */
+export function groupTarget(group: LiveGroup): LiveRow | null {
+  return group.rows.find((row) => row.kind === "tab") ?? group.rows.find((row) => row.kind === "run" && row.terminal !== null) ?? null;
+}
+
+/** A row's first line: a run's job name; a tab's session's name; unnamed, its first message in grey; no session or no message yet, the agent's name. */
 export function rowTitle(row: LiveRow): { text: string; unnamed: boolean } {
+  if (row.kind === "run") return { text: row.name, unnamed: false };
   if (row.name !== null) return { text: row.name, unnamed: false };
   if (row.firstMessage !== null) return { text: row.firstMessage, unnamed: true };
   return { text: row.agentName, unnamed: false };

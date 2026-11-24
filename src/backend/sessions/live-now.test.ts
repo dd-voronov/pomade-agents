@@ -87,10 +87,19 @@ describe("Live now", () => {
     expect(liveNow.needsYou()).toBe(1);
   });
 
-  it("leaves Runner's runs out: the panel lists agent tabs", () => {
-    const { live, liveNow } = setup();
-    live.put("run", "j\0r1", { sessionId: "s9", agent: "claude", cwd: "/w", projectId: "alpha", state: "working", job: "Nightly" });
-    expect(liveNow.answer().rows).toEqual([]);
+  it("answers a row per Runner agent run while it runs: its job, run, project, agent, attached terminal — never Needs you", () => {
+    const { live, liveNow, revisions } = setup();
+    live.put("run", "nightly/review\0r1", { sessionId: "s9", agent: "claude-pm", cwd: "/w", projectId: "alpha", state: "working", job: "Nightly review", terminal: "run:nightly.review:r1" });
+    live.put("run", "j\0r2", { sessionId: null, agent: "codex", cwd: "/w", projectId: "__workspace__", state: "working", job: "Triage", terminal: null });
+    expect(liveNow.answer().rows).toEqual([
+      { kind: "run", job: "j", run: "r2", name: "Triage", project: "__workspace__", sessionId: null, agent: "codex", agentName: "codex", state: "working", since: T0, terminal: null },
+      { kind: "run", job: "nightly/review", run: "r1", name: "Nightly review", project: "alpha", sessionId: "s9", agent: "claude-pm", agentName: "PM", state: "working", since: T0, terminal: "run:nightly.review:r1" },
+    ]);
+    expect(liveNow.needsYou()).toBe(0);
+    const before = revisions.length;
+    live.put("run", "j\0r2", null);
+    expect(liveNow.answer().rows.map((row) => row.kind === "run" && row.run)).toEqual(["r1"]);
+    expect(revisions.length).toBe(before + 1);
   });
 
   it("is a new revision whenever the answer changes — a tab, a session's name, the roster — and only then", () => {

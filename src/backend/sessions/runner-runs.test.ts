@@ -5,7 +5,7 @@ import type { Session, SessionsChanged } from "../../shared/sessions.ts";
 import { testSession, testSummary } from "../../shared/test-sessions.ts";
 import { liveSessions } from "./for-git.ts";
 import { createLiveState, type LiveState } from "./live-state.ts";
-import { PLACE_AFTER_MS, startRunnerRuns, type RunnerRuns } from "./runner-runs.ts";
+import { PLACE_AFTER_MS, runOfKey, startRunnerRuns, type RunnerRuns } from "./runner-runs.ts";
 
 const START = "2026-11-21T03:00:00.000Z";
 const later = (ms: number): string => new Date(Date.parse(START) + ms).toISOString();
@@ -89,6 +89,16 @@ describe("Runner's runs", () => {
     expect(marks).toEqual([["s-claude", "Nightly review"]]);
   });
 
+  it("keeps a run's live entry keyed by its job and run, with its attached terminal when the payload names one", () => {
+    runs.started(claudeRun({ terminal: "run:nightly-review:20261124-100000-a1b2c3" }));
+    runs.started(codexRun());
+    const entries = live.entries().map((e) => ({ ...runOfKey(e.key), terminal: e.terminal }));
+    expect(entries).toEqual([
+      { job: "nightly-review", run: "r1", terminal: "run:nightly-review:20261124-100000-a1b2c3" },
+      { job: "codex-pass", run: "r1", terminal: null },
+    ]);
+  });
+
   it("drops a finished run from liveIn and ends its session with its job", async () => {
     runs.started(claudeRun());
     runs.finished(finished(claudeRun(), { result: "failed", exitCode: 1 }));
@@ -117,7 +127,7 @@ describe("Runner's runs", () => {
   });
 
   it("places a run without a session id by its folder and start once its session appears, skipping one a tab or another run holds", async () => {
-    live.put("tab", "t1", { sessionId: "user-own", agent: "codex", cwd: "/ws/Projects/alpha", projectId: "alpha", state: "idle", job: null });
+    live.put("tab", "t1", { sessionId: "user-own", agent: "codex", cwd: "/ws/Projects/alpha", projectId: "alpha", state: "idle", job: null, terminal: null });
     putSessions(codexSession("too-early", later(-10_000)), codexSession("user-own", later(1000)));
     runs.started(codexRun());
     await settle();

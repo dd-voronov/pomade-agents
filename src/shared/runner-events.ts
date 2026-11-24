@@ -4,6 +4,8 @@
 // sorts a payload that crossed the bus into one of those, another kind of run (script, service,
 // git — not the app's), or a payload the app cannot use.
 
+import { SESSION_ID_PATTERN } from "pomade-kit/protocol";
+
 /** The app that publishes them. */
 export const RUNNER_APP_ID = "pomade-runner";
 
@@ -37,6 +39,10 @@ export type AgentRunStarted = {
   startedByRunner: true;
   /** When the run's session started, ISO 8601 with a zone. */
   startedAt: string;
+  /** The run's session in Runner's keeper — what its attached terminal shows
+   *  (`tabs.openAttached({ session: { app: "pomade-runner", session: terminal } })`). Optional: a
+   *  run without it, or with one that is not a keeper session id, has no terminal the app can open. */
+  terminal?: string | null;
 };
 
 /** `run.finished` of an agent run: `sessionId` is the one Runner found by then, else `null`. */
@@ -88,4 +94,10 @@ export function readRunStarted(value: unknown): RunEventRead<AgentRunStarted> {
 
 export function readRunFinished(value: unknown): RunEventRead<AgentRunFinished> {
   return read(value, true);
+}
+
+/** The keeper session a run's attached terminal shows; `null` when the payload names none usable. */
+export function runTerminal(run: Pick<AgentRunStarted, "terminal">): string | null {
+  const { terminal } = run;
+  return typeof terminal === "string" && SESSION_ID_PATTERN.test(terminal) ? terminal : null;
 }

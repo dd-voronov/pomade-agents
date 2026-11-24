@@ -2,11 +2,15 @@
 // project with the active one first and tagged "current"; two-line rows ordered Needs you →
 // Working → Idle; a click focuses the tab and Pomade switches to its project. The Agents icon's
 // badge counts the Needs you rows — set by the backend, so it is right before the panel was ever
-// opened — and clears when none is left.
+// opened — and clears when none is left. A Runner agent run is a ⏱ row with its job's name from its
+// run started to its run finished; a click opens its attached terminal tab in its project.
 
+import type { JsonValue } from "pomade-kit/protocol";
+
+import { RUN_FINISHED_EVENT, RUN_STARTED_EVENT, type AgentRunStarted } from "../src/shared/runner-events.ts";
 import { SESSIONS_RENAME_METHOD } from "../src/shared/sessions.ts";
 import { expect, test } from "./fixtures.ts";
-import { claudeSession, prompt } from "./transcripts.ts";
+import { claudeSession, projectFolder, prompt } from "./transcripts.ts";
 
 const NAMED = "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
 const UNNAMED = "2b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e";
@@ -105,5 +109,59 @@ test.describe("an agent tab that comes to life", () => {
     await expect(panel.getByTestId("live-row-name")).toHaveText(["Claude"]);
     await expect(panel.getByTestId("live-now-empty")).toHaveCount(0);
     await expect(panel.getByTestId("live-now-count")).toHaveText("1 running");
+  });
+});
+
+test.describe("an unattended run", () => {
+  test.use({ pomadeSeed: { agentTabs: [{ tabId: "tab-alpha", projectId: "alpha", agentId: "claude", sessionId: null, state: "needs-you" }] } });
+
+  test("is a ⏱ row with its job's name while it runs; a click opens its attached terminal in its project; run finished takes it away", async ({ page, openShell, pomade, sandbox, backend }) => {
+    await expect.poll(() => pomade.fake.subscriptions, { message: backend.output() }).toEqual(expect.arrayContaining([RUN_STARTED_EVENT, RUN_FINISHED_EVENT]));
+    const run: AgentRunStarted = {
+      job: "reviews/nightly",
+      name: "Nightly review",
+      run: "20261124-030000-a1b2c3",
+      kind: "agent",
+      folder: "Projects/beta",
+      project: "beta",
+      trigger: "schedule",
+      sessionId: null,
+      agent: "codex",
+      mode: "auto",
+      cwd: projectFolder(sandbox, "beta"),
+      startedByRunner: true,
+      startedAt: new Date().toISOString(),
+      terminal: "run:reviews.nightly:20261124-030000-a1b2c3",
+    };
+    const { panel } = await openShell(page);
+    await expect(panel.getByTestId("live-row")).toHaveCount(1);
+    pomade.fake.emitEvent(RUN_STARTED_EVENT, run as JsonValue);
+
+    const row = panel.locator('[data-testid="live-row"][data-run="20261124-030000-a1b2c3"]');
+    await expect(row.getByTestId("live-row-name")).toHaveText("Nightly review");
+    await expect(row.getByTestId("live-row-run")).toBeVisible();
+    await expect(row.getByTestId("live-row-state")).toHaveText("Working");
+    await expect(row.getByTestId("live-row-agent")).toHaveText("unattended · codex");
+    await expect(panel.getByTestId("live-group-head")).toHaveText(["Alphacurrent1", "Beta1"]);
+    await expect(panel.getByTestId("live-now-count")).toHaveText("2 running · 1 needs you");
+    expect(pomade.fake.badges).toEqual({ agents: { count: 1, urgent: true } });
+
+    await row.click();
+    await expect.poll(() => pomade.fake.openedTabs).toEqual([
+      { kind: "attached", projectId: "beta", session: { app: "pomade-runner", session: "run:reviews.nightly:20261124-030000-a1b2c3" }, title: "Nightly review" },
+    ]);
+    expect(pomade.fake.focusedAgentTabs).toEqual([]);
+
+    // A run whose run started names no terminal: the row is there, and its click opens nothing.
+    const { terminal: _named, ...bareRun } = run;
+    pomade.fake.emitEvent(RUN_STARTED_EVENT, { ...bareRun, run: "20261124-040000-d4e5f6" } as JsonValue);
+    const bare = panel.locator('[data-testid="live-row"][data-run="20261124-040000-d4e5f6"]');
+    await expect(bare).toBeDisabled();
+    await expect(panel.getByTestId("live-now-count")).toHaveText("3 running · 1 needs you");
+
+    pomade.fake.emitEvent(RUN_FINISHED_EVENT, { ...run, result: "done", exitCode: 0 } as JsonValue);
+    await expect(row).toHaveCount(0);
+    await expect(panel.getByTestId("live-now-count")).toHaveText("2 running · 1 needs you");
+    expect(pomade.fake.openedTabs).toHaveLength(1);
   });
 });
