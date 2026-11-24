@@ -103,7 +103,9 @@ session stay.
 
 `bound-tabs.ts` holds every tab Pomade lists, exited ones too (a restored tab revives when focused), and
 answers `Session.tab` — a live tab before an exited one, then the first listed. `Session.tab` is what
-Open / Resume, the rename retitle and the Live now click use.
+Open / Resume, the rename retitle and the Live now click use. The other direction, `ofTab(tabId)`, answers
+the session an agent tab names (`null` for a tab Pomade does not list as an agent's); `sessions.ofTab` and
+the `pomade-agents` command's default target use it ([interfaces](../interfaces/index.md#session-of-a-tab)).
 
 ## Names are tab names
 
@@ -166,4 +168,4 @@ started in one folder within a time window). All compare real paths. Contracts: 
 contract (git)"](../../CONTRACTS.md#the-sessions-contract-git), ["Reads for Runner"](../../CONTRACTS.md#reads-for-runner).
 Specs: `for-git.spec.ts`, `for-runner.spec.ts`, `records.spec.ts`.
 
-Tickets: T-004, T-005, T-010, T-011, T-013, T-015, T-030.
+Tickets: T-004, T-005, T-010, T-011, T-013, T-015, T-027, T-030.

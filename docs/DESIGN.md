@@ -243,6 +243,16 @@ becomes two panes:
 - The red unread dots on tabs and the per-project counters are the platform's and stay as they
   are.
 
+### 2.9 Work sessions
+
+A **work session** is a session that counts. Every count and sum the app shows — the week
+roll-ups, an agent's sessions per project — is over work sessions, and one rule in one place in
+the code decides it: every session is a work session unless its status is Done–skip/Failed.
+The window a view counts over ("this week", "the last 90 days") is that view's own.
+
+Which other sessions are not work — started and ended at once, tests, sub-agents' — and how
+each is treated is [[P-017]].
+
 ## 3. Roster
 
 ### 3.1 Agents
@@ -295,29 +305,73 @@ modes:
 - **Known limit:** command edits made in the app don't reach Pomade's `.pomade/agents.json`. The
   platform's fallback (§3.7) uses the last commands it knew itself.
 
-### 3.3 Cards (Roster tab)
+### 3.3 Roster tab
 
-Each card shows:
-- name, provider, default model + effort
-- role line, tags
-- **Connected to:** the project setting. Pomade stores it; the app reads and writes it through
-  `pomade:E-030`, and it's the same data as the project's settings list.
-- **Used in:** projects with ≥1 session by the agent
-- last active
-- this week: session count and ~$ (Done–skip excluded)
-- **Start session ▾** (pick a project) · **Sessions** · **Edit**
+One entry per agent, in two views the user switches between with two icon buttons left of
+**New agent** — **cards** and a **list** — the choice remembered on this Mac. Layout:
+`prototypes/roster/`.
+
+- **Header:** the agent count; this week's work sessions (§2.9) and ~$ across agents; the view
+  switch; **New agent**; the gear of the app's Settings (§3.8) sits at the right of the
+  Sessions | Roster bar.
+- **Order:** the built-ins first, then by id. Hidden agents are in their own collapsible section
+  at the end. An orphan and an agent with an unusable `agent.yaml` stay in place, marked.
+- **A card shows:**
+  - name (a link to the agent's page), provider, default model + effort
+  - role line and tags, both edited in place → `agent.yaml`. Hovering or editing them never moves
+    the rest of the card.
+  - **Connected to** (below)
+  - last active
+  - this week: work sessions and ~$
+  - **Start session ▾** · **Sessions** · **Open ›** (the agent's page); a ⋯ menu with Clone…,
+    Hide / Show in the "+" menu, Open CLAUDE.md, Open agent.yaml. The buttons stay inside the card
+    at every width.
+- **A list row shows** the same without tags: name and role line, provider and model, Connected
+  to, last active, this week, **Start session ▾** and the ⋯ menu.
+- **Connected to** — one field, the projects whose "+" menu offers the agent (the project
+  setting: Pomade stores it, the app reads and writes it through `pomade:E-030`):
+  - the total first, then the top projects in brackets: `8 (■ pomade-agents, ■ Pomade, …)`
+  - ordered by the agent's work sessions in the project over the last 90 days, most first;
+    connected projects without one follow in sidebar order
+  - a card shows as many names as fit, up to three; a list row one, two when the row is wide.
+    A long name is cut with "…"; the total and the brackets are never clipped; `…` before the
+    closing bracket says more are connected than shown; the tooltip lists them all
+  - a project that offers every agent (`["*"]`) counts
+  - connected to every project: `All 12 (…)`; to none, and with no workspace open: "No projects"
+  - the field is a button: it opens the agent's page on its Projects tab
+- **Start session ▾:** the mode (Normal / Full autonomy — only the enabled ones; no choice when
+  only Normal is), then the project: connected ones first, then the others, then the Workspace.
+- **Sessions:** the Sessions tab in the Workspace scope with the Agent filter set.
+- **Orphan:** **Re-link** to an unclaimed agent folder, or **Remove**.
+- **No workspace open:** the two built-ins, read-only.
 
 ### 3.4 Agent detail page
 
-| Section | Content |
+Route `roster/<agent>/<tab>`. A header — name, state chips, provider, model, the launch command,
+**Start session ▾**, a ⋯ menu (Clone…, Hide, Open CLAUDE.md, Open agent.yaml) — over tabs:
+
+| Tab | Content |
 |---|---|
-| Overview | the card; `CLAUDE.md` opens in Pomade's editor |
-| Skills | the agent's `skills/` entries grouped by source: `Agents/_shared/skills`, `Knowledge/_skills/**`, own. On/off = create / remove the symlink; **Add skill** from the catalog (both shared sources); "also in" other agents |
-| Model | default model + effort, edited in the provider config (only those keys change) |
-| Modes | §3.5, with a per-agent switch for Full autonomy |
-| Permissions, MCP, plugins | read-only; **Open `settings.json`** |
+| Overview | role and tags (edited in place), provider, launch command, config folder, `CLAUDE.md` (opens in Pomade's editor), the profile file, last active, this week |
+| Skills | the agent's `skills/` entries grouped by skill folder (§3.8), then its own. On/off = create / remove the symlink; an own skill (a real folder) has no switch. **Add skill** from the catalog of the skill folders; "also in" other agents. A link into a folder no longer listed shows under that path, marked |
+| Projects | where the agent is offered and where it worked (below) |
+| Model & modes | default model + effort, edited in the provider config (only those keys change; `codex` read-only); §3.5's modes with a switch for Full autonomy (Normal is always on) and each mode's launch line, read-only, with Copy |
+| Permissions | permissions, MCP servers and plugins, read-only; **Open `settings.json`** |
 | Memory | the projects the agent has `memory/` for; open a memory file |
-| Sessions | this agent's sessions across all projects (the Sessions list, filtered) |
+| Sessions | this agent's sessions across all projects, a Project filter, **Open in Sessions** |
+
+**Projects tab.** One table: **Project · Sessions (90 d) · Last session** — the count is of work
+sessions (§2.9) in the last 90 days. Connecting is edited here; it is the same data as the
+project's own settings.
+
+- **Connected:** every project that offers the agent, under the sidebar's groups, ordered inside
+  a group by the count. **Disconnect** on a row; a project that offers every agent (`["*"]`) is
+  connected and locked.
+- **Not connected:** the other projects, each with **Connect** — first those the agent has
+  sessions in (Start session launches anywhere, and a disconnect keeps the history), by count;
+  the never-used ones behind **Show all projects** when there are more than five.
+- Connect and Disconnect offer Undo. A click on a row opens the Sessions tab with that project
+  as its filter.
 
 ### 3.5 Modes and launch specs
 
@@ -337,18 +391,20 @@ Each card shows:
 
 ### 3.6 Creating an agent
 
-**Claude Code agents only in v1.**
+**Claude Code agents only in v1.** A page of its own, route `roster/new`.
 
-1. **Form:**
-   - **name**: `[a-z0-9-]`, starting with a letter or digit. Refused if the folder exists, or if `zsh -ilc 'type <name>'`
-     resolves (an existing alias or command).
+1. **Form,** in this order:
+   - **start from**: the blank template `Agents/Claude Agent Template`, or **clone** a folder
+     agent (a built-in is never cloned: its config folder holds history and credentials). A clone
+     pre-fills the role line, tags and projects; the name starts empty.
+   - **name**: `[a-z0-9-]`, starting with a letter or digit, checked while typed. Refused if the
+     folder exists, or if `zsh -ilc 'type <name>'` resolves (an existing alias or command).
    - **provider**
-   - **role line**
+   - **role line** (required)
    - **tags**
-   - **start from**: the blank template `Agents/Claude Agent Template`, or **clone** an existing
-     agent
    - **connect to projects**
-2. **Create:**
+   - beside the form, "Create will": the exact steps for the current choices.
+2. **Create,** in place, as a list of steps that tick:
    - Copy the template, or the source agent's identity and config: `CLAUDE.md`,
      `settings.json`, `skills/` links, `plugins` link. A clone never copies `projects/`,
      sessions, memory, history, caches or `.claude.json`.
@@ -356,12 +412,16 @@ Each card shows:
    - Write `agent.yaml`.
    - Connect the projects.
    - Append `alias <name>='CLAUDE_CONFIG_DIR="<abs folder>" claude'` to `~/.zshrc` (always, once),
-     then verify it resolves.
-3. **Open:**
-   - Pomade opens an agent tab with the new agent in the first connected project.
-   - The app shows a copyable prompt for after `/login`: *"Use the creating-claude-agent skill to
-     set up <name>: role …, tags …"*.
-   - The card shows **Needs login** until the agent's first session exists.
+     then verify it resolves. When it does not, that step is marked, everything else stays
+     created, and the page shows the line to add with **Check again**.
+3. **Done:** the page stays, with
+   - an agent tab opened by Pomade with the new agent in the first connected project — in the
+     Workspace when none is connected
+   - a copyable prompt for after `/login`: *"Use the creating-claude-agent skill to set up
+     <name>: role …, tags …"*
+   - **Go to its tab**, Open its page, Back to Roster
+   - The card and the page show **Needs login**, with the prompt to copy, until the agent's first
+     session exists.
 
 ### 3.7 The "+" menu and the clock icon
 
@@ -372,13 +432,24 @@ Each card shows:
 - **With the app installed,** the clock icon opens the Sessions tab. Otherwise it opens Pomade's
   built-in history dialog.
 
+### 3.8 Settings and skill folders
+
+The app's own settings: a page at route `settings`, opened by the gear at the right of the
+Sessions | Roster bar, kept in `settings.yaml` (§4).
+
+- **Skill folders:** the workspace folders the skills catalog reads, subfolders included —
+  `Agents/_shared/skills` and `Knowledge/_skills` from the start. Each shows how many skills it
+  holds and how many links from how many agents point into it; **Add folder…** picks another;
+  **Remove** warns when links depend on it and keeps them.
+- An agent's own `skills/` folder is always read.
+
 ## 4. Data and files
 
 | What | Where | Synced |
 |---|---|---|
 | agent profiles | `<workspace>/Apps/pomade-agents/agents/<id>/agent.yaml` | yes |
 | session records | `<workspace>/Apps/pomade-agents/sessions/<session-id>.yaml` | yes |
-| app settings | `<workspace>/Apps/pomade-agents/settings.yaml` (`adoptedAt`: the first run) | yes |
+| app settings | `<workspace>/Apps/pomade-agents/settings.yaml` (`adoptedAt`: the first run; the skill folders, §3.8) | yes |
 | parse index, stats cache | `<userData>/app-state/pomade-agents/` | no |
 
 **Session record.** One per session, written the first time the app sees the session and on

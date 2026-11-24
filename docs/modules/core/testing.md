@@ -1,7 +1,7 @@
 ---
 doc: docs/modules/core/testing.md
 audience: engineers, product
-holds: how the app is tested — the gate, unit tests, the fake Pomade and its shell, the sandbox, the Playwright fixtures, dev:fake, and the smoke inside a real Pomade
+holds: how the app is tested — the gate, unit tests, the fake Pomade and its shell, the sandbox, the command process harness, the Playwright fixtures, dev:fake, and the smoke inside a real Pomade
 kind: reference
 ---
 
@@ -29,8 +29,9 @@ checkout and runs one Electron app at a time.
   `tsconfig.node.json` (backend, shared, unit tests, `harness/`, `scripts/`, configs) and
   `tsconfig.e2e.json` (`e2e/`, the Playwright configs). `src/shared` is in both UI and node programs: keep it free of
   Node and DOM APIs.
-- **Build** is part of the gate because the e2e runs the **built** app and the **built** backend
-  (`dist/`), not the source.
+- **Build** is part of the gate because the e2e runs the **built** app, backend and command
+  (`dist/`), not the source. It ends with `scripts/check-build.ts`, which fails when `dist/` is not an
+  installable folder ([interfaces](../interfaces/index.md#the-build-check)).
 
 ## Unit tests
 
@@ -95,6 +96,16 @@ the backend as Pomade does — Node in the build folder, SIGTERM then SIGKILL af
 exposes `output()`, `running()` and `stop()` (`{ code, signal, killed }`). Environment layers: sandbox,
 then `pomade.env()`, then `env` (`undefined` unsets).
 
+`runCommand(entry, args, env)` (`harness/command-process.ts`) runs the built `pomade-agents` command
+(`BUILT_COMMAND` in `harness/app.ts`, `dist/cli/pomade-agents.mjs`) on Node as Pomade's shim does and
+resolves `{ code, stdout, stderr }` (killed after 20 s). `shimHome(sandbox)` writes
+`<sandbox>/pomade-home` with `host.json` (the sandbox's socket) and the workspace pointer, and
+`shimEnv(sandbox, appId, home, terminal)` is the shim's environment — `POMADE_HOME`, `POMADE_APP_ID`,
+`POMADE_APP_KEY_FILE`, `POMADE_CLIENT=command`, `POMADE_APP_STATE`, and, for a terminal
+(`{ tabId, projectId }`), `POMADE_WORKSPACE`, `POMADE_TAB_ID`, `POMADE_PROJECT_ID`; with `null` it is
+outside Pomade's terminals. Like the real shim it gives no `POMADE_SOCKET`: the command finds the socket
+through `host.json`.
+
 ## Playwright e2e
 
 `playwright.config.ts`: `e2e/` minus `e2e/pomade/`, fully parallel, no retries, `forbidOnly`. Two web
@@ -120,6 +131,12 @@ fake host's records; waits that depend on the backend pass `backend.output()` as
 review (`look.spec.ts` and others) go to `e2e/artifacts/` (gitignored); computed-style assertions
 (the panel's and the tab's backgrounds) pin what screenshots cannot.
 
+`command.spec.ts` runs the built command through `runCommand` against the fake Pomade, with agent tabs
+seeded in `pomadeSeed` and, for most cases, the real backend: `show --json` in an agent tab equals
+`sessions.get`'s `Session`; `--session` outside any terminal; text output; and every exit status
+(tab with no session, plain terminal, unknown id, no tab, usage, backend absent, Pomade closed, no
+app identity, a key Pomade did not issue). Interfaces: [interfaces](../interfaces/index.md#the-pomade-agents-command).
+
 Core's specs: `no-host` (outside Pomade; a Pomade with a newer Host API), `panel` (the strip icon's panel,
 no tabs opened, no badge), `tabs` (open, focus, one tab per project, the switch navigating by itself),
 `backend` (broker round trip, absent backend and recovery, `app.info` locations, clean SIGTERM and what is
@@ -144,7 +161,9 @@ sandbox path. Nothing touches the real home or `Apps/`; the sandbox is removed o
 and a missing piece fails with "point POMADE_REPO at a built Pomade checkout". `launchPomade`
 (`e2e/pomade/pomade.ts`) isolates it completely: `HOME`, `POMADE_USER_DATA` and `POMADE_WORKSPACE` are the
 sandbox's, `NODE_ENV=test` keeps Pomade's own home folder and shell-profile line off, every inherited
-`POMADE_*` and `ELECTRON_*` variable is dropped, and `POMADE_DEV_APPS` dev-links the build folder.
+`POMADE_*` and `ELECTRON_*` variable is dropped, and `POMADE_DEV_APPS` dev-links the build folder. Its
+third argument, `pomadeHome`, sets `POMADE_HOME` and so turns Pomade's commands on (they are off without
+it): Pomade writes its shims into `<pomadeHome>/bin` and puts that folder first on its terminals' `PATH`.
 
 The specs cover what a fake cannot:
 
@@ -160,8 +179,13 @@ The specs cover what a fake cannot:
 - `open-resume` — a Done session resumes in a new agent tab bound to it and turns Active; a second
   open focuses it; the session has no tab once the agent quits.
 
+- `command` — an agent in a real agent tab runs `pomade-agents show --json` off its terminal's `PATH`
+  (the shim, `POMADE_TAB_ID`, the socket and the broker are Pomade's) and gets the session that tab is
+  bound to; run with a `pomadeHome`.
+
 Agent tabs there run `STAND_IN_AGENT`, a zsh script mapped onto the fixture folder agent
 (`.pomade/agents.json`): ready at once, echoes every prompt, writes a Claude-shaped transcript on its first
-prompt, takes `--resume <id>`. The specs kill any backend pid still alive in `afterAll`.
+prompt, takes `--resume <id>`, and on the prompt `/show` runs `pomade-agents show --json` into `<store>/show.json`
+and says `AGENT_SHOWED <exit status>`. The specs kill any backend pid still alive in `afterAll`.
 
-Tickets: T-002, T-029, T-031, T-032.
+Tickets: T-002, T-027, T-029, T-031, T-032.

@@ -1,7 +1,7 @@
 ---
 doc: docs/modules/interfaces/index.md
 audience: engineers, product
-holds: how the app's API and events reach Pomade and other apps — the broker handlers, the shared types, published and subscribed events, what Pomade reads
+holds: how the app's API and events reach Pomade and other apps — the broker handlers, the shared types, published and subscribed events, what Pomade reads, the `pomade-agents` command, the format skill and the build check
 kind: reference
 ---
 
@@ -13,8 +13,10 @@ semantics are in [CONTRACTS](../../CONTRACTS.md); this page says where each live
 rules that are easy to break.
 
 Code: `src/backend/interfaces/` (`api.ts`, `platform.ts`), `src/shared/`, the wiring in
-`src/backend/core/backend.ts`. The `pomade-agents` command and the session-data format skill are not
-built.
+`src/backend/core/backend.ts`. The `pomade-agents` command (`src/command/`) and the session-data
+format skill (`public/skills/pomade-agents-sessions/`) are the app's two other surfaces for agents and
+scripts; they are described under [The `pomade-agents` command](#the-pomade-agents-command) and
+[The format skill](#the-format-skill).
 
 ## The API through the broker
 
@@ -39,6 +41,7 @@ built.
     [Sessions](../../CONTRACTS.md#sessions). `sessions.list` answers whole or as the changes
     since `{ epoch, revision }`; a malformed `since` reads as none (a full answer).
   - `sessions.get` / `lastMessage` / `find` — [Reads for Runner](../../CONTRACTS.md#reads-for-runner).
+  - `sessions.ofTab` — [Session of a tab](../../CONTRACTS.md#session-of-a-tab); see below.
   - `sessions.forRepo`, `sessions.liveIn` — [The sessions contract (git)](../../CONTRACTS.md#the-sessions-contract-git).
   - `liveNow.list` — [Live now](../../CONTRACTS.md#live-now).
   - `roster.list` / `launchSpec` / `projectsFor` / `agentsFor` / `agents` — [Roster](../../CONTRACTS.md#roster).
@@ -48,6 +51,66 @@ built.
   `json()` cast in `api.ts`. Changing any of these shapes is a change to the platform contract, not
   to this app.
 
+## Session of a tab
+
+`sessions.ofTab({ tabId })` answers `{ agentTab, session }`: the session bound to the agent tab Pomade
+lists under that id. `createApi` takes `BoundTabs.ofTab` (`sessions/bound-tabs.ts`) as `tabs` and
+reads the tab's `sessionId` through `sessions.get`. Three outcomes: no agent tab with that id (a plain
+terminal's tab, or a tab that is gone) is `{ agentTab: false, session: null }`; an agent tab not
+prompted yet, or one naming a session the app has no transcript of, is `{ agentTab: true, session: null }`;
+a bound tab is `{ agentTab: true, session }`. An empty or non-string `tabId` is `invalid-params`.
+`isSessionsOfTabResult` (`shared/sessions.ts`) rejects a session without an agent tab.
+`bound-tabs.ts` holds an exited tab too, so a tab whose agent exited still answers its session.
+
+## The `pomade-agents` command
+
+A command for agents and scripts that prints one session. Contract (arguments, output, exit statuses):
+[CONTRACTS "Command"](../../CONTRACTS.md#command).
+
+- **Source and build.** `src/command/`: `main.ts` (the entry: connects as role `command` through the
+  kit's `connectSocket`, reads `POMADE_TAB_ID`, `resolveWorkspace`), `cli.ts` (`runCli`, arguments,
+  `SUB_COMMANDS`, failures, `EXIT`), `session-text.ts` (the text form). `vite.command.config.ts`
+  bundles it, `pomade-kit` included, into `dist/cli/pomade-agents.mjs`, the path the manifest's
+  `commands` names; `npm run build` runs it after the UI and backend builds. Pomade's shim runs the
+  built module; the command has no `node_modules`.
+- **It reads nothing itself.** Every answer comes from the backend through `apps.call` to the app's own
+  API; the only other call is `project.list`, to name projects in the text form (a failure there leaves
+  ids). `runCli` takes its streams, the tab id, the workspace and the connection as `CommandDeps`, so
+  the unit tests drive it with no process.
+- **Target.** `--session <id>` calls `sessions.get`; without it the tab in `POMADE_TAB_ID` calls
+  `sessions.ofTab`. With neither, it fails before connecting, so a terminal outside Pomade fails the
+  same with Pomade open or closed.
+- **Output.** `--json` prints the `Session` exactly as `sessions.get` answers it; without it,
+  `sessionText` prints the name and `label  value` lines in UTC, one line per message, no colour.
+- **Exit statuses** (`EXIT` in `cli.ts`; one line on stderr, nothing on stdout): 0 printed, 1 failed
+  (Pomade refused the command, no app identity because it was not started through Pomade's shim, an
+  answer that fails its guard), 2 usage, 3 Pomade not running (the line names the records folder), 4
+  the backend not answering (`app-absent`, `app-not-responding`; 5 s per call), 5 no `--session` and no
+  `POMADE_TAB_ID`, 6 the tab has no session, 7 unknown session.
+- **No write path.** There is no sub-command that sets a status; an unknown command is usage.
+
+## The format skill
+
+`public/skills/pomade-agents-sessions/SKILL.md` is the master copy. The manifest's `skills` lists its
+folder; the UI build copies `public/` into `dist/`, so it ships at `skills/pomade-agents-sessions/` in
+the build folder, and Pomade reports the installed folder in `host.info`'s `skills`. Pomade links it
+nowhere: giving it to an agent is the user's step ([user guide](../../user-guide/agents-and-scripts.md)).
+It teaches an agent with no other doc to read the record files (where, every key, the status values,
+Done–skip left out of statistics, reading rules), to use `pomade-agents show` and to read its exit
+statuses. `src/command/skill.test.ts` holds its tables to the code: the record keys
+(`SESSION_RECORD_KEYS`) in the files' order, the statuses (`SESSION_STATUSES`), every `EXIT` status, the
+records folder (`RECORDS_FOLDER`) and the command's usage line.
+
+## The build check
+
+`npm run build` ends with `scripts/check-build.ts`, which fails the build when `dist/` is not an
+installable folder (`buildFolderProblems`, `scripts/build-folder.ts`): the manifest parses, every file it
+names exists (UI entry, icon, backend, each command's entry), and each skill folder holds a `SKILL.md`
+whose frontmatter `name` is the folder's name and whose `description` is present and at most 1024
+characters (`skillProblems`). `src/shared/manifest.test.ts` applies `skillProblems` to the master copy,
+checks the manifest's `commands` and `skills` entries, and checks that `vite.command.config.ts` builds
+`src/command/main.ts` into `dist/cli/pomade-agents.mjs`.
+
 ## Shared types (`src/shared/`)
 
 Everything the UI and the backend both know, with no Node or DOM imports.
@@ -55,7 +118,7 @@ Everything the UI and the backend both know, with no Node or DOM imports.
 | File | Holds |
 |---|---|
 | `api.ts` | `API_METHODS`, `app.info`, `AppInfo`, `isAppInfo` |
-| `sessions.ts` | session method names and `sessions.changed`, `Session`, `SessionSummary`, `SessionRecord`, `Attribution`, params and answers, `contextPercent`, guards |
+| `sessions.ts` | session method names and `sessions.changed`, `Session`, `SessionSummary`, `SessionRecord`, `Attribution`, params and answers, `SESSION_RECORD_KEYS`, `contextPercent`, guards |
 | `live-now.ts` | `liveNow.list`, `liveNow.changed`, the row types, the strip icon `LIVE_NOW_ICON` |
 | `roster.ts` | roster method names and `roster.changed`, `AgentProfile`, `RosterEntry`, `LaunchSpec`, guards |
 | `session-events.ts` | events A, B and C: names, payloads, `STATUS_WINDOW_MS`, guards |
@@ -130,6 +193,8 @@ They list a session the Sessions tab hides, as every read does.
 - A handler changes data only through the session data and the record store (the `sessions`
   module); the interfaces layer holds no state of its own.
 - Event payloads carry only JSON; `at` is ISO 8601.
+- The command answers only from the backend; it opens no record, transcript or store file.
+- The skill's tables equal the code's record keys, statuses and exit statuses (`skill.test.ts`).
 
 ## Tests
 
@@ -137,7 +202,12 @@ Unit: `src/backend/interfaces/api.test.ts` (params, answers, the roster API);
 `src/shared/manifest.test.ts` (manifest, `API_METHODS` and `createApi` agree, in order),
 `api.test.ts`, `sessions.test.ts`, `runner-events.test.ts` (guards and readers);
 `src/backend/sessions/session-events.test.ts` and `status-window.test.ts` (events B and C, fake
-timers); `sessions/for-git.test.ts`. End to end through the fake Pomade: `e2e/for-git.spec.ts`,
-`e2e/for-runner.spec.ts`, `e2e/roster.spec.ts`, `e2e/runner-runs.spec.ts`.
+timers); `sessions/for-git.test.ts`; `sessions/bound-tabs.test.ts` (`ofTab`). The command:
+`src/command/cli.test.ts` (arguments, targets, every exit status against a stub link),
+`session-text.test.ts` (the text form), `skill.test.ts` (the skill against the code);
+`src/shared/manifest.test.ts` (the manifest's command and skill entries, `skillProblems`). End to end through the fake Pomade:
+`e2e/for-git.spec.ts`, `e2e/for-runner.spec.ts`, `e2e/roster.spec.ts`, `e2e/runner-runs.spec.ts`,
+`e2e/command.spec.ts` (the built command as a child process); inside a real Pomade:
+`e2e/pomade/command.spec.ts` ([testing](../core/testing.md#the-pomade-smoke)).
 
-Tickets: T-016, T-017, T-018, T-019.
+Tickets: T-016, T-017, T-018, T-019, T-027.

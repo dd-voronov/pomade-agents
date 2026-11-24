@@ -17,7 +17,7 @@ in [DESIGN](../DESIGN.md).
 | `stores` | reading the agents' session stores — Claude Code (built-in + folder agents) and Codex transcripts: parsing, watching, parse index, messages, tokens, context %, cost, price table | `src/backend/stores/` |
 | `sessions` | session records (names, statuses, notes, attribution, overrides), the Sessions tab, the Live now panel, names = tab names, live state | `src/ui/sessions/`, `src/backend/sessions/`, `src/backend/records/` |
 | `roster` | `agent.yaml`, roster import, the Roster tab and cards, the agent detail page, modes and launch specs, creating agents and their aliases | `src/ui/roster/`, `src/backend/roster/` |
-| `interfaces` | the published API through Pomade's broker, events A/B/C, the `pomade-agents` command, the session-data format skill | `src/backend/interfaces/`, `src/shared/` |
+| `interfaces` | the published API through Pomade's broker, events A/B/C, the `pomade-agents` command, the session-data format skill | `src/backend/interfaces/`, `src/command/`, `src/shared/`, `public/skills/` |
 
 ## Pages
 
@@ -36,4 +36,5 @@ in [DESIGN](../DESIGN.md).
   project connections as the backend serves them; the Roster tab is a placeholder.
 - [interfaces](interfaces/index.md) — one page: the published API through Pomade's broker, the
   shared types, the published and subscribed events and their timing, what Pomade itself reads;
-  the `pomade-agents` command and the format skill are not built.
+  `sessions.ofTab`, the `pomade-agents` command (source, build, target, exit statuses), the
+  `pomade-agents-sessions` format skill and the build check that holds the build folder installable.
