@@ -44,9 +44,12 @@ One UI bundle; `welcome.surface` and the frame's route pick the view (`src/ui/co
 | panel (the `agents` icon) | any | Live now |
 | tab | `sessions`, `""`, anything else | Sessions — the table |
 | tab | `sessions/<id>` | Sessions — the list with the detail panel, session `<id>` selected |
-| tab | `roster`, `roster/…` | Roster |
-| tab | `settings` | the app's Settings — the skill folders ("Skills" below) |
+| tab | `roster` | Roster |
 | tab | `roster/new` | Roster — the New agent page (`NEW_AGENT_ROUTE`) |
+| tab | `roster/<agent>`, `roster/<agent>/<tab>` | Roster — the agent's page on `<tab>` (below) |
+| tab | any other `roster/…` | Roster |
+| tab | `settings` | the app's Settings — the skill folders ("Skills" below) |
+| tab | `sessions?agent=<id>&project=<id>` | Sessions — as `sessions`, with the Agent and Project filters preset (below) |
 
 - `sessions` is the route Pomade's History icon opens (HOST-API §4 `apps`, "Platform reads of app
   APIs").
@@ -65,6 +68,24 @@ One UI bundle; `welcome.surface` and the frame's route pick the view (`src/ui/co
   the start folder and in the project's root resolved), else relative to the workspace `app.info`
   names — with symlinks resolved (`workspaceReal`) or as Pomade names it (`workspace`) — else as
   recorded.
+- **The agent's page** — `roster/<agent>/<tab>` (`agentRoute`, `agentPageOf`, `src/ui/core/routes.ts`),
+  `<agent>` the roster id URI-encoded, `<tab>` one of `overview`, `skills`, `projects`, `model`,
+  `permissions`, `memory`, `sessions` (`AGENT_TABS`, in the page's order). A route with no tab, or
+  one this build does not know, opens `overview`; `roster/new` is not an agent. Switching tabs and
+  ← Roster are the tab navigating by itself (`navigate`, `tabs.setRoute`), so a reload and a
+  restart of Pomade open the same tab. An `<agent>` the roster does not hold shows "No such agent"
+  with a way back. The page (`src/ui/roster/agent-page/`) reads `roster.agents` and
+  `roster.changed` like the Roster, and `roster.permissions` / `roster.memory` for its tabs; each
+  tab is one file under `tabs.tsx` that takes an `AgentContext` (`agent-context.ts`).
+- **Open in the editor** — Open CLAUDE.md, Open agent.yaml, Open `settings.json` and a memory
+  file are `tabs.openFile` in the project in front (HOST-API §4): the path is workspace-relative
+  inside the workspace (as Pomade names it, or resolved), else absolute (`openPathOf`). A refusal
+  (`not-found`, `outside-workspace`, …) is a toast naming the file.
+- **Open in Sessions** — `tabs.openApp({ route: sessionsFilterRoute({ agent, project? }), projectId:
+  "__workspace__" })`: the Workspace project's tab at `sessions?agent=<id>[&project=<id>]` (ids
+  URI-encoded). The Sessions tab starts its Agent and Project filters on those values
+  (`sessionsPresetOf`) — on mount, and again whenever the tab is navigated to such a route; every
+  other Sessions route leaves the filters as they are.
 - **Status and note** are set through `sessions.setStatus` ("Sessions" below) — a status from the
   detail panel, the bulk bar, the row menu or a drag onto a status, the note from the panel — one
   call at a time; a status change of several sessions is one call with every id whose status
@@ -145,6 +166,9 @@ it the same way. Method names and shapes are in `src/shared/api.ts`, `src/shared
 | `roster.checkName` | `{ name }` | `NameVerdict` `{ name, problem, detail }` (the app's own frames) |
 | `roster.create` | `CreateAgentParams` `{ name, role, tags, projects, createId }` | `CreateAgentResult` (the app's own frames) |
 | `roster.checkAlias` | `AliasCheckParams` `{ agent }` | `AliasCheck` `{ ok, aliasLine, rcFile, detail }` (the app's own frames) |
+| `roster.updateProfile` | `RosterUpdateProfileParams` `{ agent, role?: string \| null, tags?: string[] }` | `RosterUpdateProfileResult` `{ profile: AgentProfile }` (the app's own frames) |
+| `roster.permissions` | `{ agent }` | `AgentPermissions` (the app's own frames) |
+| `roster.memory` | `{ agent }` | `AgentMemory` (the app's own frames) |
 
 ```ts
 interface AppInfo {
@@ -685,6 +709,62 @@ the `roster.creating` notice; the shapes in `src/shared/roster.ts`, the name rul
   fresh zsh defines `agent` as the alias of its config folder; never writes. `not-found` for an id
   that is not a folder agent the roster holds (or is an orphan). The page's **Check again**.
 
+**`roster.updateProfile`** — the page's edit of an agent's role line and tags in its `agent.yaml`:
+
+```ts
+type RosterUpdateProfileParams = { agent: string; role?: string | null; tags?: string[] };
+type RosterUpdateProfileResult = { profile: AgentProfile };   // as written
+```
+
+- Each key present is set; `role: null` removes the role line; a key absent is left alone, and so is
+  every other key of the file (comments and extra keys included) — the rewrite rules of "Backend"
+  below. At least one of `role` and `tags` is required.
+- `role`: one line, at most `ROLE_MAX` (200) characters, trimmed, not blank. `tags`: at most 20,
+  each one line of at most `TAG_MAX` (24) characters, trimmed, none repeated. Anything else is
+  `invalid-params`.
+- An agent the roster found whose first-sight file is not written yet gets it first. Errors:
+  `not-ready` (no workspace is open, so no profiles are kept); `not-found` (no such agent, or an
+  orphan); `io-error` (the file cannot be used — it is never written over — or cannot be written).
+- The change is in the file when the call answers; `roster.changed` follows from the data folder's
+  watch.
+
+**`roster.permissions`** — what an agent's provider config grants, for its page's Permissions tab:
+
+```ts
+type AgentPermissions = {
+  provider: "claude" | "codex";
+  file: string;            // absolute: Claude Code's settings.json (<configDir>/settings.json), Codex's config.toml
+  exists: boolean;         // false: every list below is empty
+  problem: string | null;  // why the file cannot be read
+  defaultMode: string | null; // Claude Code: permissions.defaultMode · Codex: approval_policy
+  sandbox: string | null;     // Codex: sandbox_mode · Claude Code: null
+  allow: string[]; ask: string[]; deny: string[];   // Claude Code: permissions.allow / ask / deny · Codex: []
+  mcp: { name: string; type: string | null }[];     // by name; type: stdio, http, sse…
+  plugins: string[];       // Claude Code: the enabledPlugins set to true, by name · Codex: []
+};
+```
+
+- Claude Code MCP servers are the top-level `mcpServers` of `.claude.json`: `<configDir>/.claude.json`
+  for a folder agent, `~/.claude.json` for the built-in `claude`. Codex's are the `[mcp_servers.<name>]`
+  tables of `config.toml`. A server's type is its `type`, else `stdio` when it has a `command`
+  (`http` for a Codex one with a `url`).
+- Read on each call, nothing cached; an unreadable `.claude.json` is no servers. `not-found` for an
+  agent the roster does not hold and for an orphan.
+
+**`roster.memory`** — the project memory a Claude Code agent keeps, for its page's Memory tab:
+
+```ts
+type AgentMemory = { folders: { folder: string; files: { name: string; path: string }[] }[] };
+```
+
+- One entry per `<configDir>/projects/<folder>/memory/` holding at least one Markdown file (a
+  symlink to one counts), by `folder`; `files`: `MEMORY.md` first, then by name; `path` absolute.
+  Codex has none: `{ folders: [] }`. `not-found` as `roster.permissions`.
+- `folder` is the project's folder with every character but letters and digits written as `-`
+  (`claudeFolderName`); the page names the folder after the workspace project whose folder (under
+  the workspace as Pomade names it, or resolved) encodes to it, and shows the folder's own name for
+  the rest.
+
 Adding a method: its name in the manifest's `api` and in `API_METHODS`, its shapes in
 `src/shared/`, its handler in `src/backend/interfaces/api.ts`.
 
@@ -1060,7 +1140,9 @@ type AgentRunFinished = AgentRunStarted & {
   (DESIGN §2.6): a project that no longer exists holds no session.
 - **Roster** (`src/backend/roster/`) — the agents (`roster.ts`), their first-sight values
   (`first-sight.ts`: the scan, `.pomade/agents.json`, the role line), default model and effort
-  (`provider-config.ts`), launch specs (`launch-spec.ts`) and the connection (`connections.ts`).
+  (`provider-config.ts`), launch specs (`launch-spec.ts`), the connection (`connections.ts`), the
+  edit of a profile's role and tags (`profile-edit.ts`) and the reads of an agent's permissions and
+  memory (`agent-files.ts`).
   The backend reads the roster once before it connects, so Pomade's first `roster.list` is whole,
   then again on every profile change and every 2 s; each change publishes `roster.changed`.
 - **Locations** (`src/backend/core/locations.ts`) — app data in `<workspace>/Apps/pomade-agents/`,
@@ -1129,6 +1211,11 @@ type AgentRunFinished = AgentRunStarted & {
   fixture folder agent that writes a Claude-shaped transcript on its first prompt, takes
   `--resume <id>` as Pomade's resume starts it, and on the prompt `/show` runs
   `pomade-agents show --json` from its `PATH` into `<store>/show.json`.
+- Fixture files the agent page reads (`harness/fixtures/`): the folder agent's `settings.json` (permissions, an
+  enabled and a disabled plugin) and `.claude.json` (one MCP server), the built-in Claude's
+  `settings.json` permissions and the home `.claude.json` (two MCP servers), Codex's approval policy,
+  sandbox and MCP server in `config.toml`. Memory folders are named after the sandbox's own path, so a
+  spec writes them (`e2e/agent-page.spec.ts`).
 - Transcript helpers (`e2e/transcripts.ts`): `prompt` and `answer` (Claude Code lines; a prompt
   may record a git branch, an answer carries its model, effort, usage and text), `claudeSession(sandbox, id, lines)`, `projectFolder(sandbox,
   projectId)`, and `seedIntoProject(sandbox, projectId)`, which moves the seeded transcripts' start

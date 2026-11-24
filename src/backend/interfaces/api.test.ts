@@ -61,6 +61,13 @@ function api() {
     answer: () => ({ epoch: "r", revision: 1, agents: [], profilesOff: null }),
     list: () => LISTED_AGENTS.map((id) => ({ id, name: id, command: id, provider: AGENTS[id]?.profile.provider ?? "claude" })),
     agent: (id) => AGENTS[id],
+    updateProfile: (id, edit) => {
+      calls.push(["updateProfile", id, edit]);
+      const agent = AGENTS[id];
+      return agent === undefined ? Promise.reject(new HostError("not-found", `No agent ${id}`)) : Promise.resolve({ ...agent.profile, ...(edit.role === undefined || edit.role === null ? {} : { role: edit.role }), tags: edit.tags ?? agent.profile.tags });
+    },
+    permissions: () => Promise.reject(new HostError("not-found", "not called")),
+    memory: () => Promise.reject(new HostError("not-found", "not called")),
   };
   const projects: ApiSources["projects"] = {
     projects: () => Promise.resolve(Object.keys(VISIBLE)),
@@ -259,6 +266,30 @@ describe("the roster API", () => {
 
   it.each(["ghost", "gone"])("refuses a launch spec for %s, not in the roster, as not-found", async (agent) => {
     await expect(Promise.resolve().then(() => spec({ agent, mode: "normal" }))).rejects.toMatchObject({ code: "not-found" });
+  });
+
+  it("takes a role and tags edit to the roster, trimmed, and answers the profile as written", async () => {
+    const { handlers, calls } = api();
+    const update = (params: unknown): unknown => handlers["roster.updateProfile"]?.(params as never, ctx);
+    expect(await update({ agent: "claude", role: "  Reviews code.  ", tags: [" a ", "b"] })).toEqual({ profile: { ...PROFILE, role: "Reviews code.", tags: ["a", "b"] } });
+    expect(calls.at(-1)).toEqual(["updateProfile", "claude", { role: "Reviews code.", tags: ["a", "b"] }]);
+    expect(await update({ agent: "claude", role: null })).toMatchObject({ profile: { id: "claude" } });
+    expect(calls.at(-1)).toEqual(["updateProfile", "claude", { role: null }]);
+    await expect(Promise.resolve().then(() => update({ agent: "ghost", tags: [] }))).rejects.toMatchObject({ code: "not-found" });
+  });
+
+  it.each<[string, unknown]>([
+    ["no agent", { role: "x" }],
+    ["nothing to change", { agent: "claude" }],
+    ["a role of two lines", { agent: "claude", role: "a\nb" }],
+    ["a blank role", { agent: "claude", role: "   " }],
+    ["a role that is not text", { agent: "claude", role: 3 }],
+    ["tags that are not a list", { agent: "claude", tags: "a" }],
+    ["a tag too long", { agent: "claude", tags: ["x".repeat(25)] }],
+    ["a repeated tag", { agent: "claude", tags: ["a", " a"] }],
+    ["a blank tag", { agent: "claude", tags: [""] }],
+  ])("refuses a profile edit with %s as invalid-params", async (_, params) => {
+    await expect(Promise.resolve().then(() => api().handlers["roster.updateProfile"]?.(params as never, ctx))).rejects.toMatchObject({ code: "invalid-params" });
   });
 
   it("answers the connection: a project's offered agents, an agent's projects", async () => {

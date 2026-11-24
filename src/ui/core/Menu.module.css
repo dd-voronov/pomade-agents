@@ -45,6 +45,12 @@
   color: var(--badge-fg);
 }
 
+.item:disabled {
+  background: transparent;
+  color: var(--text-faint);
+  cursor: default;
+}
+
 .glyph {
   display: inline-flex;
   flex: none;

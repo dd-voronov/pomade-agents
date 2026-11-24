@@ -230,6 +230,15 @@ export function GearIcon({ size = 16 }: IconProps): ReactElement {
   );
 }
 
+/** A chevron pointing left — back to the list. */
+export function BackIcon({ size = 16 }: IconProps): ReactElement {
+  return (
+    <Glyph size={size}>
+      <path d="M10 4L6 8l4 4" />
+    </Glyph>
+  );
+}
+
 /** A plus — add one. */
 export function PlusIcon({ size = 16 }: IconProps): ReactElement {
   return (
@@ -244,6 +253,16 @@ export function TrashIcon({ size = 16 }: IconProps): ReactElement {
   return (
     <Glyph size={size}>
       <path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5" />
+    </Glyph>
+  );
+}
+
+/** A page with lines — a document that opens in the editor. */
+export function DocIcon({ size = 16 }: IconProps): ReactElement {
+  return (
+    <Glyph size={size}>
+      <path d="M4 2.5h5.5L12.5 5.5v8H4z" />
+      <path d="M9.5 2.5v3h3M6 8.5h4.5M6 11h3" />
     </Glyph>
   );
 }

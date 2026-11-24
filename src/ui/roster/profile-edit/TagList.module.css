@@ -1,0 +1,114 @@
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-height: 20px;
+}
+
+.none {
+  color: var(--text-faint);
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 20px;
+  padding: 0 4px 0 8px;
+  border-radius: 10px;
+  background: var(--active-bg);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+/* The × has its room in every state; it only shows on hover or focus. */
+.remove {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-faint);
+  opacity: 0;
+  cursor: pointer;
+  transition:
+    opacity var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
+}
+
+.tag:hover .remove,
+.remove:focus-visible {
+  opacity: 1;
+}
+
+.remove:hover {
+  background: var(--active-bg);
+  color: var(--text);
+}
+
+/* The add button and the field it becomes are one size. */
+.add,
+.field {
+  flex: none;
+  width: 60px;
+  height: 20px;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  line-height: 18px;
+}
+
+.add {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 7px 0 5px;
+  border: none;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--border);
+  color: var(--text-faint);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    opacity var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.tags[data-add="hover"] .add {
+  opacity: 0;
+}
+
+.tags[data-add="hover"]:hover .add,
+.tags[data-add="hover"]:focus-within .add,
+.tags[data-add="hover"] .add:focus-visible {
+  opacity: 1;
+}
+
+.add:hover {
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+  color: var(--text);
+}
+
+.field {
+  padding: 0 7px;
+  border: 1px solid var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus-ring);
+  background: var(--panel-raised);
+  color: var(--text);
+}
+
+.field::placeholder {
+  color: var(--text-faint);
+}

@@ -1,0 +1,6 @@
+{
+  "mcpServers": {
+    "claude-in-chrome": { "type": "stdio", "command": "chrome-mcp" },
+    "docs": { "type": "http", "url": "https://docs.example.invalid/mcp" }
+  }
+}

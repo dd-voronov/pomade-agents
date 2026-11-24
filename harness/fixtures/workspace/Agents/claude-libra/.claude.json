@@ -1,0 +1,5 @@
+{
+  "mcpServers": {
+    "excalidraw": { "type": "stdio", "command": "npx", "args": ["excalidraw-mcp"] }
+  }
+}

@@ -325,3 +325,117 @@ export function isAliasCheck(value: unknown): value is AliasCheck {
     (value.detail === null || typeof value.detail === "string")
   );
 }
+
+// ── The agent's page: editing the profile, reading its config ────────────────
+
+/** Changes an agent's role line and tags in its `agent.yaml`; answers `RosterUpdateProfileResult`. */
+export const ROSTER_UPDATE_PROFILE_METHOD = "roster.updateProfile";
+
+/** What an agent's provider config grants — permissions, MCP servers, plugins; answers `AgentPermissions`. */
+export const ROSTER_PERMISSIONS_METHOD = "roster.permissions";
+
+/** The projects an agent keeps memory for, and the files of each; answers `AgentMemory`. */
+export const ROSTER_MEMORY_METHOD = "roster.memory";
+
+/** The longest role line, in characters. */
+export const ROLE_MAX = 200;
+/** The longest tag, in characters. */
+export const TAG_MAX = 24;
+
+/** `roster.updateProfile` params: each key present is set, `role: null` removes the role line. */
+export type RosterUpdateProfileParams = {
+  agent: string;
+  role?: string | null;
+  tags?: string[];
+};
+
+export type RosterUpdateProfileResult = { profile: AgentProfile };
+
+export type McpServer = {
+  name: string;
+  /** `stdio`, `http`, `sse`…; `null` when the config names none. */
+  type: string | null;
+};
+
+/** One agent's permissions, MCP servers and plugins, read from its provider config. */
+export type AgentPermissions = {
+  provider: AgentProvider;
+  /** The config file the facts come from, absolute: Claude Code's `settings.json`, Codex's `config.toml`. */
+  file: string;
+  /** The file exists; with `false` every list is empty. */
+  exists: boolean;
+  /** Why the file cannot be read; `null` when it can (or is absent). */
+  problem: string | null;
+  /** Claude Code: `permissions.defaultMode`; Codex: `approval_policy`. */
+  defaultMode: string | null;
+  /** Codex: `sandbox_mode`; Claude Code: always `null`. */
+  sandbox: string | null;
+  /** Claude Code's `permissions.allow` / `ask` / `deny`; empty for Codex. */
+  allow: string[];
+  ask: string[];
+  deny: string[];
+  mcp: McpServer[];
+  /** Claude Code's enabled plugins (`enabledPlugins`); empty for Codex. */
+  plugins: string[];
+};
+
+export type AgentMemoryFile = {
+  name: string;
+  /** Absolute. */
+  path: string;
+};
+
+/** The memory of one project folder: `<configDir>/projects/<folder>/memory/`. */
+export type AgentMemoryFolder = {
+  /** The folder's name under `projects/`: the project's folder path with every character other than a letter or digit as `-` (`claudeFolderName`). */
+  folder: string;
+  /** Markdown files, `MEMORY.md` first, then by name. */
+  files: AgentMemoryFile[];
+};
+
+export type AgentMemory = {
+  /** Only folders with at least one file, by folder name. */
+  folders: AgentMemoryFolder[];
+};
+
+/** How Claude Code names a project's folder under `projects/`: every character that is not a letter or digit becomes `-`. */
+export function claudeFolderName(path: string): string {
+  return path.replace(/[^A-Za-z0-9]/g, "-");
+}
+
+const isTextList = (v: unknown): v is string[] => Array.isArray(v) && v.every((s) => typeof s === "string");
+
+/** True for a well-formed `roster.updateProfile` answer. */
+export function isRosterUpdateProfileResult(value: unknown): value is RosterUpdateProfileResult {
+  return isObject(value) && isAgentProfile(value.profile);
+}
+
+/** True for a well-formed `roster.permissions` answer. */
+export function isAgentPermissions(value: unknown): value is AgentPermissions {
+  return (
+    isObject(value) &&
+    isAgentProvider(value.provider) &&
+    typeof value.file === "string" &&
+    typeof value.exists === "boolean" &&
+    (value.problem === null || typeof value.problem === "string") &&
+    (value.defaultMode === null || typeof value.defaultMode === "string") &&
+    (value.sandbox === null || typeof value.sandbox === "string") &&
+    isTextList(value.allow) &&
+    isTextList(value.ask) &&
+    isTextList(value.deny) &&
+    Array.isArray(value.mcp) &&
+    value.mcp.every((m) => isObject(m) && typeof m.name === "string" && (m.type === null || typeof m.type === "string")) &&
+    isTextList(value.plugins)
+  );
+}
+
+/** True for a well-formed `roster.memory` answer. */
+export function isAgentMemory(value: unknown): value is AgentMemory {
+  return (
+    isObject(value) &&
+    Array.isArray(value.folders) &&
+    value.folders.every(
+      (f) => isObject(f) && typeof f.folder === "string" && Array.isArray(f.files) && f.files.every((file) => isObject(file) && typeof file.name === "string" && typeof file.path === "string"),
+    )
+  );
+}

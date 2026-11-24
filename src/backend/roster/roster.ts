@@ -18,11 +18,14 @@ import { stat } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 
 import { providerModes, type RosterAgent } from "pomade-kit/protocol";
+import { HostError } from "pomade-kit/sdk";
 
-import { MODE_IDS, type AgentProfile, type ModeId, type RosterAgentsAnswer, type RosterChanged, type RosterEntry } from "../../shared/roster.ts";
-import type { FileSet } from "../records/record-store.ts";
+import { MODE_IDS, type AgentMemory, type AgentPermissions, type AgentProfile, type ModeId, type RosterAgentsAnswer, type RosterChanged, type RosterEntry } from "../../shared/roster.ts";
+import { RecordError, type FileSet } from "../records/record-store.ts";
 import { isRecordId } from "../sessions/rules.ts";
 import { AGENTS_FOLDER, folderAgentNames } from "../stores/roots.ts";
+import { readMemory, readPermissions } from "./agent-files.ts";
+import { editedProfile, type ProfileEdit } from "./profile-edit.ts";
 import { BUILTIN_IDS, NO_OVERRIDES, agentName, builtinProfile, folderProfile, readPomadeOverrides } from "./first-sight.ts";
 import { modelDefaults } from "./provider-config.ts";
 
@@ -57,6 +60,14 @@ export interface Roster {
   list(): RosterAgent[];
   /** The agent `id`, when the roster has an answering profile for it. */
   agent(id: string): RosterAgentFacts | undefined;
+  /** Apply `edit` to the agent's `agent.yaml` (only the keys it names change) and answer the profile as written.
+   *  Rejects with `HostError`: `not-ready` (no profiles are kept), `not-found` (no such agent, or an orphan),
+   *  `io-error` (the file cannot be used or written). */
+  updateProfile(id: string, edit: ProfileEdit): Promise<AgentProfile>;
+  /** The agent's permissions, MCP servers and plugins as its provider config says; `not-found` for an unknown agent or an orphan. */
+  permissions(id: string): Promise<AgentPermissions>;
+  /** The project memory the agent keeps; `not-found` as `permissions`. */
+  memory(id: string): Promise<AgentMemory>;
   /** Read everything again now; resolves when the answer is current. */
   refresh(): Promise<void>;
   onChange(listener: (changed: RosterChanged) => void): () => void;
@@ -169,6 +180,13 @@ export function startRoster(options: RosterOptions): Roster {
     return { entries, facts };
   };
 
+  /** The agent `id`'s facts; `not-found` for an agent the roster does not hold and for an orphan. */
+  const livingAgent = (id: string): RosterAgentFacts => {
+    const facts = built.facts.get(id);
+    if (facts === undefined || facts.orphan) throw new HostError("not-found", `No agent ${JSON.stringify(id)} in the roster`);
+    return facts;
+  };
+
   // ── Reading again ────────────────────────────────────────────────────────
 
   let running: Promise<void> | null = null;
@@ -238,6 +256,35 @@ export function startRoster(options: RosterOptions): Roster {
     },
 
     agent: (id) => built.facts.get(id),
+
+    async updateProfile(id, edit) {
+      if (profiles === null) throw new HostError("not-ready", noProfiles);
+      const { profile } = livingAgent(id);
+      try {
+        // An agent the scan found whose first-sight write has not landed yet gets its file first.
+        if (profiles.get(id) === undefined) await profiles.create(profile);
+        const written = await profiles.update(id, (current) => editedProfile(current, edit));
+        await refresh();
+        return written;
+      } catch (err) {
+        if (err instanceof RecordError) throw new HostError(err.kind === "missing" ? "not-found" : "io-error", err.message);
+        throw new HostError("io-error", message(err));
+      }
+    },
+
+    async permissions(id) {
+      const { profile } = livingAgent(id);
+      const configDir = resolve(profile.configDir);
+      if (configDir === null) throw new HostError("not-found", `The config folder of ${JSON.stringify(id)} cannot be resolved`);
+      return readPermissions({ provider: profile.provider, configDir, builtin: profile.kind === "builtin", home });
+    },
+
+    async memory(id) {
+      const { profile } = livingAgent(id);
+      const configDir = resolve(profile.configDir);
+      return configDir === null ? { folders: [] } : readMemory(profile.provider, configDir);
+    },
+
     refresh,
 
     onChange(listener) {

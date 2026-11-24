@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": ["Edit(Knowledge/**)", "Bash(git -C Knowledge:*)"],
+    "deny": ["Bash(rm -rf:*)", "Edit(Knowledge/01-Raw/**)"]
+  },
+  "enabledPlugins": {
+    "easel@marketplace": true,
+    "retired@marketplace": false
+  }
+}

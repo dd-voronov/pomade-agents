@@ -21,11 +21,16 @@ export type MenuEntry =
       checked?: boolean;
       /** A key or a count after the label. */
       trail?: string;
+      /** Shown dimmed and not run; keys skip it. `why` is its tooltip. */
+      disabled?: { why: string };
       run: () => void;
     };
 
 /** Where the menu opens: at a point, or under (else over) an element's box. */
 export type MenuAnchor = { x: number; y: number } | DOMRect;
+
+/** The items keys move between: a disabled one takes no focus. */
+const ENABLED_ITEM = "[role^='menuitem']:not(:disabled)";
 
 /** Keeps this much room to the window's edges. */
 const EDGE = 8;
@@ -63,7 +68,7 @@ export function Menu({ entries, anchor, onClose, label, testId = "menu" }: MenuP
   // Once placed (a hidden box takes no focus), the first item takes focus.
   const placed = at !== null;
   useLayoutEffect(() => {
-    if (placed) box.current?.querySelector<HTMLButtonElement>("[role^='menuitem']")?.focus();
+    if (placed) box.current?.querySelector<HTMLButtonElement>(ENABLED_ITEM)?.focus();
   }, [placed]);
 
   useLayoutEffect(() => {
@@ -77,7 +82,7 @@ export function Menu({ entries, anchor, onClose, label, testId = "menu" }: MenuP
   }, [onClose]);
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
-    const items = [...(box.current?.querySelectorAll<HTMLButtonElement>("[role^='menuitem']") ?? [])];
+    const items = [...(box.current?.querySelectorAll<HTMLButtonElement>(ENABLED_ITEM) ?? [])];
     const index = items.indexOf(document.activeElement as HTMLButtonElement);
     if (event.key === "Escape" || event.key === "Tab") onClose();
     else if (event.key === "ArrowDown") items[(index + 1) % items.length]?.focus();
@@ -129,6 +134,8 @@ export function Menu({ entries, anchor, onClose, label, testId = "menu" }: MenuP
                   aria-checked={entry.checked}
                   className={styles.item}
                   data-testid={`menu-item-${entry.id}`}
+                  disabled={entry.disabled !== undefined}
+                  title={entry.disabled?.why}
                   onClick={() => {
                     onClose();
                     entry.run();

@@ -1,0 +1,453 @@
+/* The agent's page: a header over a tab bar over the tab's body (layout: prototypes/roster). The
+   header's controls stay inside it at every width: the name gives way first, then the chips, then
+   the sub line; the buttons never shrink and never leave the row. */
+
+.page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.head {
+  flex: none;
+  min-width: 0;
+  padding: var(--space-2) var(--space-4) var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 22px;
+  margin-left: -6px;
+  padding: 0 6px 0 2px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.crumb:hover {
+  background: var(--hover-bg);
+  color: var(--text);
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  margin-top: 2px;
+}
+
+.name {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin: 0 var(--space-1) 0 0;
+  font-size: 18px;
+  font-weight: var(--fw-semibold);
+  line-height: 28px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Chips show whole or not at all: the ones that do not fit wrap onto a clipped second line. */
+.chips {
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  min-width: 0;
+  height: 16px;
+  overflow: hidden;
+}
+
+/* A zero-width first item, so even a lone chip too wide for the row wraps away instead of being cut. */
+.chips::before {
+  content: "";
+  flex: none;
+  width: 0;
+  height: 16px;
+  margin-right: -6px;
+}
+
+.chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: 16px;
+  padding: 0 5px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: var(--fw-medium);
+  line-height: 14px;
+  white-space: nowrap;
+}
+
+.chip[data-tone="warn"] {
+  border-color: transparent;
+  background: var(--warning-soft);
+  color: color-mix(in srgb, var(--warning) 62%, var(--text));
+}
+
+.spacer {
+  flex: 1;
+}
+
+.actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.sub {
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sep {
+  margin: 0 5px;
+  color: var(--text-faint);
+}
+
+.faint {
+  color: var(--text-faint);
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  max-width: 760px;
+  margin-top: var(--space-3);
+  padding: 7px 10px;
+  border-radius: var(--radius-md);
+  background: var(--warning-soft);
+  font-size: var(--fs-sm);
+  line-height: 17px;
+}
+
+.notice > svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--warning);
+}
+
+/* ── Buttons and links ── */
+
+.btn,
+.btnPrimary {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+}
+
+.btn {
+  border: 1px solid var(--border-strong);
+  background: var(--panel-raised);
+  color: var(--text);
+}
+
+.btn:hover {
+  background: linear-gradient(var(--hover-bg), var(--hover-bg)), var(--panel-raised);
+}
+
+.btn[aria-expanded="true"],
+.btn[data-on] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--badge-fg);
+}
+
+.btnPrimary {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.btnPrimary:hover {
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
+}
+
+.btnPrimary[aria-expanded="true"] {
+  border-color: var(--accent-active);
+  background: var(--accent-active);
+}
+
+.btn:disabled,
+.btnPrimary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.btn:disabled:hover {
+  background: var(--panel-raised);
+}
+
+.btnPrimary:disabled:hover {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.sm {
+  height: 24px;
+  padding: 0 var(--space-2);
+}
+
+.caret {
+  margin-right: -4px;
+  color: var(--text-faint);
+}
+
+.btnPrimary .caret {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.iconBtn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon-btn);
+  height: var(--icon-btn);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.iconBtn:hover,
+.iconBtn[aria-expanded="true"] {
+  background: var(--active-bg);
+  color: var(--text);
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--badge-fg);
+  font-size: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.link:disabled {
+  color: var(--text-faint);
+  cursor: default;
+  text-decoration: none;
+}
+
+/* ── Tabs ── */
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 2px;
+  margin: var(--space-3) 0 calc(-1 * var(--space-3) - 1px) -10px;
+}
+
+.tab {
+  flex: none;
+  height: 32px;
+  padding: 0 10px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.tab:hover {
+  color: var(--text);
+}
+
+.tab[aria-selected="true"] {
+  border-bottom-color: var(--accent);
+  color: var(--text);
+}
+
+/* ── The body ── */
+
+.body {
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-4) var(--space-4) var(--space-6);
+  overflow-y: auto;
+  container-type: inline-size;
+}
+
+.content {
+  min-width: 0;
+  max-width: 760px;
+}
+
+.section + .section {
+  margin-top: var(--space-5);
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 24px;
+  margin-bottom: var(--space-2);
+}
+
+.sectionHead h2 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--fs-base);
+  font-weight: var(--fw-semibold);
+}
+
+.hint {
+  margin: var(--space-3) 0 0;
+  color: var(--text-faint);
+  font-size: var(--fs-sm);
+  line-height: 17px;
+}
+
+.block {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel-raised);
+}
+
+.flush {
+  padding: 0;
+  overflow: hidden;
+}
+
+.none {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: var(--fs-sm);
+}
+
+.pad {
+  padding: var(--space-3) var(--space-4);
+}
+
+.dash {
+  color: var(--text-faint);
+}
+
+.roleRow {
+  margin-bottom: var(--space-2);
+  padding-right: 0;
+}
+
+.tagRow {
+  margin-bottom: 0;
+}
+
+/* The facts: a label column and a value column; values wrap, they never push the page wide. */
+.facts {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 5px var(--space-2);
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+
+.facts dt {
+  color: var(--text-faint);
+}
+
+.facts dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.ruled {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.sub code,
+.facts code,
+.hint code,
+.notice code {
+  padding: 1px 4px;
+  border-radius: var(--radius-sm);
+  background: var(--active-bg);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
+.facts .link {
+  font-size: var(--fs-sm);
+}
+
+@container (max-width: 420px) {
+  .facts {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .facts dd {
+    margin-bottom: 6px;
+  }
+}
+
+.pair {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

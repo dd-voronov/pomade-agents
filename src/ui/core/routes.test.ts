@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { NEW_AGENT_ROUTE, createdAgentRoute, isNewAgentRoute, selectedSessionOf, sessionsRoute, viewFor } from "./routes.ts";
+import { NEW_AGENT_ROUTE, agentPageOf, agentRoute, isNewAgentRoute, selectedSessionOf, sessionsFilterRoute, sessionsPresetOf, sessionsRoute, viewFor } from "./routes.ts";
 
 describe("viewFor", () => {
   it("shows Live now in the panel, whatever the route", () => {
@@ -47,8 +47,48 @@ describe("the New agent route", () => {
     expect(viewFor("tab", "roster/new")).toBe("roster");
     for (const route of ["roster", "roster/new/x", "roster/newer", "roster/claude-libra", "sessions/new"]) expect(isNewAgentRoute(route), route).toBe(false);
   });
+});
 
-  it("leads, once the agent is created, to its Overview", () => {
-    expect(createdAgentRoute("claude-tax")).toBe("roster/claude-tax/overview");
+describe("the agent page's route", () => {
+  it("names the agent and the tab after `roster/`", () => {
+    expect(agentRoute("claude-libra", "permissions")).toBe("roster/claude-libra/permissions");
+    expect(agentRoute("claude-libra")).toBe("roster/claude-libra/overview");
+    expect(agentPageOf("roster/claude-libra/memory")).toEqual({ agent: "claude-libra", tab: "memory" });
+  });
+
+  it("opens Overview for a route with no tab or an unknown one", () => {
+    expect(agentPageOf("roster/claude-libra")).toEqual({ agent: "claude-libra", tab: "overview" });
+    expect(agentPageOf("roster/claude-libra/nope")).toEqual({ agent: "claude-libra", tab: "overview" });
+  });
+
+  it("round-trips an agent id with characters a route cannot hold as they are", () => {
+    for (const id of ["a/b", "a b", "ünï", "%41"]) expect(agentPageOf(agentRoute(id, "sessions"))).toEqual({ agent: id, tab: "sessions" });
+  });
+
+  it("names no agent on the Roster, on the new-agent page or on any other route", () => {
+    for (const route of ["roster", "roster/", "roster/new", "roster/new/overview", "sessions/a", "", "roster/a/overview/x", "roster/%E0/overview", "rosters/a"]) expect(agentPageOf(route)).toBeNull();
+  });
+
+  it("shows every agent-page route in the Roster view", () => {
+    expect(viewFor("tab", agentRoute("claude-libra", "sessions"))).toBe("roster");
+  });
+});
+
+describe("the Sessions route's preset filters", () => {
+  it("names the agent and the project after `sessions?`", () => {
+    expect(sessionsFilterRoute({ agent: "claude-libra" })).toBe("sessions?agent=claude-libra");
+    expect(sessionsFilterRoute({ agent: "a", project: "p-1" })).toBe("sessions?agent=a&project=p-1");
+    expect(sessionsFilterRoute({})).toBe("sessions");
+  });
+
+  it("round-trips ids with characters a route cannot hold as they are, and shows the Sessions view", () => {
+    const preset = { agent: "a/b&c=d", project: "ünï %41" };
+    expect(sessionsPresetOf(sessionsFilterRoute(preset))).toEqual(preset);
+    expect(viewFor("tab", sessionsFilterRoute(preset))).toBe("sessions");
+    expect(selectedSessionOf(sessionsFilterRoute(preset))).toBeNull();
+  });
+
+  it("presets nothing on any other route", () => {
+    for (const route of ["sessions", "", "sessions?", "sessions?other=1", "sessions/a", "roster?agent=a"]) expect(sessionsPresetOf(route)).toBeNull();
   });
 });

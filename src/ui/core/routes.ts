@@ -45,7 +45,49 @@ export function isNewAgentRoute(route: string): boolean {
   return route === NEW_AGENT_ROUTE;
 }
 
-/** The Overview of the agent a Create made, `roster/<agent>/overview`. */
-export function createdAgentRoute(agent: string): string {
-  return `${ROSTER_ROUTE}/${encodeURIComponent(agent)}/overview`;
+/** The tabs of an agent's page, in the order the page shows them. */
+export const AGENT_TABS = ["overview", "skills", "projects", "model", "permissions", "memory", "sessions"] as const;
+export type AgentTab = (typeof AGENT_TABS)[number];
+
+/** The route of an agent's page on `tab`: `roster/<agent>/<tab>`, the agent's id URI-encoded. */
+export function agentRoute(agent: string, tab: AgentTab = "overview"): string {
+  return `${ROSTER_ROUTE}/${encodeURIComponent(agent)}/${tab}`;
+}
+
+/** The agent and tab an agent-page route names; `null` for the Roster itself and for `roster/new…`, since `new` never names an agent.
+ *  A route with no tab, or one this build does not know, opens Overview. */
+export function agentPageOf(route: string): { agent: string; tab: AgentTab } | null {
+  const [head, id, tab, ...rest] = route.split("/");
+  if (head !== ROSTER_ROUTE || id === undefined || id === "" || rest.length > 0) return null;
+  if (id === "new") return null;
+  let agent: string;
+  try {
+    agent = decodeURIComponent(id);
+  } catch {
+    return null;
+  }
+  return { agent, tab: AGENT_TABS.find((known) => known === tab) ?? "overview" };
+}
+
+/** What the Sessions tab opens with: the agent and the project its filters start on. */
+export type SessionsPreset = { agent?: string; project?: string };
+
+/** The Sessions route with filters preset: `sessions?agent=<id>&project=<id>`; the plain route for none. */
+export function sessionsFilterRoute(preset: SessionsPreset): string {
+  const query = new URLSearchParams();
+  if (preset.agent !== undefined) query.set("agent", preset.agent);
+  if (preset.project !== undefined) query.set("project", preset.project);
+  const text = query.toString();
+  return text === "" ? SESSIONS_ROUTE : `${SESSIONS_ROUTE}?${text}`;
+}
+
+/** The filters a Sessions route presets; `null` for a route that presets none. */
+export function sessionsPresetOf(route: string): SessionsPreset | null {
+  const prefix = `${SESSIONS_ROUTE}?`;
+  if (!route.startsWith(prefix)) return null;
+  const query = new URLSearchParams(route.slice(prefix.length));
+  const agent = query.get("agent");
+  const project = query.get("project");
+  if (agent === null && project === null) return null;
+  return { ...(agent === null ? {} : { agent }), ...(project === null ? {} : { project }) };
 }

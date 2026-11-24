@@ -1,0 +1,113 @@
+.filter {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  margin-bottom: var(--space-2);
+}
+
+.filter > button:first-child {
+  min-width: 0;
+}
+
+.filterName {
+  min-width: 0;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 8px 12px minmax(0, 1fr) 144px 168px 64px 56px;
+  align-items: center;
+  column-gap: var(--space-2);
+  height: 28px;
+  padding: 0 var(--space-4);
+  font-size: var(--fs-sm);
+}
+
+.row + .row {
+  border-top: 1px solid var(--border);
+}
+
+.status {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.status[data-status="active"] {
+  background: var(--accent);
+}
+
+.status[data-status="on-hold"] {
+  background: var(--warning);
+}
+
+.status[data-status="done"] {
+  background: var(--ok);
+}
+
+.status[data-status="done-skip"] {
+  background: var(--text-faint);
+}
+
+.live {
+  display: inline-flex;
+  justify-content: center;
+}
+
+.name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.name[data-unnamed] {
+  color: var(--text-muted);
+}
+
+.row[data-status="done-skip"] .name,
+.row[data-status="done-skip"] .number {
+  color: var(--text-faint);
+}
+
+.project,
+.model {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.number {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* What does not fit goes in this order: the model, then the project and the cost. */
+@container (max-width: 700px) {
+  .row {
+    grid-template-columns: 8px 12px minmax(0, 1fr) 144px 64px 56px;
+  }
+
+  .model {
+    display: none;
+  }
+}
+
+@container (max-width: 540px) {
+  .row {
+    grid-template-columns: 8px 12px minmax(0, 1fr) 56px;
+  }
+
+  .project,
+  .cost {
+    display: none;
+  }
+}

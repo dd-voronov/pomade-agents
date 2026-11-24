@@ -74,7 +74,10 @@
     "settings.setSkillFolders",
     "roster.checkName",
     "roster.create",
-    "roster.checkAlias"
+    "roster.checkAlias",
+    "roster.updateProfile",
+    "roster.permissions",
+    "roster.memory"
   ],
   "commands": [
     {

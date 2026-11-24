@@ -188,6 +188,56 @@ describe("the roster", () => {
     expect(r.answer()).toMatchObject({ profilesOff: "No workspace is open.", agents: [{ id: "claude", profile: null }, { id: "codex", profile: null }] });
   });
 
+  it("writes a role and tags into agent.yaml, only those keys, keeping the file's comments and other keys, and answers the profile", async () => {
+    const r = await start();
+    await expect.poll(() => r.answer().agents.every((a) => a.profile !== null), SOON).toBe(true);
+    const text = await readFile(profilePath("claude-libra"), "utf8");
+    await writeFile(profilePath("claude-libra"), `# kept\n${text}extra: 1\n`);
+    await expect.poll(async () => (await readFile(profilePath("claude-libra"), "utf8")).startsWith("# kept"), SOON).toBe(true);
+    const written = await r.updateProfile("claude-libra", { role: "Files the vault.", tags: ["vault", "knowledge"] });
+    expect(written).toMatchObject({ id: "claude-libra", role: "Files the vault.", tags: ["vault", "knowledge"] });
+    const after = await readFile(profilePath("claude-libra"), "utf8");
+    expect(after).toContain("# kept\n");
+    expect(after).toContain("role: Files the vault.\n");
+    expect(after).toContain("extra: 1\n");
+    expect(after.replace("role: Files the vault.", "role: The claude-libra agent.").replace(/tags:\n  - vault\n  - knowledge\n|tags: \[\s*vault,\s*knowledge\s*\]\n/, "tags: []\n")).toBe(`# kept\n${text}extra: 1\n`);
+    expect(r.answer().agents.find((a) => a.id === "claude-libra")?.profile).toMatchObject({ role: "Files the vault.", tags: ["vault", "knowledge"] });
+    await r.updateProfile("claude-libra", { role: null });
+    expect(await readFile(profilePath("claude-libra"), "utf8")).not.toContain("role:");
+    expect(r.answer().agents.find((a) => a.id === "claude-libra")?.profile?.role).toBeUndefined();
+  });
+
+  it("writes the first file of an agent that has none yet, and refuses what it cannot use: an unusable file, an orphan, an unknown agent, no profiles", async () => {
+    await writeProfile("claude-libra", "id: [\n");
+    const r = await start();
+    await expect(r.updateProfile("claude-libra", { role: "x" })).rejects.toMatchObject({ code: "io-error" });
+    expect(await readFile(profilePath("claude-libra"), "utf8")).toBe("id: [\n");
+    await expect(r.updateProfile("ghost", { role: "x" })).rejects.toMatchObject({ code: "not-found" });
+    await r.updateProfile("codex", { tags: ["cli"] });
+    expect(await readFile(profilePath("codex"), "utf8")).toContain("cli");
+    await rename(join(workspace, "Agents", "claude-libra"), join(workspace, "Agents", "claude-librarian"));
+    await writeFile(profilePath("claude-libra"), "id: claude-libra\nprovider: claude\nkind: folder\nconfigDir: Agents/claude-libra\ncommand: claude-libra\nmodes:\n  normal: { enabled: true }\n");
+    await expect.poll(() => r.agent("claude-libra")?.orphan, SOON).toBe(true);
+    await expect(r.updateProfile("claude-libra", { role: "x" })).rejects.toMatchObject({ code: "not-found" });
+    await expect(r.permissions("claude-libra")).rejects.toMatchObject({ code: "not-found" });
+  });
+
+  it("refuses an edit when no profiles are kept", async () => {
+    const r = await start({ workspace: null });
+    await expect(r.updateProfile("claude", { role: "x" })).rejects.toMatchObject({ code: "not-ready" });
+  });
+
+  it("reads an agent's permissions and memory from its config folder", async () => {
+    const r = await start();
+    await writeFile(join(workspace, "Agents", "claude-libra", "settings.json"), JSON.stringify({ permissions: { allow: ["Edit(Knowledge/**)"], deny: ["Bash(rm:*)"] }, enabledPlugins: { "easel@market": true, "off@market": false } }));
+    await mkdir(join(workspace, "Agents", "claude-libra", "projects", "-w-Projects-beta", "memory"), { recursive: true });
+    await writeFile(join(workspace, "Agents", "claude-libra", "projects", "-w-Projects-beta", "memory", "MEMORY.md"), "# memory\n");
+    expect(await r.permissions("claude-libra")).toMatchObject({ provider: "claude", exists: true, allow: ["Edit(Knowledge/**)"], deny: ["Bash(rm:*)"], plugins: ["easel@market"] });
+    expect(await r.memory("claude-libra")).toEqual({ folders: [{ folder: "-w-Projects-beta", files: [{ name: "MEMORY.md", path: join(workspace, "Agents", "claude-libra", "projects", "-w-Projects-beta", "memory", "MEMORY.md") }] }] });
+    expect(await r.permissions("codex")).toMatchObject({ provider: "codex", file: join(home, ".codex", "config.toml") });
+    expect(await r.memory("codex")).toEqual({ folders: [] });
+  });
+
   it("resolves a config folder under the home folder, the workspace, or as it is", () => {
     expect(resolveConfigDir("~/.claude", "/h", "/w")).toBe("/h/.claude");
     expect(resolveConfigDir("Agents/x", "/h", "/w")).toBe("/w/Agents/x");

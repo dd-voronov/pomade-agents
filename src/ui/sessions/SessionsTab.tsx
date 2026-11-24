@@ -25,6 +25,7 @@ import { SESSION_STATUSES, WORKSPACE_PROJECT_ID, type ProjectRef, type SessionSt
 import type { HostClient } from "pomade-kit/sdk";
 
 import { SearchIcon, SessionsIcon } from "../core/icons.tsx";
+import { sessionsPresetOf } from "../core/routes.ts";
 import { Menu, type MenuAnchor, type MenuEntry } from "../core/Menu.tsx";
 import { StatePage } from "../core/StatePage.tsx";
 import { useBackendInfo } from "../core/useBackendInfo.ts";
@@ -132,7 +133,12 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
   };
 
   const [query, setQuery] = useState("");
-  const [filters, setFilters] = useState<Filters>(NO_FILTERS);
+  // A route may preset the agent and project filters (`sessions?agent=…`, the agent page's Open in Sessions).
+  const [filters, setFilters] = useState<Filters>(() => ({ ...NO_FILTERS, ...sessionsPresetOf(route) }));
+  useEffect(() => {
+    const preset = sessionsPresetOf(route);
+    if (preset !== null) setFilters({ ...NO_FILTERS, ...preset });
+  }, [route]);
   const [showHidden, setShowHidden] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const pattern = useMemo(() => searchPattern(query), [query]);

@@ -7,7 +7,7 @@ import type { HostClient } from "pomade-kit/sdk";
 
 import type { CreateStep } from "../../../shared/roster.ts";
 import { CheckIcon, CloseIcon, WarningIcon } from "../../core/icons.tsx";
-import { ROSTER_ROUTE, createdAgentRoute } from "../../core/routes.ts";
+import { ROSTER_ROUTE, agentRoute } from "../../core/routes.ts";
 import { BackGlyph, CopyGlyph, SpinnerGlyph } from "./glyphs.tsx";
 import {
   RC_FILE_LABEL,
@@ -446,7 +446,7 @@ function Progress(props: ProgressProps): ReactElement {
             It’s on the Roster and in the “+” menu. It starts logged out: its first session asks for <code>/login</code>.
           </p>
           <div className={styles.actions}>
-            <button type="button" className={styles.primary} data-testid="new-agent-open-page" onClick={() => navigate(createdAgentRoute(name))}>
+            <button type="button" className={styles.primary} data-testid="new-agent-open-page" onClick={() => navigate(agentRoute(name))}>
               Open its page
             </button>
             {back}

@@ -24,10 +24,13 @@ import {
   ROSTER_CREATE_METHOD,
   ROSTER_LAUNCH_SPEC_METHOD,
   ROSTER_LIST_METHOD,
+  ROSTER_MEMORY_METHOD,
+  ROSTER_PERMISSIONS_METHOD,
   ROSTER_PROJECTS_FOR_METHOD,
   type AliasCheck,
   type CreateAgentParams,
   type CreateAgentResult,
+  ROSTER_UPDATE_PROFILE_METHOD,
   type LaunchSpec,
   type LaunchSpecParams,
   type NameVerdict,
@@ -62,6 +65,7 @@ import type { RealPath } from "../core/real-paths.ts";
 import type { BoundTabs } from "../sessions/bound-tabs.ts";
 import { agentsFor, projectsFor, type ProjectReads } from "../roster/connections.ts";
 import { launchSpec } from "../roster/launch-spec.ts";
+import { checkProfileEdit } from "../roster/profile-edit.ts";
 import { enabledModes, resolveConfigDir, type Roster } from "../roster/roster.ts";
 import { liveSessions, repoSessions } from "../sessions/for-git.ts";
 import { foundSessions } from "../sessions/for-runner.ts";
@@ -79,7 +83,7 @@ export interface ApiSources {
   tabs: Pick<BoundTabs, "ofTab">;
   liveNow: Pick<LiveNow, "answer">;
   realPath: RealPath;
-  roster: Pick<Roster, "answer" | "list" | "agent">;
+  roster: Pick<Roster, "answer" | "list" | "agent" | "updateProfile" | "permissions" | "memory">;
   /** Pomade's projects, through the connection the API is served on. */
   projects: ProjectReads;
   /** Open / Resume the session, through the connection the API is served on (`open.ts`). */
@@ -330,5 +334,13 @@ export function createApi({ info, sessions, live, tabs, liveNow, realPath, roste
       if (folder === null) throw new HostError("not-found", `No folder agent ${JSON.stringify(agent)} in the roster`);
       return creating().checkAlias(agent, folder);
     },
+    [ROSTER_UPDATE_PROFILE_METHOD]: async (raw) => {
+      const params = paramsOf(raw);
+      const checked = checkProfileEdit(params.role, params.tags);
+      if (!checked.ok) throw new HostError("invalid-params", checked.problem);
+      return { profile: await roster.updateProfile(nameOf(params, "agent", "a roster id"), checked.edit) } as unknown as JsonValue;
+    },
+    [ROSTER_PERMISSIONS_METHOD]: async (raw) => (await roster.permissions(nameOf(paramsOf(raw), "agent", "a roster id"))) as unknown as JsonValue,
+    [ROSTER_MEMORY_METHOD]: async (raw) => (await roster.memory(nameOf(paramsOf(raw), "agent", "a roster id"))) as unknown as JsonValue,
   };
 }
