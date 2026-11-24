@@ -9,7 +9,7 @@ kind: reference
 
 Cmd means Ctrl on Windows and Linux. The Sessions tab's keys work while the tab has focus, no menu is open
 and the cursor is not in a text field; fields have their own keys (below). The Roster tab and the Live now
-panel have none.
+panel have no keys of their own beyond their menus and fields.
 
 ## Sessions tab
 
@@ -49,7 +49,8 @@ closed.
 
 ## Menus
 
-The row menu, **Move to project**, and the filter menus.
+The row menu, **Move to project**, the filter menus, and the Roster's **Start session ▾**, ⋯, **Re-link ▾**,
+**Add skill** and model menus.
 
 | Keys | What it does |
 |---|---|
@@ -57,6 +58,18 @@ The row menu, **Move to project**, and the filter menus.
 | Home End | First / last item |
 | Enter | Run the item |
 | Esc, Tab | Close the menu |
+| ↓ in a menu's search field | Move to the first item |
+| Enter in a menu's search field | Run the first item |
+
+## Roster fields
+
+| Keys | What it does |
+|---|---|
+| Enter on the role line | Edit it; Enter in the field saves, Esc keeps the old one |
+| Enter or `,` in a tag field | Add the tag and keep the field open |
+| Esc in a tag field | Close the field without adding |
+| Enter in the New agent page's name or role field | **Create agent** |
+| Backspace in the New agent page's empty tag field | Remove the last tag |
 
 ## Source
 
@@ -67,3 +80,5 @@ The row menu, **Move to project**, and the filter menus.
 | Search field's Esc and ↓ | `src/ui/sessions/Toolbar.tsx:40`, `:44` |
 | Name and note fields | `src/ui/sessions/DetailPanel.tsx:147`, `:234` |
 | Menus | `src/ui/core/Menu.tsx:103` |
+| Role line, tag field | `src/ui/roster/profile-edit/RoleLine.tsx:97`, `src/ui/roster/profile-edit/TagList.tsx:98`, `:106` |
+| New agent page's fields | `src/ui/roster/new-agent/NewAgentPage.tsx:154`, `:160` |
