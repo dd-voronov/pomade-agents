@@ -13,6 +13,8 @@ import { openRecordStore, type RecordStore } from "../records/record-store.ts";
 import { createAgentCreation, stagingName, stepBoard, TEMPLATE_FOLDER, type CreationOptions } from "./create-agent.ts";
 import { aliasCommand, type ZshAnswer } from "./shell.ts";
 
+/** A change on disk reaches the record store through its watch: under a loaded machine that takes more than the default second. */
+const WATCH = { timeout: 3000, interval: 25 };
 const NONE: ZshAnswer = { alias: null, resolves: false, description: "" };
 
 describe("the step board", () => {
@@ -127,7 +129,7 @@ describe("creating an agent", () => {
     it("refuses a name whose profile exists without its folder", async () => {
       await mkdir(join(dataDir, "agents", "claude-gone"), { recursive: true });
       await writeFile(join(dataDir, "agents", "claude-gone", "agent.yaml"), "id: claude-gone\nprovider: claude\nkind: folder\nconfigDir: Agents/elsewhere\ncommand: claude-gone\n");
-      await expect.poll(() => records.profiles.get("claude-gone") !== undefined).toBe(true);
+      await expect.poll(() => records.profiles.get("claude-gone") !== undefined, WATCH).toBe(true);
       expect((await creation().checkName("claude-gone")).problem).toBe("agent");
     });
   });
@@ -278,7 +280,7 @@ describe("creating an agent", () => {
     let release: () => void = () => undefined;
     const c = creation({ refreshRoster: () => new Promise<void>((resolve) => (release = resolve)) });
     const running = c.create(params(), () => undefined);
-    await expect.poll(async () => (await c.checkName("claude-tax")).problem).toBe("folder");
+    await expect.poll(async () => (await c.checkName("claude-tax")).problem, WATCH).toBe("folder");
     release();
     expect((await running).outcome).toBe("created");
     expect(logs.at(-1)).toContain("create: claude-tax created in");

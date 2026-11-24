@@ -347,6 +347,8 @@ export type RosterUpdateProfileParams = {
   agent: string;
   role?: string | null;
   tags?: string[];
+  /** A mode switched on or off; `normal` is always on, so it takes only `true`. */
+  modes?: Partial<Record<ModeId, boolean>>;
 };
 
 export type RosterUpdateProfileResult = { profile: AgentProfile };
@@ -437,5 +439,50 @@ export function isAgentMemory(value: unknown): value is AgentMemory {
     value.folders.every(
       (f) => isObject(f) && typeof f.folder === "string" && Array.isArray(f.files) && f.files.every((file) => isObject(file) && typeof file.name === "string" && typeof file.path === "string"),
     )
+  );
+}
+
+// ── The agent's page: model, effort and modes ─────────────────────────────────
+
+/** An agent's default model and effort as its provider config holds them; answers `AgentModelConfig`. */
+export const ROSTER_MODEL_CONFIG_METHOD = "roster.modelConfig";
+
+/** Sets or removes a Claude Code agent's `model` / `effortLevel` in its `settings.json`; answers `AgentModelConfig`. */
+export const ROSTER_SET_MODEL_METHOD = "roster.setModel";
+
+/** One agent's default model and effort, read from its provider config. */
+export type AgentModelConfig = {
+  provider: AgentProvider;
+  /** The config file, absolute: Claude Code's `settings.json`, Codex's `config.toml`. */
+  file: string;
+  /** The file exists. */
+  exists: boolean;
+  /** Why the file cannot be used — not readable, not a JSON object; `null` when it can (or is absent). */
+  problem: string | null;
+  /** `null`: the file sets none, so the provider's default applies. */
+  model: string | null;
+  effort: string | null;
+  /** The app writes these keys: Claude Code, with a file that is absent or a JSON object. */
+  writable: boolean;
+};
+
+/** `roster.setModel` params: each key present is set, `null` removes it from `settings.json`. */
+export type RosterSetModelParams = {
+  agent: string;
+  model?: string | null;
+  effort?: string | null;
+};
+
+/** True for a well-formed `roster.modelConfig` / `roster.setModel` answer. */
+export function isAgentModelConfig(value: unknown): value is AgentModelConfig {
+  return (
+    isObject(value) &&
+    isAgentProvider(value.provider) &&
+    typeof value.file === "string" &&
+    typeof value.exists === "boolean" &&
+    (value.problem === null || typeof value.problem === "string") &&
+    (value.model === null || typeof value.model === "string") &&
+    (value.effort === null || typeof value.effort === "string") &&
+    typeof value.writable === "boolean"
   );
 }

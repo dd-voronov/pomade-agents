@@ -6,6 +6,7 @@ import { useState, type KeyboardEvent, type ReactElement, type ReactNode } from 
 import type { HostClient } from "pomade-kit/sdk";
 
 import type { CreateStep } from "../../../shared/roster.ts";
+import { copyText } from "../../core/clipboard.ts";
 import { CheckIcon, CloseIcon, WarningIcon } from "../../core/icons.tsx";
 import { ROSTER_ROUTE, agentRoute } from "../../core/routes.ts";
 import { BackGlyph, CopyGlyph, SpinnerGlyph } from "./glyphs.tsx";
@@ -42,17 +43,7 @@ function Parts({ parts }: { parts: readonly Part[] }): ReactElement {
 function CopyButton({ text, testId }: { text: string; testId: string }): ReactElement {
   const [copied, setCopied] = useState(false);
   const copy = async (): Promise<void> => {
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      // A frame without clipboard access: the browser's own copy of a selected text field.
-      const area = document.createElement("textarea");
-      area.value = text;
-      document.body.append(area);
-      area.select();
-      document.execCommand("copy");
-      area.remove();
-    }
+    await copyText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };

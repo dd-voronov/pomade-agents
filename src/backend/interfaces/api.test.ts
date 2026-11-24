@@ -68,6 +68,13 @@ function api() {
     },
     permissions: () => Promise.reject(new HostError("not-found", "not called")),
     memory: () => Promise.reject(new HostError("not-found", "not called")),
+    modelConfig: () => Promise.reject(new HostError("not-found", "not called")),
+    setModel: (id, change) => {
+      calls.push(["setModel", id, change]);
+      return AGENTS[id] === undefined
+        ? Promise.reject(new HostError("not-found", `No agent ${id}`))
+        : Promise.resolve({ provider: "claude", file: "/s.json", exists: true, problem: null, model: change.model ?? null, effort: change.effort ?? null, writable: true });
+    },
   };
   const projects: ApiSources["projects"] = {
     projects: () => Promise.resolve(Object.keys(VISIBLE)),
@@ -290,6 +297,45 @@ describe("the roster API", () => {
     ["a blank tag", { agent: "claude", tags: [""] }],
   ])("refuses a profile edit with %s as invalid-params", async (_, params) => {
     await expect(Promise.resolve().then(() => api().handlers["roster.updateProfile"]?.(params as never, ctx))).rejects.toMatchObject({ code: "invalid-params" });
+  });
+
+  it("takes a mode switch to the roster with the profile edit", async () => {
+    const { handlers, calls } = api();
+    await handlers["roster.updateProfile"]?.({ agent: "claude", modes: { "full-autonomy": false } }, ctx);
+    expect(calls.at(-1)).toEqual(["updateProfile", "claude", { modes: { "full-autonomy": false } }]);
+  });
+
+  it.each<[string, unknown]>([
+    ["Normal switched off", { agent: "claude", modes: { normal: false } }],
+    ["an unknown mode", { agent: "claude", modes: { yolo: true } }],
+    ["a mode that is not on or off", { agent: "claude", modes: { "full-autonomy": "no" } }],
+    ["no mode", { agent: "claude", modes: {} }],
+  ])("refuses a modes edit with %s as invalid-params", async (_, params) => {
+    await expect(Promise.resolve().then(() => api().handlers["roster.updateProfile"]?.(params as never, ctx))).rejects.toMatchObject({ code: "invalid-params" });
+  });
+
+  it("takes a model and effort change to the roster; null removes a key", async () => {
+    const { handlers, calls } = api();
+    const set = (params: unknown): unknown => handlers["roster.setModel"]?.(params as never, ctx);
+    expect(await set({ agent: "claude", effort: "high" })).toMatchObject({ effort: "high" });
+    expect(calls.at(-1)).toEqual(["setModel", "claude", { effort: "high" }]);
+    await set({ agent: "claude", model: "claude-opus-4-8[1m]", effort: null });
+    expect(calls.at(-1)).toEqual(["setModel", "claude", { model: "claude-opus-4-8[1m]", effort: null }]);
+    await set({ agent: "claude", model: null });
+    expect(calls.at(-1)).toEqual(["setModel", "claude", { model: null }]);
+    await expect(Promise.resolve().then(() => set({ agent: "ghost", model: "opus" }))).rejects.toMatchObject({ code: "not-found" });
+  });
+
+  it.each<[string, unknown]>([
+    ["no agent", { model: "opus" }],
+    ["nothing to change", { agent: "claude" }],
+    ["an unknown effort", { agent: "claude", effort: "max!" }],
+    ["a model of two lines", { agent: "claude", model: "opus\nx" }],
+    ["a model with a space", { agent: "claude", model: "opus x" }],
+    ["a blank model", { agent: "claude", model: "" }],
+    ["a model too long", { agent: "claude", model: "o".repeat(129) }],
+  ])("refuses a model change with %s as invalid-params", async (_, params) => {
+    await expect(Promise.resolve().then(() => api().handlers["roster.setModel"]?.(params as never, ctx))).rejects.toMatchObject({ code: "invalid-params" });
   });
 
   it("answers the connection: a project's offered agents, an agent's projects", async () => {

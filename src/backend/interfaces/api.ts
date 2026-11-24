@@ -36,7 +36,11 @@ import {
   type NameVerdict,
   type RosterAgentsForResult,
   type RosterProjectsForResult,
+  ROSTER_MODEL_CONFIG_METHOD,
+  ROSTER_SET_MODEL_METHOD,
 } from "../../shared/roster.ts";
+import { isEffortLevel, EFFORT_LEVELS } from "../../shared/model-choices.ts";
+import type { ModelChange } from "../roster/model-config.ts";
 import {
   SESSIONS_FIND_METHOD,
   SESSIONS_GET_METHOD,
@@ -83,7 +87,7 @@ export interface ApiSources {
   tabs: Pick<BoundTabs, "ofTab">;
   liveNow: Pick<LiveNow, "answer">;
   realPath: RealPath;
-  roster: Pick<Roster, "answer" | "list" | "agent" | "updateProfile" | "permissions" | "memory">;
+  roster: Pick<Roster, "answer" | "list" | "agent" | "updateProfile" | "permissions" | "memory" | "modelConfig" | "setModel">;
   /** Pomade's projects, through the connection the API is served on. */
   projects: ProjectReads;
   /** Open / Resume the session, through the connection the API is served on (`open.ts`). */
@@ -235,6 +239,28 @@ function createParams(raw: unknown): CreateAgentParams {
   return { name, role: role.trim(), tags: [...new Set(tags.map((t) => t.trim()))], projects: projects as string[], createId };
 }
 
+/** The longest model name `roster.setModel` takes. */
+const MODEL_MAX = 128;
+const MODEL_NAME = /^[A-Za-z0-9][A-Za-z0-9._:@/[\]-]*$/;
+
+/** `roster.setModel`'s change: `model` a model name or `null`, `effort` one of the effort levels or `null`, at least one given. */
+function modelChangeOf(params: Params): ModelChange {
+  const { model, effort } = params;
+  const change: ModelChange = {};
+  if (model !== undefined) {
+    if (model !== null && (typeof model !== "string" || model.length > MODEL_MAX || !MODEL_NAME.test(model))) {
+      throw new HostError("invalid-params", `"model" must be a model name of at most ${MODEL_MAX} characters, or null`);
+    }
+    change.model = model;
+  }
+  if (effort !== undefined) {
+    if (effort !== null && !isEffortLevel(effort)) throw new HostError("invalid-params", `"effort" must be one of ${EFFORT_LEVELS.join(", ")}, or null`);
+    change.effort = effort;
+  }
+  if (change.model === undefined && change.effort === undefined) throw new HostError("invalid-params", 'give "model", "effort" or both');
+  return change;
+}
+
 /** The kit's contract shapes are interfaces, which TypeScript does not take for JSON values; they hold only JSON. */
 const json = (value: SessionsForRepoResult | SessionsLiveInResult): JsonValue => value as unknown as JsonValue;
 
@@ -336,11 +362,17 @@ export function createApi({ info, sessions, live, tabs, liveNow, realPath, roste
     },
     [ROSTER_UPDATE_PROFILE_METHOD]: async (raw) => {
       const params = paramsOf(raw);
-      const checked = checkProfileEdit(params.role, params.tags);
+      const checked = checkProfileEdit(params.role, params.tags, params.modes);
       if (!checked.ok) throw new HostError("invalid-params", checked.problem);
       return { profile: await roster.updateProfile(nameOf(params, "agent", "a roster id"), checked.edit) } as unknown as JsonValue;
     },
     [ROSTER_PERMISSIONS_METHOD]: async (raw) => (await roster.permissions(nameOf(paramsOf(raw), "agent", "a roster id"))) as unknown as JsonValue,
     [ROSTER_MEMORY_METHOD]: async (raw) => (await roster.memory(nameOf(paramsOf(raw), "agent", "a roster id"))) as unknown as JsonValue,
+    [ROSTER_MODEL_CONFIG_METHOD]: async (raw) => (await roster.modelConfig(nameOf(paramsOf(raw), "agent", "a roster id"))) as unknown as JsonValue,
+    [ROSTER_SET_MODEL_METHOD]: async (raw) => {
+      const params = paramsOf(raw);
+      const agent = nameOf(params, "agent", "a roster id");
+      return (await roster.setModel(agent, modelChangeOf(params))) as unknown as JsonValue;
+    },
   };
 }

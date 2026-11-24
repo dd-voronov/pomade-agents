@@ -37,3 +37,20 @@ describe("editedProfile", () => {
     expect(editedProfile(bare, { role: "Set." })).toEqual({ ...PROFILE, role: "Set." });
   });
 });
+
+describe("modes", () => {
+  it("takes a mode switch and refuses Normal off", () => {
+    expect(checkProfileEdit(undefined, undefined, { "full-autonomy": false })).toEqual({ ok: true, edit: { modes: { "full-autonomy": false } } });
+    expect(checkProfileEdit(undefined, undefined, { normal: true })).toMatchObject({ ok: true });
+    expect(checkProfileEdit(undefined, undefined, { normal: false })).toMatchObject({ ok: false, problem: expect.stringContaining("Normal") as unknown });
+    expect(checkProfileEdit(undefined, undefined, { other: true })).toMatchObject({ ok: false });
+    expect(checkProfileEdit(undefined, undefined, [])).toMatchObject({ ok: false });
+  });
+
+  it("switches only the mode named, adding it when the profile lacks it", () => {
+    const on = { ...PROFILE, modes: { normal: { enabled: true }, "full-autonomy": { enabled: true } } };
+    expect(editedProfile(on, { modes: { "full-autonomy": false } }).modes).toEqual({ normal: { enabled: true }, "full-autonomy": { enabled: false } });
+    expect(editedProfile({ ...PROFILE, modes: { normal: { enabled: true } } }, { modes: { "full-autonomy": true } }).modes).toEqual({ normal: { enabled: true }, "full-autonomy": { enabled: true } });
+    expect(editedProfile(on, { role: "x" }).modes).toEqual(on.modes);
+  });
+});

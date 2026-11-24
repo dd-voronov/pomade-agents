@@ -20,7 +20,7 @@ import { isAbsolute, join } from "node:path";
 import { providerModes, type RosterAgent } from "pomade-kit/protocol";
 import { HostError } from "pomade-kit/sdk";
 
-import { MODE_IDS, type AgentMemory, type AgentPermissions, type AgentProfile, type ModeId, type RosterAgentsAnswer, type RosterChanged, type RosterEntry } from "../../shared/roster.ts";
+import { MODE_IDS, type AgentMemory, type AgentModelConfig, type AgentPermissions, type AgentProfile, type ModeId, type RosterAgentsAnswer, type RosterChanged, type RosterEntry } from "../../shared/roster.ts";
 import { RecordError, type FileSet } from "../records/record-store.ts";
 import { isRecordId } from "../sessions/rules.ts";
 import { AGENTS_FOLDER, folderAgentNames } from "../stores/roots.ts";
@@ -28,6 +28,7 @@ import { readMemory, readPermissions } from "./agent-files.ts";
 import { editedProfile, type ProfileEdit } from "./profile-edit.ts";
 import { BUILTIN_IDS, NO_OVERRIDES, agentName, builtinProfile, folderProfile, readPomadeOverrides } from "./first-sight.ts";
 import { modelDefaults } from "./provider-config.ts";
+import { ModelWriteError, readModelConfig, writeModelConfig, type ModelChange } from "./model-config.ts";
 
 /** How often folders, overrides and provider configs are read again. */
 export const TICK_MS = 2000;
@@ -68,6 +69,13 @@ export interface Roster {
   permissions(id: string): Promise<AgentPermissions>;
   /** The project memory the agent keeps; `not-found` as `permissions`. */
   memory(id: string): Promise<AgentMemory>;
+  /** The agent's default model and effort as its provider config holds them; `not-found` as `permissions`. */
+  modelConfig(id: string): Promise<AgentModelConfig>;
+  /** Write the agent's default model and effort (Claude Code's `settings.json`, only those keys) and answer the config as written;
+   *  the roster is read again before it resolves. Rejects with `HostError`: `not-ready` (no profiles are kept), `not-found` as
+   *  `permissions`, `invalid-params` (a Codex
+   *  agent), `io-error` (the file cannot be used or written). */
+  setModel(id: string, change: ModelChange): Promise<AgentModelConfig>;
   /** Read everything again now; resolves when the answer is current. */
   refresh(): Promise<void>;
   onChange(listener: (changed: RosterChanged) => void): () => void;
@@ -283,6 +291,29 @@ export function startRoster(options: RosterOptions): Roster {
       const { profile } = livingAgent(id);
       const configDir = resolve(profile.configDir);
       return configDir === null ? { folders: [] } : readMemory(profile.provider, configDir);
+    },
+
+    async modelConfig(id) {
+      const { profile } = livingAgent(id);
+      const configDir = resolve(profile.configDir);
+      if (configDir === null) throw new HostError("not-found", `The config folder of ${JSON.stringify(id)} cannot be resolved`);
+      return readModelConfig(profile.provider, configDir);
+    },
+
+    async setModel(id, change) {
+      // Without a workspace the built-ins are shown read-only, their model included (DESIGN §3.3).
+      if (profiles === null) throw new HostError("not-ready", noProfiles);
+      const { profile } = livingAgent(id);
+      const configDir = resolve(profile.configDir);
+      if (configDir === null) throw new HostError("not-found", `The config folder of ${JSON.stringify(id)} cannot be resolved`);
+      try {
+        const written = await writeModelConfig(profile.provider, configDir, change);
+        await refresh();
+        return written;
+      } catch (err) {
+        if (err instanceof ModelWriteError) throw new HostError(err.kind === "read-only" ? "invalid-params" : "io-error", err.message);
+        throw err;
+      }
     },
 
     refresh,

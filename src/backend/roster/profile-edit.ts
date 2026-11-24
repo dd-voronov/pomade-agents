@@ -1,13 +1,16 @@
-// A change of an agent's role line and tags (`roster.updateProfile`): what it may hold, and the
-// profile it makes. Only these two keys are edited here; the profile's other keys are never touched.
+// A change of an agent's role line, tags and modes (`roster.updateProfile`): what it may hold, and
+// the profile it makes. Only these keys are edited here; the profile's other keys are never touched.
+// Normal is always on (DESIGN §3.4): an edit can switch only the other modes off.
 
-import { ROLE_MAX, TAG_MAX, type AgentProfile } from "../../shared/roster.ts";
+import { MODE_IDS, ROLE_MAX, TAG_MAX, type AgentProfile, type ModeId } from "../../shared/roster.ts";
 
 export type ProfileEdit = {
   /** A new role line; `null` removes it. Absent: unchanged. */
   role?: string | null;
   /** The whole new tag list. Absent: unchanged. */
   tags?: string[];
+  /** Modes switched on or off. Absent: unchanged. */
+  modes?: Partial<Record<ModeId, boolean>>;
 };
 
 /** The most tags one agent holds. */
@@ -16,7 +19,7 @@ export const TAGS_MAX = 20;
 const oneLine = (text: string): boolean => text.trim() !== "" && !/[\r\n\0]/.test(text);
 
 /** `raw` as an edit, or what is wrong with it. */
-export function checkProfileEdit(role: unknown, tags: unknown): { ok: true; edit: ProfileEdit } | { ok: false; problem: string } {
+export function checkProfileEdit(role: unknown, tags: unknown, modes?: unknown): { ok: true; edit: ProfileEdit } | { ok: false; problem: string } {
   const edit: ProfileEdit = {};
   if (role !== undefined) {
     if (role !== null && (typeof role !== "string" || !oneLine(role) || role.trim().length > ROLE_MAX)) {
@@ -32,7 +35,15 @@ export function checkProfileEdit(role: unknown, tags: unknown): { ok: true; edit
     if (new Set(trimmed).size !== trimmed.length) return { ok: false, problem: '"tags" must not repeat a tag' };
     edit.tags = trimmed;
   }
-  if (edit.role === undefined && edit.tags === undefined) return { ok: false, problem: 'give "role", "tags" or both' };
+  if (modes !== undefined) {
+    const entries = typeof modes === "object" && modes !== null && !Array.isArray(modes) ? Object.entries(modes) : null;
+    if (entries === null || entries.length === 0 || !entries.every(([id, on]) => (MODE_IDS as readonly string[]).includes(id) && typeof on === "boolean")) {
+      return { ok: false, problem: `"modes" must map one or more of ${MODE_IDS.join(", ")} to true or false` };
+    }
+    if ((modes as Record<string, boolean>).normal === false) return { ok: false, problem: "Normal is always on: it cannot be switched off" };
+    edit.modes = modes as Partial<Record<ModeId, boolean>>;
+  }
+  if (edit.role === undefined && edit.tags === undefined && edit.modes === undefined) return { ok: false, problem: 'give "role", "tags", "modes" or some of them' };
   return { ok: true, edit };
 }
 
@@ -40,5 +51,10 @@ export function checkProfileEdit(role: unknown, tags: unknown): { ok: true; edit
 export function editedProfile(profile: AgentProfile, edit: ProfileEdit): AgentProfile {
   const { role: _role, ...rest } = profile;
   const role = edit.role === undefined ? profile.role : (edit.role ?? undefined);
-  return { ...rest, ...(role === undefined ? {} : { role }), tags: edit.tags ?? profile.tags };
+  const modes = { ...profile.modes };
+  for (const id of MODE_IDS) {
+    const on = edit.modes?.[id];
+    if (on !== undefined) modes[id] = { ...modes[id], enabled: on };
+  }
+  return { ...rest, ...(role === undefined ? {} : { role }), tags: edit.tags ?? profile.tags, modes };
 }

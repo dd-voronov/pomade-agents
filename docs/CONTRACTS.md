@@ -75,7 +75,8 @@ One UI bundle; `welcome.surface` and the frame's route pick the view (`src/ui/co
   ← Roster are the tab navigating by itself (`navigate`, `tabs.setRoute`), so a reload and a
   restart of Pomade open the same tab. An `<agent>` the roster does not hold shows "No such agent"
   with a way back. The page (`src/ui/roster/agent-page/`) reads `roster.agents` and
-  `roster.changed` like the Roster, and `roster.permissions` / `roster.memory` for its tabs; each
+  `roster.changed` like the Roster, and `roster.permissions` / `roster.memory` /
+  `roster.modelConfig` / `roster.launchSpec` for its tabs; each
   tab is one file under `tabs.tsx` that takes an `AgentContext` (`agent-context.ts`).
 - **Open in the editor** — Open CLAUDE.md, Open agent.yaml, Open `settings.json` and a memory
   file are `tabs.openFile` in the project in front (HOST-API §4): the path is workspace-relative
@@ -166,9 +167,11 @@ it the same way. Method names and shapes are in `src/shared/api.ts`, `src/shared
 | `roster.checkName` | `{ name }` | `NameVerdict` `{ name, problem, detail }` (the app's own frames) |
 | `roster.create` | `CreateAgentParams` `{ name, role, tags, projects, createId }` | `CreateAgentResult` (the app's own frames) |
 | `roster.checkAlias` | `AliasCheckParams` `{ agent }` | `AliasCheck` `{ ok, aliasLine, rcFile, detail }` (the app's own frames) |
-| `roster.updateProfile` | `RosterUpdateProfileParams` `{ agent, role?: string \| null, tags?: string[] }` | `RosterUpdateProfileResult` `{ profile: AgentProfile }` (the app's own frames) |
+| `roster.updateProfile` | `RosterUpdateProfileParams` `{ agent, role?: string \| null, tags?: string[], modes?: { [mode]: boolean } }` | `RosterUpdateProfileResult` `{ profile: AgentProfile }` (the app's own frames) |
 | `roster.permissions` | `{ agent }` | `AgentPermissions` (the app's own frames) |
 | `roster.memory` | `{ agent }` | `AgentMemory` (the app's own frames) |
+| `roster.modelConfig` | `{ agent }` | `AgentModelConfig` (the app's own frames) |
+| `roster.setModel` | `RosterSetModelParams` `{ agent, model?: string \| null, effort?: string \| null }` | `AgentModelConfig` (the app's own frames) |
 
 ```ts
 interface AppInfo {
@@ -709,16 +712,20 @@ the `roster.creating` notice; the shapes in `src/shared/roster.ts`, the name rul
   fresh zsh defines `agent` as the alias of its config folder; never writes. `not-found` for an id
   that is not a folder agent the roster holds (or is an orphan). The page's **Check again**.
 
-**`roster.updateProfile`** — the page's edit of an agent's role line and tags in its `agent.yaml`:
+**`roster.updateProfile`** — the page's edit of an agent's role line, tags and modes in its `agent.yaml`:
 
 ```ts
-type RosterUpdateProfileParams = { agent: string; role?: string | null; tags?: string[] };
+type RosterUpdateProfileParams = { agent: string; role?: string | null; tags?: string[]; modes?: Partial<Record<ModeId, boolean>> };
 type RosterUpdateProfileResult = { profile: AgentProfile };   // as written
 ```
 
 - Each key present is set; `role: null` removes the role line; a key absent is left alone, and so is
   every other key of the file (comments and extra keys included) — the rewrite rules of "Backend"
-  below. At least one of `role` and `tags` is required.
+  below. At least one of `role`, `tags` and `modes` is required.
+- `modes`: one or more of `normal`, `full-autonomy` mapped to `true` / `false`; each sets
+  `modes.<id>.enabled`, the other modes are left alone. Normal is always on: `normal: false` is
+  `invalid-params`. A mode switched off leaves `roster.list` and `roster.launchSpec` refuses it
+  (`invalid-params`, "the agent's Full autonomy mode is not enabled").
 - `role`: one line, at most `ROLE_MAX` (200) characters, trimmed, not blank. `tags`: at most 20,
   each one line of at most `TAG_MAX` (24) characters, trimmed, none repeated. Anything else is
   `invalid-params`.
@@ -764,6 +771,39 @@ type AgentMemory = { folders: { folder: string; files: { name: string; path: str
   (`claudeFolderName`); the page names the folder after the workspace project whose folder (under
   the workspace as Pomade names it, or resolved) encodes to it, and shows the folder's own name for
   the rest.
+
+**`roster.modelConfig`** / **`roster.setModel`** — an agent's default model and effort, for its
+page's Model & modes tab. The provider's config is their one truth (DESIGN §3.2):
+
+```ts
+type AgentModelConfig = {
+  provider: "claude" | "codex";
+  file: string;            // absolute: <configDir>/settings.json (Claude Code) · <configDir>/config.toml (Codex)
+  exists: boolean;
+  problem: string | null;  // why the file cannot be used: unreadable, not valid JSON, not a JSON object
+  model: string | null;    // settings.json model · config.toml model; null: the provider's default
+  effort: string | null;   // settings.json effortLevel · config.toml model_reasoning_effort
+  writable: boolean;       // Claude Code with a file that is absent or a JSON object
+};
+type RosterSetModelParams = { agent: string; model?: string | null; effort?: string | null };
+```
+
+- `roster.setModel` writes Claude Code's `settings.json` only: each key present is set, `null`
+  removes it (the provider's default applies). Only those keys' text changes — every other key,
+  the key order, the indentation, the spacing and the trailing newline stay byte for byte
+  (`json-keys.ts`); a new key goes after the last one, laid out like it. A missing file is created
+  holding just the keys set. A symlinked file is written through and stays a symlink.
+- `model`: a model name (`[A-Za-z0-9][A-Za-z0-9._:@/[\]-]*`, at most 128); `effort`: one of
+  `EFFORT_LEVELS` (`low`, `medium`, `high`, `xhigh`); at least one is required. The page offers
+  `CLAUDE_MODEL_CHOICES` (`opus`, `sonnet`, `haiku`) and the file's own model when it names another
+  (`src/shared/model-choices.ts`).
+- Writes to one file run one at a time, each from the file as it is on disk then. The roster is read
+  again before the call answers, so `roster.changed` carries the new `model` / `effort` of
+  `roster.agents`.
+- Errors: `not-ready` (no workspace is open — the built-ins are read-only then); `not-found` as
+  `roster.permissions`; `invalid-params` (a Codex agent: read-only here); `io-error` (a file that
+  cannot be used — never written over — or cannot be written). `roster.modelConfig` reads on each
+  call, nothing cached; `not-found` as `roster.permissions`.
 
 Adding a method: its name in the manifest's `api` and in `API_METHODS`, its shapes in
 `src/shared/`, its handler in `src/backend/interfaces/api.ts`.
