@@ -21,6 +21,7 @@ import {
   forkTooltip,
   groupByStatus,
   inScope,
+  isListed,
   isLong,
   liveTitle,
   projectLabel,
@@ -51,6 +52,14 @@ describe("scope", () => {
     expect([alpha, shared, bucket].filter((s) => inScope(s, "twin")).map((s) => s.id)).toEqual(["s"]);
     expect([alpha, shared, bucket].filter((s) => inScope(s, "beta"))).toEqual([]);
     expect([alpha, shared, bucket].filter((s) => inScope(s, "__workspace__")).map((s) => s.id)).toEqual(["a", "s", "w"]);
+  });
+
+  it("lists a hidden session only while the hidden ones are shown, and only in its scope", () => {
+    const hidden = { ...session("h", { projects: ["alpha"] }), hidden: "empty" as const };
+    const shown = session("a", { projects: ["alpha"] });
+    expect([hidden, shown].filter((s) => isListed(s, "alpha", false)).map((s) => s.id)).toEqual(["a"]);
+    expect([hidden, shown].filter((s) => isListed(s, "alpha", true)).map((s) => s.id)).toEqual(["h", "a"]);
+    expect(isListed(hidden, "beta", true)).toBe(false);
   });
 });
 
@@ -260,6 +269,7 @@ describe("a row's texts", () => {
       { kind: "shared-folder", text: "shared folder", tooltip: "Its start folder is the root of Alpha and Twin" },
       { kind: "outside-pomade", text: "outside Pomade", tooltip: "Started outside Pomade: no tab, no live state" },
     ]);
+    expect(chipsOf({ ...all, record, hidden: "empty" }, names).map((chip) => chip.text)).toEqual(["hidden — no messages", "nightly", "shared folder", "outside Pomade"]);
   });
 });
 

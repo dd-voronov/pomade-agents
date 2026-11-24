@@ -360,6 +360,20 @@ describe("the session data", () => {
     expect(d.list().map((s) => s.id).sort()).toEqual(["a", "b"]);
   });
 
+  it("marks a session without messages hidden as empty and lists it, and shows it from its first message as a change since a revision", async () => {
+    const source = fakeSource();
+    source.put(summary("bare"), summary("talk", { firstMessage: { text: "Hi", at: null }, lastMessage: { text: "Hi", at: null } }));
+    source.indexed();
+    const d = await start(source, false);
+    expect([session("bare")?.hidden, session("talk")?.hidden]).toEqual(["empty", null]);
+    expect(d.list().map((s) => s.id).sort()).toEqual(["bare", "talk"]);
+
+    const before = d.answer();
+    source.put(summary("bare", { firstMessage: { text: "Start over", at: null }, lastMessage: { text: "Start over", at: null } }));
+    await expect.poll(() => session("bare")?.hidden, SOON).toBeNull();
+    expect(d.answer({ epoch: before.epoch, revision: before.revision }).sessions.map((s) => s.id)).toEqual(["bare"]);
+  });
+
   it("without a workspace keeps no records, answers the sessions with why, and refuses changes", async () => {
     const source = fakeSource();
     source.put(summary("s"));

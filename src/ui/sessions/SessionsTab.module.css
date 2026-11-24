@@ -39,6 +39,29 @@
   white-space: nowrap;
 }
 
+/* "N hidden": shows the hidden sessions, and pressed, hides them again. */
+.hiddenToggle {
+  flex: none;
+  margin-right: -4px;
+  padding: 0 4px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--badge-fg);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.hiddenToggle:hover {
+  text-decoration: underline;
+}
+
+.hiddenToggle[aria-pressed="true"] {
+  background: var(--accent-soft);
+}
+
 .indexing {
   color: var(--text-muted);
 }

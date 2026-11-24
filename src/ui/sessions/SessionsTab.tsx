@@ -10,6 +10,10 @@
 // While a search or filter is on, the rows are its matches, each group showing all of them, and the
 // list shows them grouped instead of one status tab; only matches stay checked.
 //
+// Hidden sessions (`Session.hidden`) are left out of the rows, the counts, the sums, the search and
+// the filters; the header says how many the scope hides, and clicking that shows them in their
+// groups, dimmed, until clicked again. The header's count and sum never take them.
+//
 // Keys: ↑ ↓ move the selection in both layouts; Shift+↑↓ check a range from the selected row (the
 // list) or the marked one (the table); Space checks that row; Cmd+A checks every row shown; F2
 // renames that row in the panel; `/` focuses the search; Esc clears the checks, then closes the
@@ -38,7 +42,7 @@ import { listRows, openTab, revealInTable, step, tableOrder, type PickedTab } fr
 import { SessionsList } from "./SessionsList.tsx";
 import { SessionsTable } from "./SessionsTable.tsx";
 import { NO_FILTERS, filterMenu, folderLabel, folderOf, isFiltering, matches, searchPattern, type Criteria, type FilterKind, type Filters } from "./search-model.ts";
-import { formatHeaderSum, groupByStatus, inScope, statusOf, totalCost } from "./table-model.ts";
+import { formatHeaderSum, groupByStatus, inScope, isListed, statusOf, totalCost } from "./table-model.ts";
 import { Toolbar } from "./Toolbar.tsx";
 import { Toast } from "./Toast.tsx";
 import styles from "./SessionsTab.module.css";
@@ -122,14 +126,20 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
 
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<Filters>(NO_FILTERS);
+  const [showHidden, setShowHidden] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const pattern = useMemo(() => searchPattern(query), [query]);
   // Typing stays quick over thousands of sessions: the rows follow the field when React has time.
   const rowsPattern = useDeferredValue(pattern);
 
-  const scoped = useMemo(() => (copy === null ? NO_SESSIONS : [...copy.byId.values()].filter((session) => inScope(session, scope.id))), [copy, scope.id]);
+  const inTab = useCallback((session: Session) => isListed(session, scope.id, showHidden), [scope.id, showHidden]);
+  const inScopeAll = useMemo(() => (copy === null ? NO_SESSIONS : [...copy.byId.values()].filter((session) => inScope(session, scope.id))), [copy, scope.id]);
+  /** The sessions the tab lists: the scope's, the hidden ones only while they are shown. */
+  const scoped = useMemo(() => inScopeAll.filter(inTab), [inScopeAll, inTab]);
   const groups = groupByStatus(scoped, scope.id);
-  const count = scoped.length;
+  const counted = showHidden ? inScopeAll.filter((session) => session.hidden === null) : scoped;
+  const count = counted.length;
+  const hiddenCount = inScopeAll.length - count;
   const criteria: Criteria = useMemo(
     () => ({ pattern: rowsPattern, filters, folder: (session) => folderOf(session, workspace, workspaceRoots) }),
     [rowsPattern, filters, workspace, workspaceRoots],
@@ -143,12 +153,12 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
   const matchTotal = shown.active.length + shown["on-hold"].length + shown.done.length + shown["done-skip"].length;
   const shownExpanded = filtering ? EVERY_STATUS : expanded;
   const candidate = selectedId === null ? undefined : copy?.byId.get(selectedId);
-  const selected = candidate !== undefined && inScope(candidate, scope.id) ? candidate : null;
+  const selected = candidate !== undefined && inTab(candidate) ? candidate : null;
   const tab = selected === null ? null : openTab(selected, picked);
   // Only sessions the tab lists stay checked.
   const checked = pruned(checkedSet, (id) => {
     const session = copy?.byId.get(id);
-    return session !== undefined && inScope(session, scope.id) && (!filtering || matches(session, criteria));
+    return session !== undefined && inTab(session) && (!filtering || matches(session, criteria));
   });
 
   /** The rows shown, top to bottom: the table's, the matches in the list, or the open status tab's. */
@@ -356,7 +366,7 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
         The agents' sessions show here once their stores are read.
       </StatePage>
     );
-  } else if (count === 0) {
+  } else if (scoped.length === 0) {
     body = (
       <StatePage icon={<SessionsIcon size={20} />} title={`No sessions in ${workspace ? "the Workspace" : scopeName} yet`} testId="sessions-empty">
         {copy.indexing
@@ -400,7 +410,7 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
           byId={copy.byId}
           inTab={(id) => {
             const session = copy.byId.get(id);
-            return session !== undefined && inScope(session, scope.id);
+            return session !== undefined && inTab(session);
           }}
           onSelect={onSelect}
           onClose={close}
@@ -470,8 +480,23 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
             data-indexing={copy.indexing ? "" : undefined}
           >
             {copy.indexing && <span className={styles.indexing}>Indexing… </span>}
-            {formatHeaderSum(count, totalCost(groups))}
+            {formatHeaderSum(count, totalCost(groupByStatus(counted, scope.id)))}
           </span>
+        )}
+        {hiddenCount > 0 && (
+          <button
+            type="button"
+            className={styles.hiddenToggle}
+            aria-pressed={showHidden}
+            title={showHidden ? "Hide them again" : "Show the sessions hidden from the tab: those with no message and no answer"}
+            data-testid="sessions-hidden"
+            onClick={() => {
+              if (showHidden && selected?.hidden != null) select(null);
+              setShowHidden(!showHidden);
+            }}
+          >
+            {hiddenCount} hidden
+          </button>
         )}
       </header>
       {copy?.recordsOff != null && (
@@ -491,7 +516,7 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
         />
       ) : (
         copy !== null &&
-        count > 0 && (
+        scoped.length > 0 && (
           <Toolbar
             searchRef={searchRef}
             query={query}

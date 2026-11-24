@@ -56,6 +56,8 @@ describe("sessions shapes", () => {
     expect(isSessionsAnswer({ ...answer, recordsOff: undefined })).toBe(false);
     expect(isSession(testSession({ attribution: { projects: [""], by: "folder", sharedFolder: false } }))).toBe(false);
     expect(isSession(testSession({ attribution: { projects: [], by: "guess" as "folder", sharedFolder: false } }))).toBe(false);
+    expect(isSession(testSession({ hidden: "noise" as "empty" }))).toBe(false);
+    expect(isSession({ ...testSession(), hidden: undefined })).toBe(false);
     expect(isSessionsChanged({ epoch: "e" })).toBe(false);
     expect(isSessionsChanged(null)).toBe(false);
     expect(isSessionsUpdated({ sessions: [{ id: "s" }] })).toBe(false);

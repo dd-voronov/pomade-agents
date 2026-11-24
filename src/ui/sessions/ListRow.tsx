@@ -44,6 +44,7 @@ export function ListRow({ session, workspace, names, fork, now, selected, marks,
       data-testid="session-row"
       data-session-id={session.id}
       data-status={statusOf(session)}
+      data-hidden={session.hidden ?? undefined}
       data-checked={marks.checked ? "" : undefined}
       data-menu={marks.menu ? "" : undefined}
       draggable

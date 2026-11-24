@@ -45,6 +45,7 @@ export function SessionRow({ session, columns, names, fork, now, lastSelected, m
       data-session-id={session.id}
       data-status={statusOf(session)}
       data-last-selected={lastSelected ? "" : undefined}
+      data-hidden={session.hidden ?? undefined}
       data-checked={marks.checked ? "" : undefined}
       data-menu={marks.menu ? "" : undefined}
       draggable

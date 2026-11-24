@@ -2,7 +2,7 @@ import type { ProjectRef } from "pomade-kit/protocol";
 import { describe, expect, it } from "vitest";
 
 import type { LiveRunRow, LiveTabRow } from "../../shared/live-now.ts";
-import { groupRows, groupTarget, headerCount, rowTitle } from "./live-now-model.ts";
+import { groupRows, groupTarget, headerCount, rowTitle, rowTooltip } from "./live-now-model.ts";
 
 const row = (tabId: string, patch: Partial<LiveTabRow> = {}): LiveTabRow => ({
   kind: "tab",
@@ -90,5 +90,17 @@ describe("Live now's texts", () => {
     expect(rowTitle(row("a", { sessionId: "s", firstMessage: "why does it flicker" }))).toEqual({ text: "why does it flicker", unnamed: true });
     expect(rowTitle(row("a"))).toEqual({ text: "Claude Code", unnamed: false });
     expect(rowTitle(run("r1", { sessionId: "s" }))).toEqual({ text: "Nightly review", unnamed: false });
+  });
+});
+
+describe("a row's tooltip", () => {
+  const local = (d: number, h: number, m: number): string => new Date(2026, 10, d, h, m).toISOString();
+  const now = new Date(2026, 10, 24, 12, 0);
+
+  it("says since when as the rows and the detail panel do, then what the click does", () => {
+    expect(rowTooltip(row("t", { state: "working", since: local(24, 9, 5) }), now)).toBe("Working since 09:05 — switches project and focuses the tab");
+    expect(rowTooltip(row("t", { state: "needs-you", since: local(23, 18, 40) }), now)).toBe("Needs you since yesterday, 18:40 — switches project and focuses the tab");
+    expect(rowTooltip(run("r", { since: local(3, 9, 5) }), now)).toBe("Working since Nov 3, 09:05 — opens the run’s terminal tab");
+    expect(rowTooltip(run("r", { terminal: null, since: local(3, 9, 5) }), now)).toBe("Working since Nov 3, 09:05 — Runner did not say which terminal it runs in");
   });
 });

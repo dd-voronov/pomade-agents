@@ -152,3 +152,8 @@
 .row[data-menu] .more {
   opacity: 1;
 }
+
+/* A hidden session, shown on request: dimmed, its background marks still whole. */
+.row[data-hidden] > * {
+  opacity: 0.55;
+}

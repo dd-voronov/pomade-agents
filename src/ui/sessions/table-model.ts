@@ -168,6 +168,11 @@ export function formatMoney(usd: number): string {
   return `~$${MONEY.format(usd)}`;
 }
 
+/** True when the tab lists the session: it is in the scope, and not hidden unless the hidden ones are shown. */
+export function isListed(session: Session, scopeId: string, showHidden: boolean): boolean {
+  return inScope(session, scopeId) && (showHidden || session.hidden === null);
+}
+
 /** The header's summary: "3 sessions · ~$4.20 est."; the sum is left out when no cost is known. */
 export function formatHeaderSum(count: number, cost: number | null): string {
   const sessions = count === 1 ? "1 session" : `${count} sessions`;
@@ -257,11 +262,13 @@ export function projectLabel(session: Session, names: ReadonlyMap<string, string
   return projects.map((id) => names.get(id) ?? id).join(", ");
 }
 
-export type Chip = { kind: "runner" | "shared-folder" | "outside-pomade"; text: string; tooltip: string };
+export type Chip = { kind: "hidden" | "runner" | "shared-folder" | "outside-pomade"; text: string; tooltip: string };
 
-/** The row's chips: an unattended run (⏱ + job), "shared folder", "outside Pomade". */
+/** The row's chips: why it is hidden ("hidden — no messages"), an unattended run (⏱ + job),
+ *  "shared folder", "outside Pomade". */
 export function chipsOf(session: Session, names: ReadonlyMap<string, string>): Chip[] {
   const chips: Chip[] = [];
+  if (session.hidden === "empty") chips.push({ kind: "hidden", text: "hidden — no messages", tooltip: "Hidden from the tab: no message from you and no answer yet. It shows once it has one." });
   const job = session.record?.startedByRunner?.job;
   if (job !== undefined) chips.push({ kind: "runner", text: job, tooltip: `Started by Runner job ${job}, unattended` });
   if (session.attribution.sharedFolder) {

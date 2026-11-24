@@ -188,7 +188,9 @@ selected, the **list with the detail panel** once one is.
 - **Empty states:** no sessions in this scope; nothing matches (with "Clear search and
   filters"); a line in each empty status.
 - **Sessions hidden from the tab** — today those that hold only a `/clear` — are left out of the
-  rows, counts and sums; the header says how many are hidden and shows them on request.
+  rows, counts, sums, search and filters; the header says "N hidden", and clicking it shows them
+  in their groups, dimmed, with a "hidden — no messages" chip, until clicked again. The header's
+  count and sum never take them. Live now lists their agent tabs all the same.
 - Light theme only. One density.
 - Deep reading = Resume. There is no transcript viewer in v1.
 

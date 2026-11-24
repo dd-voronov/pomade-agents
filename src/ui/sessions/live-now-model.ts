@@ -7,6 +7,8 @@ import { WORKSPACE_PROJECT_ID, type ProjectRef } from "pomade-kit/protocol";
 
 import type { LiveRow, LiveRowState } from "../../shared/live-now.ts";
 import { liveRowKey, needsYouCount } from "../../shared/live-now.ts";
+import { LIVE_LABELS } from "../core/live.ts";
+import { sinceStamp } from "./table-model.ts";
 
 export interface LiveGroup {
   project: string;
@@ -65,4 +67,12 @@ export function rowTitle(row: LiveRow): { text: string; unnamed: boolean } {
   if (row.name !== null) return { text: row.name, unnamed: false };
   if (row.firstMessage !== null) return { text: row.firstMessage, unnamed: true };
   return { text: row.agentName, unnamed: false };
+}
+
+/** A row's tooltip: its state since when, as the rows and the detail panel say it, and what its
+ *  click does — "Working since 09:05 — switches project and focuses the tab". */
+export function rowTooltip(row: LiveRow, now: Date): string {
+  const click =
+    row.kind === "tab" ? "switches project and focuses the tab" : row.terminal === null ? "Runner did not say which terminal it runs in" : "opens the run’s terminal tab";
+  return `${LIVE_LABELS[row.state]} since ${sinceStamp(row.since, now)} — ${click}`;
 }

@@ -37,6 +37,7 @@ import { RecordError, type RecordStore } from "../records/record-store.ts";
 import type { SummariesAnswer } from "../stores/session-store.ts";
 import type { RealPath } from "../core/real-paths.ts";
 import { attribute, folderInProject, type ProjectPlace } from "./attribution.ts";
+import { hiddenReason } from "./hidden.ts";
 import type { LiveState } from "./live-state.ts";
 import { isRecordId, latestSummary, newRecord, refreshRecord, sameRecord, type RecordContext } from "./rules.ts";
 
@@ -261,7 +262,7 @@ export function startSessionData(options: SessionDataOptions): SessionData {
     }
     const cwd = realCwd ?? summary.cwd;
     const attribution = attribute({ cwd, record, projects });
-    put(id, { id, summary, record, recordProblem: problem, attribution, folderInProject: folderInProject(cwd, attribution.projects[0], projects), ...live.ofSession(id) });
+    put(id, { id, summary, record, recordProblem: problem, attribution, folderInProject: folderInProject(cwd, attribution.projects[0], projects), ...live.ofSession(id), hidden: hiddenReason(summary) });
   };
 
   const flush = (): void => {

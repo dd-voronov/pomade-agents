@@ -131,3 +131,9 @@
   flex: none;
   color: var(--text-faint);
 }
+
+/* A hidden session, shown on request: dimmed, its background marks still whole. */
+.row[data-hidden] > .live,
+.row[data-hidden] > .text {
+  opacity: 0.55;
+}

@@ -37,6 +37,7 @@ export function testSession(patch: Partial<Session> = {}): Session {
     folderInProject: null,
     live: "closed",
     liveSince: null,
+    hidden: null,
     ...patch,
   };
 }

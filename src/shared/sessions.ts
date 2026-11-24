@@ -133,7 +133,12 @@ export type Attribution = {
   sharedFolder: boolean;
 };
 
-/** One session: what its transcript says, its record, where it shows, and what it is doing now. */
+/** Why the Sessions tab leaves a session out (DESIGN §2.7): `empty` — its transcript holds no
+ *  message of the user's and no answer, as a file that holds only a `/clear`. */
+export type HiddenReason = "empty";
+
+/** One session: what its transcript says, its record, where it shows, what it is doing now, and
+ *  why the Sessions tab hides it. */
 export type Session = {
   id: string;
   /** The session's latest transcript. */
@@ -150,6 +155,8 @@ export type Session = {
   live: SessionLiveState;
   /** When the backend saw it enter `live` (ISO 8601); `null`: Closed, and not seen live since the backend started. */
   liveSince: string | null;
+  /** Why the Sessions tab hides it; `null`: shown. Every read lists it all the same. */
+  hidden: HiddenReason | null;
 };
 
 /** Where a caller's copy stands: the `epoch` and `revision` of the last answer it applied. */
@@ -376,7 +383,8 @@ export function isSession(value: unknown): value is Session {
     isAttribution(v.attribution) &&
     isStringOrNull(v.folderInProject) &&
     (SESSION_LIVE_STATES as readonly unknown[]).includes(v.live) &&
-    isStringOrNull(v.liveSince)
+    isStringOrNull(v.liveSince) &&
+    (v.hidden === null || v.hidden === "empty")
   );
 }
 

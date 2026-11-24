@@ -171,6 +171,7 @@ type Session = {
                                       // with symlinks resolved: "" at its root; null: no project, or it does not hold it
   live: SessionLiveState;             // the kit's: working · needs-you · idle · closed
   liveSince: string | null;           // when the backend saw it enter `live`; null: Closed, not seen live this run
+  hidden: "empty" | null;             // why the Sessions tab hides it (`HiddenReason`); null: shown
 };
 
 type SessionsAnswer = {
@@ -195,6 +196,13 @@ type SessionsUpdated = { sessions: Session[] };   // the changed sessions as the
   input ÷ the `model_context_window` the rollout records.
 - Codex sub-agent rollouts (`session_meta.source.subagent`) are not sessions, like Claude's
   `subagents/` transcripts.
+- **Hidden** (`src/backend/sessions/hidden.ts`) — why the Sessions tab leaves a session out,
+  from its summary: `"empty"` when it holds no message of the user's and no answer
+  (`firstMessage`, `lastMessage` and `lastAnswer` all `null`) — a file that holds only a `/clear`.
+  The first message or answer makes it `null`, a change like any other. The field only marks the
+  session: every read lists a hidden session as any other — `sessions.list`, `sessions.get`,
+  `sessions.find`, `sessions.forRepo`, `sessions.liveIn`, Live now — and only the Sessions tab
+  leaves it out (DESIGN §2.7).
 
 **Attribution** (`src/backend/sessions/attribution.ts`), in order: Move to project (`override`;
 no project = the Workspace) → the project of the first Pomade tab seen bound to the session
@@ -368,6 +376,7 @@ type FoundSession = {
 type SessionsFindResult = { sessions: FoundSession[] };  // earliest start first
 ```
 
+- `Session` carries `hidden` ("Sessions" above): a hidden session is answered like any other.
 - **`get` and `lastMessage`** — an `id` (a non-empty string) no transcript of which is known is
   `not-found`. `lastMessage` is the summary's `lastAnswer`: the text as the agent wrote it
   (Markdown, line breaks kept), trimmed, capped at 4000 characters (a longer one ends in "…"), from

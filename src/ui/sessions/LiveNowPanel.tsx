@@ -21,21 +21,15 @@ import { ROSTER_ROUTE, SESSIONS_ROUTE } from "../core/routes.ts";
 import { useActiveProject } from "../core/useActiveProject.ts";
 import { useNow } from "../core/useNow.ts";
 import { useProjects } from "../core/useProjects.ts";
-import { groupRows, groupTarget, headerCount, rowTitle } from "./live-now-model.ts";
+import { groupRows, groupTarget, headerCount, rowTitle, rowTooltip } from "./live-now-model.ts";
 import styles from "./LiveNowPanel.module.css";
-import { formatAgo, formatStamp } from "./table-model.ts";
+import { formatAgo } from "./table-model.ts";
 import { useLiveNow } from "./useLiveNow.ts";
 
 /** "Since when" is renewed this often. */
 const CLOCK_MS = 30_000;
 
 const NO_PROJECTS: ReadonlyMap<string, ProjectRef> = new Map();
-
-/** What a row's click does, in its tooltip. */
-function clickWords(row: LiveRow): string {
-  if (row.kind === "tab") return "switches project and focuses the tab";
-  return row.terminal === null ? "Runner did not say which terminal it runs in" : "opens the run’s terminal tab";
-}
 
 function Row({ row, now, open }: { row: LiveRow; now: Date; open: (() => void) | null }): ReactElement {
   const title = rowTitle(row);
@@ -48,7 +42,7 @@ function Row({ row, now, open }: { row: LiveRow; now: Date; open: (() => void) |
       data-tab={row.kind === "tab" ? row.tabId : undefined}
       data-run={row.kind === "run" ? row.run : undefined}
       data-state={row.state}
-      title={`${label} since ${formatStamp(row.since, now)} — ${clickWords(row)}`}
+      title={rowTooltip(row, now)}
       disabled={open === null}
       onClick={open ?? undefined}
     >
