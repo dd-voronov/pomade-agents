@@ -8,6 +8,8 @@ import { SESSION_STATUSES } from "pomade-kit/protocol";
 import { describe, expect, it } from "vitest";
 
 import { SESSION_RECORD_KEYS } from "../shared/sessions.ts";
+import { testSummary } from "../shared/test-sessions.ts";
+import { isWorkSession } from "../shared/work-sessions.ts";
 import { EXIT, RECORDS_FOLDER } from "./cli.ts";
 
 const SKILL = readFileSync(new URL("../../public/skills/pomade-agents-sessions/SKILL.md", import.meta.url), "utf8");
@@ -25,9 +27,12 @@ describe("the pomade-agents-sessions skill", () => {
     expect(firstCells("Key")).toEqual(SESSION_RECORD_KEYS.map((key) => `\`${key}\``));
   });
 
-  it("describes every status, and that Done–skip is left out of statistics", () => {
+  it("describes every status, and the work-session rule as the code has it: every status counts but Done–skip", () => {
     expect(firstCells("Value")).toEqual(SESSION_STATUSES.map((status) => `\`${status}\``));
-    expect(SKILL).toContain("Done–skip sessions are excluded from statistics");
+    const counted = SESSION_STATUSES.filter((status) => isWorkSession({ summary: testSummary(), record: { id: "s1", provider: "claude-code", agent: "claude", status } }));
+    expect(SESSION_STATUSES.filter((status) => !counted.includes(status))).toEqual(["done-skip"]);
+    expect(SKILL).toContain("**Every session is a work session unless its status\nis `done-skip`**");
+    expect(SKILL).toContain('"work": true');
   });
 
   it("gives every exit status the command has", () => {

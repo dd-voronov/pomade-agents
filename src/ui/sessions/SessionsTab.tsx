@@ -1,4 +1,4 @@
-// The Sessions tab: the header (the scope, its session count and ~$ sum), the toolbar (search and
+// The Sessions tab: the header (the scope, its work sessions' count and ~$ sum), the toolbar (search and
 // filters) or, while rows are checked, the bulk bar in its row, then — while no session is
 // selected — the table of the scope's sessions, or — once one is — the list with the detail panel
 // (DESIGN §2.7). A state page shows while the stores are read, when the scope has none, or in the
@@ -12,7 +12,8 @@
 //
 // Hidden sessions (`Session.hidden`) are left out of the rows, the counts, the sums, the search and
 // the filters; the header says how many the scope hides, and clicking that shows them in their
-// groups, dimmed, until clicked again. The header's count and sum never take them.
+// groups, dimmed, until clicked again. The header's count and sum never take them; they count the
+// work sessions (`Session.work`) of the rest. A group's ~$ sum is of its work sessions too.
 //
 // Keys: ↑ ↓ move the selection in both layouts; Shift+↑↓ check a range from the selected row (the
 // list) or the marked one (the table); Space checks that row; Enter opens or resumes it; Cmd+A
@@ -42,7 +43,7 @@ import { listRows, openTab, revealInTable, step, tableOrder, type PickedTab } fr
 import { SessionsList } from "./SessionsList.tsx";
 import { SessionsTable } from "./SessionsTable.tsx";
 import { NO_FILTERS, filterMenu, folderLabel, folderOf, isFiltering, matches, searchPattern, type Criteria, type FilterKind, type Filters } from "./search-model.ts";
-import { formatHeaderSum, groupByStatus, inScope, isListed, statusOf, totalCost } from "./table-model.ts";
+import { formatHeaderSum, groupByStatus, inScope, isListed, statusOf, workCost, workSessions } from "./table-model.ts";
 import { Toolbar } from "./Toolbar.tsx";
 import { Toast } from "./Toast.tsx";
 import styles from "./SessionsTab.module.css";
@@ -143,9 +144,10 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
   /** The sessions the tab lists: the scope's, the hidden ones only while they are shown. */
   const scoped = useMemo(() => inScopeAll.filter(inTab), [inScopeAll, inTab]);
   const groups = groupByStatus(scoped, scope.id);
-  const counted = showHidden ? inScopeAll.filter((session) => session.hidden === null) : scoped;
+  /** The work sessions the header counts and sums: never a hidden one. */
+  const counted = useMemo(() => workSessions(inScopeAll.filter((session) => session.hidden === null)), [inScopeAll]);
   const count = counted.length;
-  const hiddenCount = inScopeAll.length - count;
+  const hiddenCount = inScopeAll.filter((session) => session.hidden !== null).length;
   const criteria: Criteria = useMemo(
     () => ({ pattern: rowsPattern, filters, folder: (session) => folderOf(session, workspace, workspaceRoots) }),
     [rowsPattern, filters, workspace, workspaceRoots],
@@ -507,14 +509,14 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
         {copy !== null && (
           <span
             className={styles.sum}
-            title="Done–skip/Failed is left out of the total"
+            title="Work sessions: every session but Done–skip/Failed"
             data-testid="sessions-count"
             data-count={count}
             data-revision={copy.since.revision}
             data-indexing={copy.indexing ? "" : undefined}
           >
             {copy.indexing && <span className={styles.indexing}>Indexing… </span>}
-            {formatHeaderSum(count, totalCost(groupByStatus(counted, scope.id)))}
+            {formatHeaderSum(count, workCost(counted))}
           </span>
         )}
         {hiddenCount > 0 && (

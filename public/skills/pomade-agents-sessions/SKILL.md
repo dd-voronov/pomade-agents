@@ -1,6 +1,6 @@
 ---
 name: pomade-agents-sessions
-description: Read Pomade's agent-session data — the session records the Agents app keeps (name, status, note, project, transcript) in <workspace>/Apps/pomade-agents/sessions/, and the `pomade-agents show` command for one session's full data with tokens, cost and live state. Use when a script or an agent needs session names or statuses (e.g. a session analyzer that must skip Done–skip sessions), wants to label or filter sessions, or asks "which session is this / what is its name or status". Status is the user's alone; never edit the record files.
+description: Read Pomade's agent-session data — the session records the Agents app keeps (name, status, note, project, transcript) in <workspace>/Apps/pomade-agents/sessions/, and the `pomade-agents show` command for one session's full data with tokens, cost, live state and whether it is a work session. Use when a script or an agent needs session names or statuses, counts or sums sessions (only work sessions count — every session but Done–skip), wants to label or filter sessions, or asks "which session is this / what is its name or status". Status is the user's alone; never edit the record files.
 ---
 
 # Pomade agent sessions — records and the `pomade-agents` command
@@ -96,12 +96,22 @@ Reading rules:
 | `done` | Done | finished, and it counts |
 | `done-skip` | Done–skip/Failed | finished but not worth counting: failed, abandoned, a throwaway |
 
-- **Done–skip sessions are excluded from statistics.** The app leaves them out of cost totals;
-  analyzers (session statistics, knowledge extraction, reports) should skip them unless asked
-  otherwise.
+- **Done–skip sessions are not work sessions** (below): they count nowhere.
 - Nothing but the user (and a resume, which sets Active) changes a status. It is not the live state:
   whether an agent is running now (Working, Needs you, Idle, Closed) is detected, not recorded —
   `show` reports it.
+
+## Work sessions — which sessions count
+
+A **work session** is a session that counts. **Every session is a work session unless its status
+is `done-skip`** — a session without a record yet counts too. Every count and sum the app shows
+(cost totals, an agent's sessions this week or per project) is over work sessions only, and so
+should yours: session statistics, reports, knowledge extraction — unless asked otherwise.
+
+- From `pomade-agents show --json`, read the session's `work` field (`true` / `false`): the app's
+  own answer, which follows the rule wherever it changes.
+- From the record files, apply the rule yourself: `status != "done-skip"`.
+- A time window ("this week", "the last 90 days") is your choice, not part of the rule.
 
 ## The command: `pomade-agents show`
 
@@ -148,7 +158,8 @@ The JSON document (the app's `Session`):
   "live": "idle",                   // working · needs-you · idle · closed
   "liveSince": "2026-11-09T14:30:41.000Z",  // null: closed and not seen running since the app started
   "tab": { "tabId": "…", "projectId": "…" },  // the Pomade agent tab bound to it; null when none
-  "hidden": null                    // "empty": it holds no message yet (the Sessions tab hides it)
+  "hidden": null,                   // "empty": it holds no message yet (the Sessions tab hides it)
+  "work": true                      // a work session: it counts (every session but Done–skip)
 }
 ```
 
@@ -171,7 +182,7 @@ Every error is one line on stderr, starting `pomade-agents:`.
 
 ## Worked example — Done sessions with their names, from the files alone
 
-Lists every Done session (skipping Done–skip ones), newest record first, with its name or
+Lists every Done session (Done–skip ones are another status, and no work sessions), newest record first, with its name or
 "unnamed". It needs only the files and Python 3 with PyYAML (`pip install pyyaml`):
 
 ```python

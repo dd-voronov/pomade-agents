@@ -3,6 +3,7 @@ import type { SessionStatus } from "pomade-kit/protocol";
 
 import type { Session } from "../../shared/sessions.ts";
 import { testSession, testSummary } from "../../shared/test-sessions.ts";
+import { isWorkSession } from "../../shared/work-sessions.ts";
 import {
   COLUMN_WIDTH,
   NAME_MIN_WIDTH,
@@ -29,17 +30,21 @@ import {
   shownRows,
   sinceStamp,
   statusOf,
-  totalCost,
   unknownReason,
+  workCost,
+  workSessions,
 } from "./table-model.ts";
 
 const session = (id: string, opts: { status?: SessionStatus | null; projects?: string[]; at?: string | null; cost?: number | null } = {}): Session => {
   const base = testSession({ id });
+  const summary = testSummary({ id, lastActiveAt: opts.at === undefined ? base.summary.lastActiveAt : opts.at, costUsd: opts.cost ?? null });
+  const record: Session["record"] = opts.status === null ? null : { id, provider: "claude-code", agent: "claude", status: opts.status ?? "active" };
   return {
     ...base,
-    summary: testSummary({ id, lastActiveAt: opts.at === undefined ? base.summary.lastActiveAt : opts.at, costUsd: opts.cost ?? null }),
-    record: opts.status === null ? null : { id, provider: "claude-code", agent: "claude", status: opts.status ?? "active" },
+    summary,
+    record,
     attribution: { projects: opts.projects ?? [], by: "folder", sharedFolder: (opts.projects ?? []).length > 1 },
+    work: isWorkSession({ summary, record }),
   };
 };
 
@@ -102,18 +107,16 @@ describe("sums", () => {
     expect(costSum([session("a", { cost: 0 })])).toBe(0);
   });
 
-  it("the header leaves Done–skip/Failed out", () => {
-    const groups = groupByStatus(
-      [
-        session("a", { status: "active", cost: 1 }),
-        session("h", { status: "on-hold", cost: 2 }),
-        session("d", { status: "done", cost: 4 }),
-        session("s", { status: "done-skip", cost: 100 }),
-      ],
-      "__workspace__",
-    );
-    expect(totalCost(groups)).toBe(7);
-    expect(totalCost(groupByStatus([session("s", { status: "done-skip", cost: 100 })], "__workspace__"))).toBeNull();
+  it("counts and sums only the work sessions: Done–skip/Failed is left out", () => {
+    const all = [
+      session("a", { status: "active", cost: 1 }),
+      session("h", { status: "on-hold", cost: 2 }),
+      session("d", { status: "done", cost: 4 }),
+      session("s", { status: "done-skip", cost: 100 }),
+    ];
+    expect(workSessions(all).map((s) => s.id)).toEqual(["a", "h", "d"]);
+    expect(workCost(all)).toBe(7);
+    expect(workCost([session("s", { status: "done-skip", cost: 100 })])).toBeNull();
   });
 
   it("reads as money and as the header's summary", () => {
@@ -121,10 +124,10 @@ describe("sums", () => {
     expect(formatMoney(0.004)).toBe("~$0.00");
     expect(formatMoney(2.345)).toBe("~$2.35");
     expect(formatMoney(1234.5)).toBe("~$1,234.50");
-    expect(formatHeaderSum(1, 0.5)).toBe("1 session · ~$0.50 est.");
-    expect(formatHeaderSum(3, 12)).toBe("3 sessions · ~$12.00 est.");
-    expect(formatHeaderSum(2, null)).toBe("2 sessions");
-    expect(formatHeaderSum(0, null)).toBe("0 sessions");
+    expect(formatHeaderSum(1, 0.5)).toBe("1 work session · ~$0.50 est.");
+    expect(formatHeaderSum(3, 12)).toBe("3 work sessions · ~$12.00 est.");
+    expect(formatHeaderSum(2, null)).toBe("2 work sessions");
+    expect(formatHeaderSum(0, null)).toBe("0 work sessions");
   });
 });
 

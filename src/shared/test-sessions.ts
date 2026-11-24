@@ -1,6 +1,7 @@
 // Sessions for the unit tests: a summary or a session with every field set, the given ones changed.
 
 import type { Session, SessionSummary } from "./sessions.ts";
+import { isWorkSession } from "./work-sessions.ts";
 
 export function testSummary(patch: Partial<SessionSummary> = {}): SessionSummary {
   const id = patch.id ?? "s1";
@@ -26,9 +27,10 @@ export function testSummary(patch: Partial<SessionSummary> = {}): SessionSummary
   };
 }
 
+/** `work` follows the rule over the patched summary and record unless the patch sets it. */
 export function testSession(patch: Partial<Session> = {}): Session {
   const id = patch.id ?? "s1";
-  return {
+  const session: Omit<Session, "work"> = {
     id,
     summary: testSummary({ id }),
     record: { id, provider: "claude-code", agent: "claude", status: "active" },
@@ -41,4 +43,5 @@ export function testSession(patch: Partial<Session> = {}): Session {
     hidden: null,
     ...patch,
   };
+  return { ...session, work: patch.work ?? isWorkSession(session) };
 }

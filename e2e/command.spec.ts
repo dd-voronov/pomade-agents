@@ -63,13 +63,14 @@ test("show --session names any session, outside Pomade's terminals too, and prin
   await recorded(pomade, CODEX);
   const json = await command(sandbox, manifest.id, ["show", "--session", CODEX, "--json"], null);
   expect(json, backend.output()).toMatchObject({ code: 0, stderr: "" });
-  expect(JSON.parse(json.stdout)).toMatchObject({ id: CODEX, summary: { provider: "codex" } });
+  expect(JSON.parse(json.stdout)).toMatchObject({ id: CODEX, summary: { provider: "codex" }, work: true });
 
   const text = await command(sandbox, manifest.id, ["show", `--session=${CODEX}`], null);
   expect(text).toMatchObject({ code: 0, stderr: "" });
   const lines = text.stdout.split("\n");
   expect(lines[0]).toBe("Unnamed session");
   expect(lines).toContain("status        Done");
+  expect(lines).toContain("work session  yes — it counts");
   expect(text.stdout).toMatch(/^live {10}Working since \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC$/m);
   expect(lines).toContain(`id            ${CODEX}`);
   expect(text.stdout).not.toContain("\u001b");

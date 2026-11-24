@@ -92,9 +92,10 @@ test.describe("a project's sessions", () => {
 
     const alpha = await openSessions(page, openShell, pomade, "alpha");
     await expect(alpha.getByTestId("sessions-scope")).toHaveText("Alpha");
-    await expect(alpha.getByTestId("sessions-count")).toHaveAttribute("data-count", "5");
+    // The header counts and sums the work sessions: NEAR_FULL, Done–skip/Failed, is none.
+    await expect(alpha.getByTestId("sessions-count")).toHaveAttribute("data-count", "4");
     const totals = of(SEEDED.claude, SEEDED.folderAgent, SEEDED.codex, UNKNOWN_MODEL);
-    await expect(alpha.getByTestId("sessions-count")).toHaveText(formatHeaderSum(5, costSum(totals)));
+    await expect(alpha.getByTestId("sessions-count")).toHaveText(formatHeaderSum(4, costSum(totals)));
 
     const expected: Record<string, string[]> = {
       active: [SEEDED.claude],
@@ -109,7 +110,7 @@ test.describe("a project's sessions", () => {
     }
     await expect(alpha.getByTestId("group-sum-active")).toHaveText(formatMoney(costSum(of(SEEDED.claude)) ?? NaN));
     await expect(alpha.getByTestId("group-sum-done")).toHaveText(formatMoney(costSum(of(UNKNOWN_MODEL, SEEDED.codex)) ?? NaN));
-    await expect(alpha.getByTestId("group-sum-done-skip")).toHaveText(`${formatMoney(costSum(of(NEAR_FULL)) ?? NaN)} · not in totals`);
+    await expect(alpha.getByTestId("group-sum-done-skip")).toHaveText("not in totals");
 
     await expect(row(alpha, SEEDED.claude).getByTestId("cell-agent")).toHaveText("claude");
     await expect(row(alpha, SEEDED.folderAgent).getByTestId("cell-agent")).toHaveText("claude-libra");
@@ -122,7 +123,7 @@ test.describe("a project's sessions", () => {
 
     const workspace = await openSessions(page, openShell, pomade, null);
     await expect(workspace.getByTestId("sessions-scope")).toHaveText("Workspace · all projects");
-    await expect(workspace.getByTestId("sessions-count")).toHaveAttribute("data-count", "7");
+    await expect(workspace.getByTestId("sessions-count")).toHaveAttribute("data-count", "6");
     await expect(workspace.getByTestId("sessions-columns")).toContainText("Project");
     await expect(row(workspace, SEEDED.codex).getByTestId("cell-project")).toHaveText("Alpha");
     await expect(row(workspace, IN_BETA).getByTestId("cell-project")).toHaveText("Beta");
@@ -251,7 +252,7 @@ test("a scope with no sessions shows the empty state", async ({ page, openShell,
   await recordsDone(pomade, 3);
   const alpha = await openSessions(page, openShell, pomade, "alpha");
   await expect(alpha.getByTestId("sessions-empty")).toContainText("No sessions in Alpha yet");
-  await expect(alpha.getByTestId("sessions-count")).toHaveText("0 sessions");
+  await expect(alpha.getByTestId("sessions-count")).toHaveText("0 work sessions");
   await expect(alpha.getByTestId("sessions-table")).toHaveCount(0);
   expect(backend.running()).toBe(true);
 });

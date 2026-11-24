@@ -8,7 +8,7 @@ import type { SessionStatus } from "pomade-kit/protocol";
 
 import { ChevronIcon } from "../core/icons.tsx";
 import type { Session } from "../../shared/sessions.ts";
-import { EMPTY_GROUP_TEXT, LATEST_SHOWN, STATUS_LABELS, costSum, formatMoney, isLong, shownRows } from "./table-model.ts";
+import { EMPTY_GROUP_TEXT, LATEST_SHOWN, STATUS_LABELS, formatMoney, isLong, shownRows, workCost } from "./table-model.ts";
 import styles from "./StatusGroup.module.css";
 import type { StatusDrop } from "./useStatusDrag.ts";
 
@@ -32,17 +32,17 @@ export function StatusMark({ status }: { status: SessionStatus }): ReactElement 
   return <span className={styles.mark} data-status={status} aria-hidden="true" />;
 }
 
-function sumText(status: SessionStatus, sessions: readonly Session[]): string | null {
+/** The ~$ sum of the group's work sessions; "not in totals" for a group that holds none. */
+function sumText(sessions: readonly Session[]): string | null {
   if (sessions.length === 0) return null;
-  const sum = costSum(sessions);
-  const parts = sum === null ? [] : [formatMoney(sum)];
-  if (status === "done-skip") parts.push("not in totals");
-  return parts.length === 0 ? null : parts.join(" · ");
+  if (!sessions.some((session) => session.work)) return "not in totals";
+  const sum = workCost(sessions);
+  return sum === null ? null : formatMoney(sum);
 }
 
 export function StatusGroup({ status, sessions, collapsed, expanded, onToggleCollapsed, onToggleExpanded, drop, row, filtered = false }: StatusGroupProps): ReactElement {
   const count = sessions.length;
-  const sum = sumText(status, sessions);
+  const sum = sumText(sessions);
   const long = !filtered && isLong(status, count);
   return (
     <section className={styles.group} data-testid={`group-${status}`} data-count={count} aria-label={STATUS_LABELS[status]}>

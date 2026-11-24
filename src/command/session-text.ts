@@ -81,6 +81,7 @@ export function sessionText(session: Session, projectNames: ReadonlyMap<string, 
   const { summary, record } = session;
   const rows: [string, string | null][] = [
     ["status", statusLine(session)],
+    ["work session", session.work ? "yes — it counts" : "no — left out of every count and sum"],
     ["live", liveLine(session)],
     ["agent", agentLine(session)],
     ["project", projectLine(session, projectNames)],

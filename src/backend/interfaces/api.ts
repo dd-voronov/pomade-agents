@@ -50,6 +50,7 @@ import {
   type SessionsSince,
   type SessionsUpdated,
 } from "../../shared/sessions.ts";
+import { SESSIONS_AGENT_COUNTS_METHOD, agentCounts, type AgentCountsAnswer } from "../../shared/work-sessions.ts";
 import type { RealPath } from "../core/real-paths.ts";
 import type { BoundTabs } from "../sessions/bound-tabs.ts";
 import { agentsFor, projectsFor, type ProjectReads } from "../roster/connections.ts";
@@ -252,6 +253,12 @@ export function createApi({ info, sessions, live, tabs, liveNow, realPath, roste
       const tab = tabs.ofTab(tabId);
       if (tab === null) return { agentTab: false, session: null };
       return { agentTab: true, session: tab.sessionId === null ? null : (sessions.get(tab.sessionId) ?? null) };
+    },
+    [SESSIONS_AGENT_COUNTS_METHOD]: (raw): AgentCountsAnswer => {
+      const params = paramsOf(raw);
+      const windows = { weekFrom: timeOf(params, "weekFrom"), projectsFrom: timeOf(params, "projectsFrom") };
+      const { epoch, revision, indexing, sessions: all } = sessions.answer();
+      return { epoch, revision, indexing, agents: agentCounts(all, windows) };
     },
   };
 }

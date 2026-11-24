@@ -35,6 +35,7 @@ describe("show's text", () => {
       [
         "G4 tickets",
         "status        On hold — waiting for review",
+        "work session  yes — it counts",
         "live          Needs you since 2026-11-17 10:06 UTC",
         "agent         claude · claude-code · claude-opus-5-5 high",
         "project       Alpha (alpha), Beta (beta) — shared folder",
@@ -57,11 +58,16 @@ describe("show's text", () => {
 
   it("says unnamed, the Workspace, Closed, an unknown cost and a missing record plainly, and leaves out what is unknown", () => {
     const text = sessionText(testSession({ id: "s1", record: null, attribution: { projects: ["gone"], by: "remembered", sharedFolder: false } }), NAMES);
-    expect(text.split("\n").slice(0, 5)).toEqual(["Unnamed session", "status        — no record yet", "live          Closed", "agent         claude · claude-code", "project       gone"]);
+    expect(text.split("\n").slice(0, 6)).toEqual(["Unnamed session", "status        — no record yet", "work session  yes — it counts", "live          Closed", "agent         claude · claude-code", "project       gone"]);
     expect(text).toContain("cost          — a model it ran is not in the price table\n");
     expect(text).not.toMatch(/^(branch|context|runner job|first message|last answer) /m);
     expect(sessionText(testSession({ record: null, recordProblem: "it is not valid YAML" }), NAMES)).toContain("status        — its record cannot be read: it is not valid YAML\n");
     expect(sessionText(testSession(), NAMES)).toContain("project       Workspace\n");
+  });
+
+  it("says a Done–skip/Failed session is no work session", () => {
+    const skipped = testSession({ record: { id: "s1", provider: "claude-code", agent: "claude", status: "done-skip" } });
+    expect(sessionText(skipped, NAMES)).toContain("work session  no — left out of every count and sum\n");
   });
 
   it("holds no escape sequence: the text is the same on a terminal and in a pipe", () => {

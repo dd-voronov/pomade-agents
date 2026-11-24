@@ -33,6 +33,7 @@ import type {
   SessionsChanged,
   SessionsSince,
 } from "../../shared/sessions.ts";
+import { isWorkSession } from "../../shared/work-sessions.ts";
 import { RecordError, type RecordStore } from "../records/record-store.ts";
 import type { SummariesAnswer } from "../stores/session-store.ts";
 import type { RealPath } from "../core/real-paths.ts";
@@ -265,7 +266,18 @@ export function startSessionData(options: SessionDataOptions): SessionData {
     }
     const cwd = realCwd ?? summary.cwd;
     const attribution = attribute({ cwd, record, projects });
-    put(id, { id, summary, record, recordProblem: problem, attribution, folderInProject: folderInProject(cwd, attribution.projects[0], projects), ...live.ofSession(id), tab: tabs.ofSession(id), hidden: hiddenReason(summary) });
+    put(id, {
+      id,
+      summary,
+      record,
+      recordProblem: problem,
+      attribution,
+      folderInProject: folderInProject(cwd, attribution.projects[0], projects),
+      ...live.ofSession(id),
+      tab: tabs.ofSession(id),
+      hidden: hiddenReason(summary),
+      work: isWorkSession({ summary, record }),
+    });
   };
 
   const flush = (): void => {

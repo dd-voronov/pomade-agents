@@ -295,7 +295,6 @@ function StatusButtons({ session, onSetStatus }: Pick<DetailPanelProps, "session
 function Facts({ session, now, names, workspaceRoots }: Pick<DetailPanelProps, "session" | "now" | "names" | "workspaceRoots">): ReactElement {
   const { summary } = session;
   const folder = startedIn(session, workspaceRoots);
-  const status = statusOf(session);
   return (
     <dl className={styles.facts} data-testid="facts">
       <dt>Project</dt>
@@ -340,7 +339,7 @@ function Facts({ session, now, names, workspaceRoots }: Pick<DetailPanelProps, "
       <dt>~$ est.</dt>
       <dd data-testid="fact-cost">
         {summary.costUsd === null ? <Unknown session={session} /> : formatMoney(summary.costUsd)}
-        {status === "done-skip" && summary.costUsd !== null && <span className={styles.faint}>not counted in totals</span>}
+        {!session.work && summary.costUsd !== null && <span className={styles.faint}>not counted in totals</span>}
       </dd>
     </dl>
   );

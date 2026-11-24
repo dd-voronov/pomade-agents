@@ -117,7 +117,8 @@ test.describe("the Sessions table", () => {
     pomade.fake.setActiveProject(null);
     await panel.getByTestId("open-sessions").click();
     const workspace = tabFrame("__workspace__");
-    await expect(workspace.getByTestId("sessions-count")).toHaveAttribute("data-count", String(3 + ALPHA.length + BETA.length + 1));
+    // Every session but SEEDED_CODEX, Done–skip/Failed: the seeded three, Alpha's, Beta's and the Workspace's one.
+    await expect(workspace.getByTestId("sessions-count")).toHaveAttribute("data-count", String(3 - 1 + ALPHA.length + BETA.length + 1));
     await workspace.getByTestId("group-toggle-done").click();
     await page.screenshot({ path: `${ARTIFACTS}/sessions-workspace.png`, animations: "disabled" });
     expect(backend.running()).toBe(true);

@@ -107,8 +107,8 @@ One UI bundle; `welcome.surface` and the frame's route pick the view (`src/ui/co
 ## Published API
 
 Served by the backend through Pomade's broker (`api.serve`); callers use `apps.call`. The UI calls
-it the same way. Method names and shapes are in `src/shared/api.ts`, `src/shared/sessions.ts` and
-`src/shared/roster.ts`; the sessions contract's and `RosterAgent` are `pomade-kit/protocol`'s.
+it the same way. Method names and shapes are in `src/shared/api.ts`, `src/shared/sessions.ts`,
+`src/shared/roster.ts` and `src/shared/work-sessions.ts`; the sessions contract's and `RosterAgent` are `pomade-kit/protocol`'s.
 
 | Method | Params | Answer |
 |---|---|---|
@@ -130,6 +130,7 @@ it the same way. Method names and shapes are in `src/shared/api.ts`, `src/shared
 | `roster.agentsFor` | `RosterAgentsForParams` `{ project }` | `RosterAgentsForResult` `{ agents: string[] }` |
 | `roster.agents` | — | `RosterAgentsAnswer` (the app's own frames) |
 | `sessions.ofTab` | `SessionsOfTabParams` `{ tabId }` | `SessionsOfTabResult` `{ agentTab, session: Session \| null }` (the command) |
+| `sessions.agentCounts` | `AgentCountsParams` `{ weekFrom, projectsFrom }` | `AgentCountsAnswer` (the app's own frames) |
 
 ```ts
 interface AppInfo {
@@ -194,6 +195,7 @@ type Session = {
   tab: { tabId: string; projectId: string } | null;  // the agent tab Pomade lists bound to it (a live one
                                       // first, then the first listed); null: none
   hidden: "empty" | null;             // why the Sessions tab hides it (`HiddenReason`); null: shown
+  work: boolean;                      // a work session: it counts (`isWorkSession`, below)
 };
 
 type SessionsAnswer = {
@@ -231,6 +233,15 @@ type SessionsOpenResult = {
   session: every read lists a hidden session as any other — `sessions.list`, `sessions.get`,
   `sessions.find`, `sessions.forRepo`, `sessions.liveIn`, Live now — and only the Sessions tab
   leaves it out (DESIGN §2.7).
+- **Work session** (`isWorkSession` in `src/shared/work-sessions.ts`; DESIGN §2.9) — whether the
+  session counts: every session is one unless its record's status is `done-skip`; a session
+  without a record counts. The backend sets `work` from it whenever it builds a session, so a
+  status change changes `work` like any other field. Every count and sum the app shows is over
+  sessions with `work: true` — the Sessions tab's header count and ~$ sum (of its listed, unhidden
+  sessions) and each status group's ~$ sum ("not in totals" for a group that holds none), and
+  `sessions.agentCounts` ("Agent counts" below). A hidden session is a work session all the same;
+  only the Sessions tab leaves it out of its own counts. A group's and a status tab's row count is
+  of its rows, every status alike.
 
 **Attribution** (`src/backend/sessions/attribution.ts`), in order: Move to project (`override`;
 no project = the Workspace) → the project of the first Pomade tab seen bound to the session
@@ -432,6 +443,8 @@ type SessionsFindResult = { sessions: FoundSession[] };  // earliest start first
 ```
 
 - `Session` carries `hidden` ("Sessions" above): a hidden session is answered like any other.
+- `Session` carries `work` ("Sessions" above): `true` for a work session — one that counts. A
+  reader that counts or sums sessions takes only those.
 - **`get` and `lastMessage`** — an `id` (a non-empty string) no transcript of which is known is
   `not-found`. `lastMessage` is the summary's `lastAnswer`: the text as the agent wrote it
   (Markdown, line breaks kept), trimmed, capped at 4000 characters (a longer one ends in "…"), from
@@ -608,6 +621,53 @@ type SessionsOfTabResult = {
 
 An empty or non-string `tabId` is `invalid-params`.
 
+### Agent counts
+
+`sessions.agentCounts` — each agent's counts over work sessions ("Sessions" above), for the
+Roster's frames (DESIGN §3.3, §3.4); shapes and the counting (`agentCounts`) in
+`src/shared/work-sessions.ts`. The windows are the caller's: the rule knows none.
+
+```ts
+type AgentCountsParams = {
+  weekFrom: string;      // ISO 8601 with a zone: `week` counts the work sessions active from then on
+  projectsFrom: string;  // ISO 8601 with a zone: `ProjectCounts.sessions` counts those active from then on
+};
+
+type AgentCountsAnswer = {
+  epoch: string;         // the sessions' epoch and revision the counts are of ("Change notice" above)
+  revision: number;
+  indexing: boolean;     // the first walk of the stores is still running: the counts are partial
+  agents: AgentCounts[]; // every agent with a work session; one missing has none
+};
+
+type AgentCounts = {
+  agent: string;                                      // roster id
+  lastActiveAt: string | null;                        // its latest work session's last activity
+  week: { sessions: number; costUsd: number | null }; // work sessions active in the week; the sum of their
+                                                      // known ~$ estimates, null when none has one
+  projects: ProjectCounts[];                          // every project it has a work session in, ever
+};
+
+type ProjectCounts = {
+  project: string;       // stable project id; "__workspace__" for the Workspace bucket
+  sessions: number;      // its work sessions in the project active in the window
+  lastAt: string | null; // the last activity of its latest work session in the project, ever
+};
+```
+
+- **Active in a window:** a session's last activity — its `lastActiveAt`, else its `startedAt` —
+  at or after the window's start. A session with neither is in no window, and leaves times `null`.
+  A session's whole ~$ counts in the week it was last active.
+- **Projects** are the session's `attribution.projects` (`[]`: the Workspace bucket), so a
+  session follows Move to project; a shared-folder session counts in each of its projects, and
+  once in `week`. `projects` is ordered by `sessions`, most first, then by `lastAt`, latest first.
+- **Kept current:** the answer names the sessions' `{ epoch, revision }`; a frame asks again when
+  `sessions.changed` is past them, and when its windows change. `useAgentCounts`
+  (`src/ui/roster/useAgentCounts.ts`) does both; `rosterWindows` (`agent-counts-model.ts`) gives
+  the Roster's windows — the local calendar week from Monday 00:00, and the last 90 days from 00:00
+  local — the same all day.
+- Errors: `invalid-params` when either time is missing or not ISO 8601 with a zone.
+
 ## Command
 
 `pomade-agents` (manifest `commands`; DESIGN §7), source `src/command/` — `main.ts` (the entry:
@@ -627,7 +687,7 @@ pomade-agents --help · pomade-agents show --help
 - **`--json`:** the `Session` ("Sessions" above) — exactly what `sessions.get` answers in
   `session` — as one JSON document (2-space indent, a trailing newline) on stdout.
 - **Text:** the name (`Unnamed session` when none), then `label  value` lines — status and note,
-  live state and since when, agent · provider · model effort, project(s) by name and id (from
+  whether it is a work session, live state and since when, agent · provider · model effort, project(s) by name and id (from
   `project.list`; the Workspace when none), start folder, branch, start and last activity, first and
   last message and last answer (one line, at most 100 characters), tokens, ~$ cost, context, Runner
   job, transcript, id. Times in UTC; no colour or escape sequence. A line whose value is unknown is
@@ -650,9 +710,10 @@ pomade-agents --help · pomade-agents show --help
   resolves its target with `targetOf` / `sessionOf`.
 - **The format skill** — `public/skills/pomade-agents-sessions/SKILL.md`, shipped at
   `skills/pomade-agents-sessions/` in the build (manifest `skills`): the record files (DESIGN §4,
-  every key of `SESSION_RECORD_KEYS`), status semantics, this command and its exit statuses, and a
-  worked example (Done sessions with their names, Done–skip left out, from the files alone).
-  `src/command/skill.test.ts` fails when its key, status or exit-status tables drift from the code.
+  every key of `SESSION_RECORD_KEYS`), status semantics, work sessions and their rule, this command
+  and its exit statuses, and a worked example (Done sessions with their names, from the files alone).
+  `src/command/skill.test.ts` fails when its key, status or exit-status tables, or the work-session
+  rule it states, drift from the code.
   Pomade links the skill nowhere; `host.info`'s `skills` gives its installed folder.
 
 ## Published events

@@ -153,7 +153,7 @@ export type SessionTab = {
 export type HiddenReason = "empty";
 
 /** One session: what its transcript says, its record, where it shows, what it is doing now, the
- *  agent tab bound to it, and why the Sessions tab hides it. */
+ *  agent tab bound to it, why the Sessions tab hides it, and whether it counts. */
 export type Session = {
   id: string;
   /** The session's latest transcript. */
@@ -174,6 +174,8 @@ export type Session = {
   tab: SessionTab | null;
   /** Why the Sessions tab hides it; `null`: shown. Every read lists it all the same. */
   hidden: HiddenReason | null;
+  /** True for a work session (DESIGN §2.9, `isWorkSession`): every count and sum is over these. */
+  work: boolean;
 };
 
 /** Where a caller's copy stands: the `epoch` and `revision` of the last answer it applied. */
@@ -430,7 +432,8 @@ export function isSession(value: unknown): value is Session {
     (SESSION_LIVE_STATES as readonly unknown[]).includes(v.live) &&
     isStringOrNull(v.liveSince) &&
     (v.tab === null || (isObject(v.tab) && isText(v.tab.tabId) && isText(v.tab.projectId))) &&
-    (v.hidden === null || v.hidden === "empty")
+    (v.hidden === null || v.hidden === "empty") &&
+    typeof v.work === "boolean"
   );
 }
 

@@ -75,9 +75,14 @@ export function costSum(sessions: readonly Session[]): number | null {
   return sum;
 }
 
-/** The header's ~$ sum: every group but Done–skip/Failed. */
-export function totalCost(groups: Record<SessionStatus, readonly Session[]>): number | null {
-  return costSum([...groups.active, ...groups["on-hold"], ...groups.done]);
+/** The work sessions of a set (`Session.work`, DESIGN §2.9): what every count and sum takes. */
+export function workSessions(sessions: readonly Session[]): Session[] {
+  return sessions.filter((session) => session.work);
+}
+
+/** The sum of the known ~$ estimates of a set's work sessions; `null` when none has one. */
+export function workCost(sessions: readonly Session[]): number | null {
+  return costSum(workSessions(sessions));
 }
 
 // ── The latest-10 rule ──────────────────────────────────────────────────────
@@ -173,9 +178,9 @@ export function isListed(session: Session, scopeId: string, showHidden: boolean)
   return inScope(session, scopeId) && (showHidden || session.hidden === null);
 }
 
-/** The header's summary: "3 sessions · ~$4.20 est."; the sum is left out when no cost is known. */
+/** The header's summary of the work sessions: "3 work sessions · ~$4.20 est."; the sum is left out when no cost is known. */
 export function formatHeaderSum(count: number, cost: number | null): string {
-  const sessions = count === 1 ? "1 session" : `${count} sessions`;
+  const sessions = count === 1 ? "1 work session" : `${count} work sessions`;
   return cost === null ? sessions : `${sessions} · ${formatMoney(cost)} est.`;
 }
 

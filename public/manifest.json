@@ -62,7 +62,8 @@
     "roster.projectsFor",
     "roster.agentsFor",
     "roster.agents",
-    "sessions.ofTab"
+    "sessions.ofTab",
+    "sessions.agentCounts"
   ],
   "commands": [
     {

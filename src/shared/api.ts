@@ -15,6 +15,7 @@ import {
   SESSIONS_SET_STATUS_METHOD,
 } from "./sessions.ts";
 import { LIVE_NOW_LIST_METHOD } from "./live-now.ts";
+import { SESSIONS_AGENT_COUNTS_METHOD } from "./work-sessions.ts";
 import { ROSTER_AGENTS_FOR_METHOD, ROSTER_AGENTS_METHOD, ROSTER_LAUNCH_SPEC_METHOD, ROSTER_LIST_METHOD, ROSTER_PROJECTS_FOR_METHOD } from "./roster.ts";
 
 /** Answers `AppInfo`: which backend is running and where it keeps the app's data. */
@@ -40,6 +41,7 @@ export const API_METHODS = [
   ROSTER_AGENTS_FOR_METHOD,
   ROSTER_AGENTS_METHOD,
   SESSIONS_OF_TAB_METHOD,
+  SESSIONS_AGENT_COUNTS_METHOD,
 ] as const;
 
 export interface AppInfo {

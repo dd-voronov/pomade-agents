@@ -38,7 +38,7 @@ function api() {
   const sessions: ApiSources["sessions"] = {
     answer: (since) => {
       calls.push(["answer", since]);
-      return { epoch: "e", revision: 0, full: true, sessions: [], removed: [], indexing: false, recordsOff: null };
+      return { epoch: "e", revision: 0, full: true, sessions: LISTED, removed: [], indexing: false, recordsOff: null };
     },
     changeStatus: (ids, status, note) => {
       calls.push(["changeStatus", ids, status, note]);
@@ -169,6 +169,24 @@ describe("the API's params", () => {
     expect(await handlers["sessions.ofTab"]?.({ tabId: "early" }, ctx)).toEqual({ agentTab: true, session: null });
     expect(await handlers["sessions.ofTab"]?.({ tabId: "plain-terminal" }, ctx)).toEqual({ agentTab: false, session: null });
   });
+
+  it("answers the agent counts over every session, with the sessions' epoch and revision", async () => {
+    const { handlers } = api();
+    const answer = await handlers["sessions.agentCounts"]?.({ weekFrom: "2026-11-16T00:00:00.000Z", projectsFrom: "2026-08-18T00:00:00Z" }, { from: "pomade-agents" });
+    expect(answer).toEqual({
+      epoch: "e",
+      revision: 0,
+      indexing: false,
+      agents: [{ agent: "claude", lastActiveAt: "2026-11-17T10:05:00.000Z", week: { sessions: 2, costUsd: null }, projects: [{ project: "__workspace__", sessions: 2, lastAt: "2026-11-17T10:05:00.000Z" }] }],
+    });
+  });
+
+  it.each([null, {}, { weekFrom: "2026-11-16T00:00:00Z" }, { weekFrom: "monday", projectsFrom: "2026-08-18T00:00:00Z" }, { weekFrom: 1, projectsFrom: 2 }])(
+    "refuses sessions.agentCounts with %j as invalid-params",
+    async (params) => {
+      await expect(Promise.resolve().then(() => call("sessions.agentCounts", params))).rejects.toMatchObject({ code: "invalid-params" });
+    },
+  );
 
   it.each([null, {}, { tabId: "" }, { tabId: 3 }])("refuses sessions.ofTab with %j as invalid-params", async (params) => {
     await expect(Promise.resolve().then(() => call("sessions.ofTab", params))).rejects.toMatchObject({ code: "invalid-params" });

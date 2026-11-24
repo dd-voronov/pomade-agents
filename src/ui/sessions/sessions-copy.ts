@@ -17,8 +17,8 @@ export function applyAnswer(copy: SessionsCopy | null, answer: SessionsAnswer): 
   return { since: { epoch: answer.epoch, revision: answer.revision }, byId: next, indexing: answer.indexing, recordsOff: answer.recordsOff };
 }
 
-/** True when a change notice (or nothing yet) means the copy is behind. */
-export function isBehind(copy: SessionsCopy | null, notice: SessionsSince): boolean {
+/** True when a change notice (or nothing yet) means the copy — or an answer of the sessions at `since` — is behind. */
+export function isBehind(copy: Pick<SessionsCopy, "since"> | null, notice: SessionsSince): boolean {
   return copy === null || copy.since.epoch !== notice.epoch || copy.since.revision < notice.revision;
 }
 
