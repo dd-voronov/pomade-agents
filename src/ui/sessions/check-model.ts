@@ -78,10 +78,14 @@ export function pruned(checked: Checked, known: (id: string) => boolean): Checke
 /** The longest name the toast quotes before cutting it with "…". */
 export const TOAST_NAME_MAX = 44;
 
+/** A name as the toast quotes it: cut to `TOAST_NAME_MAX` with "…". */
+export function cutForToast(text: string): string {
+  return text.length > TOAST_NAME_MAX ? `${text.slice(0, TOAST_NAME_MAX - 1)}…` : text;
+}
+
 /** A session's name as the toast quotes it: as its row shows it, cut to `TOAST_NAME_MAX`. */
 export function toastName(session: Session): string {
-  const { text } = rowName(session);
-  return text.length > TOAST_NAME_MAX ? `${text.slice(0, TOAST_NAME_MAX - 1)}…` : text;
+  return cutForToast(rowName(session).text);
 }
 
 /** What the toast says after `moved` were set to `status`: the session by name, or how many. */

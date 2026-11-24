@@ -136,8 +136,9 @@ export function draftNote(draft: string): string | undefined {
 
 // ── A failed change ─────────────────────────────────────────────────────────
 
-/** What a change sets: a status, a note, or the earlier statuses back (Undo). */
-export type ChangeKind = "status" | "note" | "undo";
+/** What a change sets: a status, a note, the earlier statuses back (Undo), a name, a project, or
+ *  the earlier project back (Undo). */
+export type ChangeKind = "status" | "note" | "undo" | "rename" | "move" | "move-back";
 
 /** A failed change as the panel shows it: `text` in plain words, `reason` (the backend's own
  *  words, paths included) on hover. */
@@ -159,6 +160,9 @@ const LEADS: Record<ChangeKind, string> = {
   status: "The status was not changed.",
   note: "The note was not saved.",
   undo: "The earlier status was not set back.",
+  rename: "The name was not saved.",
+  move: "The session was not moved.",
+  "move-back": "The session was not moved back.",
 };
 
 /** What the panel says when a change fails: what was not done and, in plain words, why. */

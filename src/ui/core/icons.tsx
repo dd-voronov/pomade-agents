@@ -161,3 +161,31 @@ export function MoreIcon({ size = 16 }: IconProps): ReactElement {
     </Glyph>
   );
 }
+
+/** A pencil — rename. */
+export function PencilIcon({ size = 16 }: IconProps): ReactElement {
+  return (
+    <Glyph size={size}>
+      <path d="M3 13l.5-2.75L10.75 3l2.25 2.25L5.75 12.5z" />
+    </Glyph>
+  );
+}
+
+/** A folder with an arrow into it — move to a project. */
+export function MoveIcon({ size = 16 }: IconProps): ReactElement {
+  return (
+    <Glyph size={size}>
+      <path d="M2 4.5h4l1.5 1.5H14v6.5H2z" />
+      <path d="M6.5 9.25h3.5M8.5 7.75L10 9.25l-1.5 1.5" />
+    </Glyph>
+  );
+}
+
+/** A small chevron pointing down — a button that opens a menu. */
+export function CaretIcon({ size = 12 }: IconProps): ReactElement {
+  return (
+    <Glyph size={size}>
+      <path d="M4.5 6.5L8 10l3.5-3.5" />
+    </Glyph>
+  );
+}

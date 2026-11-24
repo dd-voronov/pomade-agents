@@ -1,13 +1,13 @@
-// The detail panel (DESIGN §2.7 "List with the detail panel"): one session's name and when it was
-// last active, its marker notes, its status as four buttons with the one-line note under them, the
+// The detail panel (DESIGN §2.7 "List with the detail panel"): one session's name — renamed in
+// place — and when it was last active, Rename and Move to project, its marker notes, its status as four buttons with the one-line note under them, the
 // facts, and its first message, last message and last agent answer. A refused change says so
 // under the note.
 
-import { useRef, useState, type KeyboardEvent, type ReactElement, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactElement, type ReactNode } from "react";
 import { SESSION_STATUSES, type SessionStatus } from "pomade-kit/protocol";
 
-import { CloseIcon, FolderIcon, ForkIcon, InfoIcon, TimerIcon, WarningIcon } from "../core/icons.tsx";
-import { SESSION_NOTE_MAX, type Session } from "../../shared/sessions.ts";
+import { CaretIcon, CloseIcon, FolderIcon, ForkIcon, InfoIcon, MoveIcon, PencilIcon, TimerIcon, WarningIcon } from "../core/icons.tsx";
+import { SESSION_NAME_MAX, SESSION_NOTE_MAX, type Session } from "../../shared/sessions.ts";
 import { ClampedText } from "./ClampedText.tsx";
 import {
   CLAMP_LINES,
@@ -46,6 +46,19 @@ export interface DetailPanelProps {
   failure: Failure | null;
   /** The note field's text while it is typed in; `null` once it is saved or left. */
   onDraftNote: (session: string, text: string | null) => void;
+  /** The name shows as a field, focused. */
+  renaming: boolean;
+  onStartRename: () => void;
+  /** The name field was left with `text` in it (Enter, or focus moved away). */
+  onSaveName: (text: string) => void;
+  /** The name field was left with Esc: nothing is saved. */
+  onCancelRename: () => void;
+  /** Move to project is open under the panel's button. */
+  moveOpen: boolean;
+  /** Open Move to project under the panel's button now (the row menu asked for it). */
+  askMove: boolean;
+  /** Open Move to project under `anchor`, the button's box. */
+  onOpenMove: (anchor: DOMRect) => void;
 }
 
 function Note({ icon, children, kind }: { icon: ReactElement; children: ReactNode; kind: MarkerNote["kind"] }): ReactElement {
@@ -87,7 +100,7 @@ function MarkerNotes({ notes, onSelect }: { notes: MarkerNote[]; onSelect: (id: 
           case "shared-folder":
             return (
               <Note key={note.kind} kind={note.kind} icon={<FolderIcon />}>
-                Shared folder: {note.projects} have the same root, and no Pomade tab launched this session, so it shows in each.
+                Shared folder: {note.projects} have the same root, and no Pomade tab launched this session, so it shows in each. Move to project pins it to one.
               </Note>
             );
           case "outside-pomade":
@@ -99,6 +112,78 @@ function MarkerNotes({ notes, onSelect }: { notes: MarkerNote[]; onSelect: (id: 
         }
       })}
     </>
+  );
+}
+
+function NameField({ session, onSaveName, onCancelRename }: Pick<DetailPanelProps, "session" | "onSaveName" | "onCancelRename">): ReactElement {
+  const field = useRef<HTMLInputElement>(null);
+  const leaving = useRef<"save" | "revert">("save");
+
+  useLayoutEffect(() => {
+    field.current?.focus();
+    field.current?.select();
+  }, []);
+
+  const onKeyDown = (event: KeyboardEvent<HTMLInputElement>): void => {
+    if (event.key === "Enter") {
+      event.currentTarget.blur();
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      leaving.current = "revert";
+      event.currentTarget.blur();
+    }
+  };
+
+  return (
+    <input
+      ref={field}
+      className={styles.nameInput}
+      type="text"
+      defaultValue={session.record?.name ?? ""}
+      placeholder="Session name — also the tab’s name"
+      aria-label="Session name"
+      title="Saved on Enter or when you leave the field; Esc keeps the name; an empty field makes the session unnamed"
+      maxLength={SESSION_NAME_MAX}
+      spellCheck={false}
+      data-testid="name-input"
+      onKeyDown={onKeyDown}
+      onBlur={(event) => {
+        if (leaving.current === "revert") onCancelRename();
+        else onSaveName(event.currentTarget.value);
+      }}
+    />
+  );
+}
+
+function Actions({ moveOpen, askMove, onStartRename, onOpenMove }: Pick<DetailPanelProps, "moveOpen" | "askMove" | "onStartRename" | "onOpenMove">): ReactElement {
+  const moveButton = useRef<HTMLButtonElement>(null);
+
+  useLayoutEffect(() => {
+    const button = moveButton.current;
+    if (askMove && button !== null) onOpenMove(button.getBoundingClientRect());
+  }, [askMove, onOpenMove]);
+
+  return (
+    <div className={styles.actions}>
+      <button type="button" className={styles.action} title="Rename the session — its tab takes the name (F2)" data-testid="detail-rename" onClick={onStartRename}>
+        <PencilIcon />
+        Rename
+      </button>
+      <button
+        ref={moveButton}
+        type="button"
+        className={styles.action}
+        aria-haspopup="menu"
+        aria-expanded={moveOpen}
+        title="Show the session in another project, over the folder it started in"
+        data-testid="detail-move"
+        onClick={(event) => onOpenMove(event.currentTarget.getBoundingClientRect())}
+      >
+        <MoveIcon />
+        Move to project
+        <CaretIcon />
+      </button>
+    </div>
   );
 }
 
@@ -274,9 +359,13 @@ export function DetailPanel(props: DetailPanelProps): ReactElement {
     <aside className={styles.panel} aria-label="Session details" data-testid="detail-panel" data-session-id={session.id}>
       <div className={styles.inner}>
         <div className={styles.head}>
-          <h2 className={styles.name} data-unnamed={name.unnamed ? "" : undefined} data-testid="detail-name">
-            {name.text}
-          </h2>
+          {props.renaming ? (
+            <NameField session={session} onSaveName={props.onSaveName} onCancelRename={props.onCancelRename} />
+          ) : (
+            <h2 className={styles.name} data-unnamed={name.unnamed ? "" : undefined} title="Click to rename (F2)" data-testid="detail-name" onClick={props.onStartRename}>
+              {name.text}
+            </h2>
+          )}
           <button type="button" className={styles.close} title="Close (Esc)" aria-label="Close the details" data-testid="detail-close" onClick={onClose}>
             <CloseIcon />
           </button>
@@ -284,6 +373,7 @@ export function DetailPanel(props: DetailPanelProps): ReactElement {
         <p className={styles.sub} data-testid="detail-last-active">
           {lastActiveLine(session.summary.lastActiveAt, now)}
         </p>
+        <Actions moveOpen={props.moveOpen} askMove={props.askMove} onStartRename={props.onStartRename} onOpenMove={props.onOpenMove} />
         <MarkerNotes notes={notes} onSelect={onSelect} />
         <section className={styles.section}>
           <h3 className={styles.label}>Status</h3>

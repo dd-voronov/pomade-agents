@@ -156,7 +156,9 @@ describe("the session store", () => {
     await warm.indexed;
     const second = warm.answer().summaries;
     expect(second.find((x) => x.id === "5b0e8f52")?.lastMessage?.text).toBe("Written while away");
-    expect(second.filter((x) => x.id !== "5b0e8f52")).toEqual(first.filter((x) => x.id !== "5b0e8f52"));
+    // The others as they were; the answer's order follows the stores' walk, which is not fixed.
+    const others = (list: typeof first) => list.filter((x) => x.id !== "5b0e8f52").sort((a, b) => a.transcript.localeCompare(b.transcript));
+    expect(others(second)).toEqual(others(first));
   });
 
   it("rebuilds from scratch over a corrupt index", async () => {

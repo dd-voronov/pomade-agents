@@ -26,7 +26,7 @@ export function SessionName({ session, names, fork }: SessionNameProps): ReactEl
           <ForkIcon size={14} />
         </span>
       )}
-      <span className={styles.name} data-unnamed={name.unnamed ? "" : undefined} title={name.text}>
+      <span className={styles.name} data-unnamed={name.unnamed ? "" : undefined} title={name.text} data-testid="session-name">
         {name.text}
       </span>
       {chips.length > 0 && (

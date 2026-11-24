@@ -66,10 +66,16 @@ One UI bundle; `welcome.surface` and the frame's route pick the view (`src/ui/co
   written.", `not-ready`, `not-found`, `app-absent`, `app-not-responding`, else "Something went
   wrong."); the backend's message is its hover text.
 - **Undo.** Every status change shows a toast for 4 s (`TOAST_MS`,
-  `src/ui/sessions/useStatusMoves.ts`) with Undo, which sets each session's earlier status back —
+  `src/ui/sessions/useToast.ts`) with Undo, which sets each session's earlier status back —
   one `sessions.setStatus` per earlier status. The toast leaves before the backend's 5 s window
   ("Published events", C) can close, so an Undo lands inside it and `session.statusChanged` is
   never published for the change taken back.
+- **Name and project** are set through `sessions.rename` and `sessions.moveToProject` ("Sessions"
+  below), one session at a time, from the detail panel (Rename, a click on the name, F2; Move to
+  project) or the row menu (`src/ui/sessions/useSessionEdits.ts`). The frame takes the session from
+  the answer; a toast says what was done, or what was not and why (`failureText`). A move's toast
+  has Undo, which moves the session back where the record had it: the project or Workspace the user
+  had chosen (`projectOverride`), else `null` — its automatic project.
 - **Live now** (the panel) follows the project in front — `welcome.project`, then each
   `project.changed` — for its group order and "current" tag. A row's click is `agentTabs.focus` of
   its tab (Pomade switches to the tab's project); a group header's is `agentTabs.focus` of the

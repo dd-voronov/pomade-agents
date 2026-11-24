@@ -193,7 +193,7 @@ test.describe("the list with the detail panel", () => {
     } finally {
       await chmod(folder, 0o755);
     }
-    await alpha.getByTestId("detail-name").click();
+    await alpha.getByTestId("facts").click();
 
     await page.setViewportSize({ width: 860, height: 720 });
     await page.screenshot({ path: `${ARTIFACTS}/detail-narrow.png` });

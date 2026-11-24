@@ -3,13 +3,14 @@
 // one is — the list with the detail panel (DESIGN §2.7). A state page shows while the stores are
 // read, or when the scope has none. The scope is the project the tab was opened in
 // (`welcome.project`); a tab keeps it. The selection is the tab's route (`useSelection`); the
-// checked rows, the row menu and the toast are the tab's own.
+// checked rows, the menus (a row's, Move to project) and the toast are the tab's own. A session
+// moved out of the scope leaves the rows, and the panel closes.
 //
 // Keys: ↑ ↓ move the selection in both layouts; Shift+↑↓ check a range from the selected row (the
-// list) or the marked one (the table); Space checks that row; Cmd+A checks every row shown; Esc
-// clears the checks, then closes the panel.
+// list) or the marked one (the table); Space checks that row; Cmd+A checks every row shown; F2
+// renames that row in the panel; Esc clears the checks, then closes the panel.
 
-import { useCallback, useEffect, useMemo, useState, type ReactElement } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { WORKSPACE_PROJECT_ID, type ProjectRef, type SessionStatus } from "pomade-kit/protocol";
 import type { HostClient } from "pomade-kit/sdk";
 
@@ -24,8 +25,9 @@ import { BulkBar } from "./BulkBar.tsx";
 import { NONE_CHECKED, extended, headerClick, headerState, pruned, targetsOf, toggled as toggledCheck, withAll, withRange, type Checked } from "./check-model.ts";
 import { draftNote } from "./detail-model.ts";
 import { DetailPanel } from "./DetailPanel.tsx";
+import { moveTargets, nameToSave } from "./edit-model.ts";
 import type { RowEvents } from "./row-events.ts";
-import { rowMenuEntries } from "./row-menu.tsx";
+import { moveMenuEntries, rowMenuEntries } from "./row-menu.tsx";
 import { listRows, openTab, revealInTable, step, tableOrder, type PickedTab } from "./selection-model.ts";
 import { SessionsList } from "./SessionsList.tsx";
 import { SessionsTable } from "./SessionsTable.tsx";
@@ -33,10 +35,12 @@ import { formatHeaderSum, groupByStatus, inScope, statusOf, totalCost } from "./
 import { Toast } from "./Toast.tsx";
 import styles from "./SessionsTab.module.css";
 import { useSelection } from "./useSelection.ts";
+import { useSessionEdits } from "./useSessionEdits.ts";
 import { useSessions } from "./useSessions.ts";
 import { useStatusChange } from "./useStatusChange.ts";
 import { useStatusDrag } from "./useStatusDrag.ts";
 import { useStatusMoves } from "./useStatusMoves.ts";
+import { useToast } from "./useToast.ts";
 
 /** Relative times ("5m") are renewed this often. */
 const CLOCK_MS = 30_000;
@@ -63,7 +67,9 @@ function modifiers(event: KeyboardEvent): "none" | "shift" | "command" | "other"
   return event.shiftKey ? "shift" : "none";
 }
 
+/** The menu open now: a row's, or Move to project under the detail panel's button. */
 interface OpenMenu {
+  kind: "row" | "move";
   session: string;
   anchor: MenuAnchor;
 }
@@ -93,8 +99,15 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
   /** Where a Shift range starts: the row last clicked, checked, or moved to with Shift+↑↓. */
   const [anchor, setAnchor] = useState<string | null>(null);
   const [menu, setMenu] = useState<OpenMenu | null>(null);
+  /** The session whose name shows as a field in the panel. */
+  const [renaming, setRenaming] = useState<string | null>(null);
+  /** The session the row menu asked to move: the panel opens Move to project once it shows. */
+  const [moveAsked, setMoveAsked] = useState<string | null>(null);
+  const toasts = useToast();
+  const { toast } = toasts;
   const { change, failure, dismiss } = useStatusChange(host, update);
-  const { move, toast } = useStatusMoves(change, dismiss, copy?.byId);
+  const { move } = useStatusMoves(change, dismiss, copy?.byId, toasts);
+  const edits = useSessionEdits(host, update, toasts);
 
   const groups = groupByStatus(copy?.byId.values() ?? [], scope.id);
   const count = groups.active.length + groups["on-hold"].length + groups.done.length + groups["done-skip"].length;
@@ -113,9 +126,22 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
 
   const onSelect = (id: string): void => {
     if (failure !== null && !failure.sessions.includes(id)) dismiss();
+    if (renaming !== id) setRenaming(null);
     setPicked(null);
     setAnchor(id);
     select(id);
+  };
+
+  /** Select the session and show its name as a field. */
+  const startRename = (id: string): void => {
+    onSelect(id);
+    setRenaming(id);
+  };
+
+  /** Select the session and open Move to project in its panel. */
+  const askMove = (id: string): void => {
+    onSelect(id);
+    setMoveAsked(id);
   };
 
   const close = (): void => {
@@ -125,6 +151,7 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
     setCollapsed(revealed.collapsed);
     setExpanded(revealed.expanded);
     dismiss();
+    setRenaming(null);
     select(null);
   };
 
@@ -140,6 +167,23 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
 
   const drag = useStatusDrag(checked, setStatusOf);
   const closeMenu = useCallback(() => setMenu(null), []);
+  const openMove = useCallback((session: string, anchor: DOMRect) => {
+    setMoveAsked(null);
+    setMenu({ kind: "move", session, anchor });
+  }, []);
+
+  /** A moved session that left the scope takes the selection with it — the selection as it is
+   *  when the backend answers. */
+  const selectedNow = useRef(selectedId);
+  selectedNow.current = selectedId;
+  const onMoved = (moved: Session): void => {
+    if (inScope(moved, scope.id)) return;
+    setLastSelected((id) => (id === moved.id ? null : id));
+    if (selectedNow.current === moved.id) {
+      setRenaming(null);
+      select(null);
+    }
+  };
 
   /** The row a key acts on: the selected one in the list, the marked one in the table. */
   const keyRow = (): string | null => selected?.id ?? lastSelected;
@@ -165,7 +209,7 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
         setAnchor(id);
       }
     },
-    onMenu: (id, at) => setMenu({ session: id, anchor: at }),
+    onMenu: (id, at) => setMenu({ kind: "row", session: id, anchor: at }),
     ...drag.row,
   };
 
@@ -178,6 +222,13 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
         else if (selected !== null) close();
         else return;
         event.preventDefault();
+        return;
+      }
+      if (event.key === "F2" && keys === "none") {
+        const row = keyRow();
+        if (row === null) return;
+        event.preventDefault();
+        startRename(row);
         return;
       }
       if (event.key === "a" && keys === "command") {
@@ -246,7 +297,7 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
           onOpenTab={(status) => setPicked({ status, session: selected.id, sessionStatus: statusOf(selected) })}
           selected={selected.id}
           checked={checked}
-          menuOf={menu?.session ?? null}
+          menuOf={menu?.kind === "row" ? menu.session : null}
           events={events}
           drop={drag.drop}
           expanded={expanded}
@@ -277,6 +328,17 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
           }}
           failure={failure}
           onDraftNote={(session, text) => setNoteDraft(text === null ? null : { session, text })}
+          renaming={renaming === selected.id}
+          onStartRename={() => setRenaming(selected.id)}
+          onSaveName={(text) => {
+            setRenaming(null);
+            const name = nameToSave(text, selected.record?.name);
+            if (name !== undefined) edits.rename(selected, name);
+          }}
+          onCancelRename={() => setRenaming(null)}
+          moveOpen={menu?.kind === "move" && menu.session === selected.id}
+          askMove={moveAsked === selected.id}
+          onOpenMove={(anchor) => openMove(selected.id, anchor)}
         />
       </div>
     );
@@ -298,7 +360,7 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
         checked={checked}
         allChecked={state === "mixed" ? "mixed" : state === "true"}
         onCheckAll={() => setChecked(headerClick(checked, order))}
-        menuOf={menu?.session ?? null}
+        menuOf={menu?.kind === "row" ? menu.session : null}
         events={events}
         drop={drag.drop}
       />
@@ -343,13 +405,22 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
         />
       )}
       {body}
-      {menu !== null && menuSession !== undefined && (
+      {menu?.kind === "row" && menuSession !== undefined && (
         <Menu
           label="Session"
           testId="row-menu"
           anchor={menu.anchor}
           onClose={closeMenu}
-          entries={rowMenuEntries(menuSession, targetsOf(menuSession.id, checked), { setStatus: setStatusOf })}
+          entries={rowMenuEntries(menuSession, targetsOf(menuSession.id, checked), { setStatus: setStatusOf, rename: startRename, move: askMove })}
+        />
+      )}
+      {menu?.kind === "move" && menuSession !== undefined && (
+        <Menu
+          label="Move to project"
+          testId="move-menu"
+          anchor={menu.anchor}
+          onClose={closeMenu}
+          entries={moveMenuEntries(menuSession, moveTargets(projects.values()), (target) => edits.moveTo(menuSession, target, onMoved))}
         />
       )}
       {toast !== null && <Toast key={toast.key} toast={toast} />}

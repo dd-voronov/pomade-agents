@@ -1,8 +1,8 @@
-// The toast at the bottom of the tab: what a status change did, with Undo, or why it was not done.
+// The toast at the bottom of the tab: what a change did, with Undo, or why it was not done.
 
 import type { ReactElement } from "react";
 
-import type { Toast as ToastData } from "./useStatusMoves.ts";
+import type { Toast as ToastData } from "./useToast.ts";
 import styles from "./Toast.module.css";
 
 export function Toast({ toast }: { toast: ToastData }): ReactElement {
