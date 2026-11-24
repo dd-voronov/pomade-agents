@@ -61,7 +61,7 @@ test.describe("with agents running in two projects and the Workspace", () => {
     await expect(names.nth(0)).not.toHaveAttribute("data-unnamed");
     await expect(names.nth(2)).toHaveAttribute("data-unnamed", "true");
     await expect(alpha.getByTestId("live-row-state")).toHaveText(["Needs you", "Working", "Idle"]);
-    await expect(alpha.getByTestId("live-row-agent")).toHaveText(["claude", "codex", "claude"]);
+    await expect(alpha.getByTestId("live-row-agent")).toHaveText(["Claude", "Codex", "Claude"]);
     await expect(alpha.getByTestId("live-row-since").first()).toHaveText(/^(now|\d+m)$/);
     expect(await alpha.getByTestId("live-mark").evaluateAll((marks) => marks.map((m) => m.getAttribute("data-state")))).toEqual(["needs-you", "working", "idle"]);
 
@@ -112,6 +112,23 @@ test.describe("an agent tab that comes to life", () => {
   });
 });
 
+test.describe("a built-in and a folder agent running", () => {
+  test.use({
+    pomadeSeed: {
+      agentTabs: [
+        { tabId: "tab-builtin", projectId: "alpha", agentId: "claude", sessionId: null, state: "working" },
+        { tabId: "tab-folder", projectId: "alpha", agentId: "claude-libra", sessionId: null, state: "idle" },
+      ],
+    },
+  });
+
+  test("a row's second line is the agent's name — \"Claude\" for the built-in, the folder's name for a folder agent — never the lowercase id of a built-in", async ({ page, openShell, backend }) => {
+    const { panel } = await openShell(page);
+    await expect(panel.getByTestId("live-row"), backend.output()).toHaveCount(2);
+    await expect(panel.getByTestId("live-row-agent")).toHaveText(["Claude", "claude-libra"]);
+  });
+});
+
 test.describe("an unattended run", () => {
   test.use({ pomadeSeed: { agentTabs: [{ tabId: "tab-alpha", projectId: "alpha", agentId: "claude", sessionId: null, state: "needs-you" }] } });
 
@@ -141,7 +158,7 @@ test.describe("an unattended run", () => {
     await expect(row.getByTestId("live-row-name")).toHaveText("Nightly review");
     await expect(row.getByTestId("live-row-run")).toBeVisible();
     await expect(row.getByTestId("live-row-state")).toHaveText("Working");
-    await expect(row.getByTestId("live-row-agent")).toHaveText("unattended · codex");
+    await expect(row.getByTestId("live-row-agent")).toHaveText("unattended · Codex");
     await expect(panel.getByTestId("live-group-head")).toHaveText(["Alphacurrent1", "Beta1"]);
     await expect(panel.getByTestId("live-now-count")).toHaveText("2 running · 1 needs you");
     expect(pomade.fake.badges).toEqual({ agents: { count: 1, urgent: true } });

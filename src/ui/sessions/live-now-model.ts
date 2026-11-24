@@ -69,6 +69,11 @@ export function rowTitle(row: LiveRow): { text: string; unnamed: boolean } {
   return { text: row.agentName, unnamed: false };
 }
 
+/** The last part of a row's second line: the agent's name (`agentName` is the id when the roster has no name); a run's is marked "unattended". */
+export function rowAgent(row: LiveRow): string {
+  return row.kind === "run" ? `unattended · ${row.agentName}` : row.agentName;
+}
+
 /** A row's tooltip: its state since when, as the rows and the detail panel say it, and what its
  *  click does — "Working since 09:05 — switches project and focuses the tab". */
 export function rowTooltip(row: LiveRow, now: Date): string {

@@ -21,7 +21,7 @@ import { ROSTER_ROUTE, SESSIONS_ROUTE } from "../core/routes.ts";
 import { useActiveProject } from "../core/useActiveProject.ts";
 import { useNow } from "../core/useNow.ts";
 import { useProjects } from "../core/useProjects.ts";
-import { groupRows, groupTarget, headerCount, rowTitle, rowTooltip } from "./live-now-model.ts";
+import { groupRows, groupTarget, headerCount, rowAgent, rowTitle, rowTooltip } from "./live-now-model.ts";
 import styles from "./LiveNowPanel.module.css";
 import { formatAgo } from "./table-model.ts";
 import { useLiveNow } from "./useLiveNow.ts";
@@ -69,7 +69,7 @@ function Row({ row, now, open }: { row: LiveRow; now: Date; open: (() => void) |
           </span>
           <span>·</span>
           <span className={styles.agent} data-testid="live-row-agent">
-            {row.kind === "run" ? `unattended · ${row.agent}` : row.agent}
+            {rowAgent(row)}
           </span>
         </span>
       </span>

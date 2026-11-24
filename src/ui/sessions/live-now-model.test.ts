@@ -2,7 +2,7 @@ import type { ProjectRef } from "pomade-kit/protocol";
 import { describe, expect, it } from "vitest";
 
 import type { LiveRunRow, LiveTabRow } from "../../shared/live-now.ts";
-import { groupRows, groupTarget, headerCount, rowTitle, rowTooltip } from "./live-now-model.ts";
+import { groupRows, groupTarget, headerCount, rowAgent, rowTitle, rowTooltip } from "./live-now-model.ts";
 
 const row = (tabId: string, patch: Partial<LiveTabRow> = {}): LiveTabRow => ({
   kind: "tab",
@@ -83,6 +83,12 @@ describe("Live now's texts", () => {
     expect(headerCount([row("a", { state: "needs-you" }), row("b")])).toBe("2 running · 1 needs you");
     expect(headerCount([row("a", { state: "needs-you" }), row("b", { state: "needs-you" }), row("c")])).toBe("3 running · 2 need you");
     expect(headerCount([run("r1"), row("a", { state: "needs-you" })])).toBe("2 running · 1 needs you");
+  });
+
+  it("shows a row's agent by its name — a run's marked unattended — and by its id only when the name is the id", () => {
+    expect(rowAgent(row("a", { agent: "claude", agentName: "Claude" }))).toBe("Claude");
+    expect(rowAgent(row("a", { agent: "claude-libra", agentName: "claude-libra" }))).toBe("claude-libra");
+    expect(rowAgent(run("r1", { agent: "codex", agentName: "Codex" }))).toBe("unattended · Codex");
   });
 
   it("names a row by its session's name, else its first message in grey, else the agent", () => {

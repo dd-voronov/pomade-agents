@@ -39,7 +39,7 @@ The answer is unordered; the panel orders it.
   Projects panel order, the Workspace last (`groupRows`). Inside a group: Needs you → Working → Idle, then
   the latest `since` first, ties by tab or run key (`byUrgency`).
 - **Row** — live mark, title, time since (`formatAgo`), state word · agent. The agent shown is the row's
-  `agent`, the roster id; `agentName` is used only as the title's last fallback. Title: a run's job name; a
+  `agentName` (`rowAgent`): "Claude", "Codex", a folder agent's id. Title: a run's job name; a
   tab's session name, else its first message in grey, else the agent's name (`rowTitle`). Run rows carry a ⏱
   and "unattended · <agent>". The tooltip is "Working since 09:05 — switches project and focuses the tab" /
   "— opens the run’s terminal tab" / "— Runner did not say which terminal it runs in" (`rowTooltip`); the
