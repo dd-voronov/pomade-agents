@@ -62,3 +62,30 @@
   min-height: 0;
   overflow: auto;
 }
+
+/* The app's Settings (DESIGN §3.8), at the bar's right end. */
+.gear {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon-btn);
+  height: var(--icon-btn);
+  margin-left: auto;
+  margin-right: -4px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.gear:hover,
+.gear[aria-current="page"] {
+  background: var(--active-bg);
+  color: var(--text);
+}

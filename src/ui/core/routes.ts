@@ -7,11 +7,12 @@ import type { Surface } from "pomade-kit/sdk";
 export const SESSIONS_ROUTE = "sessions";
 export const ROSTER_ROUTE = "roster";
 
-export type View = "live-now" | "sessions" | "roster";
+export type View = "live-now" | "sessions" | "roster" | "settings";
 
 /** A tab at any route other than the Roster's shows Sessions, the app's default view. */
 export function viewFor(surface: Surface, route: string): View {
   if (surface === "panel") return "live-now";
+  if (route.split("/")[0] === SETTINGS_ROUTE) return "settings";
   return route.split("/")[0] === ROSTER_ROUTE ? "roster" : "sessions";
 }
 
@@ -32,3 +33,6 @@ export function selectedSessionOf(route: string): string | null {
     return null;
   }
 }
+
+/** The app's own Settings page (DESIGN §3.8), opened by the gear of the tab's bar. */
+export const SETTINGS_ROUTE = "settings";

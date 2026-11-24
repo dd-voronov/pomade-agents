@@ -111,6 +111,13 @@ export interface RecordStore {
   readonly profiles: FileSet<AgentProfile>;
   /** Stop watching; resolves once the writes in flight are done. */
   stop(): Promise<void>;
+  /** `settings.yaml`'s text as last read; `null` when there is no file. */
+  settingsText(): string | null;
+  /** Write `rewrite(text)` as `settings.yaml` — `text` being the file as the disk holds it now,
+   *  `null` when absent — one write at a time with the other settings writes; resolves once the
+   *  settings are read again. Rejects with `RecordError` (`unreadable`) when the file cannot be
+   *  used, and with what `rewrite` throws (nothing is written then). */
+  rewriteSettings(rewrite: (text: string | null) => string): Promise<void>;
 }
 
 /** How one kind of file is named, read and written. */
@@ -535,6 +542,24 @@ export async function openRecordStore(options: RecordStoreOptions): Promise<Reco
       watcher?.close();
       watcher = null;
       await Promise.all(chains.values());
+    },
+
+    settingsText: () => settingsText,
+
+    rewriteSettings(rewrite) {
+      return queue(SETTINGS_KEY, async () => {
+        const path = join(dataDir, SETTINGS_FILE);
+        const text = await readText(path);
+        if (text !== null) {
+          const parsed = parseSettings(text);
+          if (!parsed.ok) throw new RecordError("unreadable", `${path} cannot be used: ${parsed.problem}. Fix or delete the file.`);
+        }
+        const next = rewrite(text);
+        if (next === text) return;
+        if (text === null) {
+          if (!(await writeNew(path, next))) throw new Error(`${path} appeared while it was being written; try again`);
+        } else await replace(path, next);
+      }).then(reloadSettings);
     },
   };
 }

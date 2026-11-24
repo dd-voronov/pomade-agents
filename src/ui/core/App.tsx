@@ -5,6 +5,7 @@ import type { ReactElement } from "react";
 import type { ConnectResult, HostClient } from "pomade-kit/sdk";
 
 import { RosterTab } from "../roster/RosterTab.tsx";
+import { SettingsPage } from "../settings/SettingsPage.tsx";
 import { LiveNowPanel } from "../sessions/LiveNowPanel.tsx";
 import { SessionsTab } from "../sessions/SessionsTab.tsx";
 import { viewFor } from "./routes.ts";
@@ -18,7 +19,7 @@ function Hosted({ host }: { host: HostClient }): ReactElement {
   if (view === "live-now") return <LiveNowPanel host={host} />;
   return (
     <TabView view={view} navigate={navigate}>
-      {view === "roster" ? <RosterTab /> : <SessionsTab host={host} route={route} navigate={navigate} />}
+      {view === "settings" ? <SettingsPage host={host} /> : view === "roster" ? <RosterTab /> : <SessionsTab host={host} route={route} navigate={navigate} />}
     </TabView>
   );
 }

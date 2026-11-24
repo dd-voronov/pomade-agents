@@ -5,6 +5,7 @@
 // stop publishes the status changes still inside their window first.
 
 import { realpath } from "node:fs/promises";
+import { join, relative } from "node:path";
 
 import type { HostClient } from "pomade-kit/sdk";
 import { stayConnected } from "pomade-kit/node";
@@ -16,7 +17,7 @@ import { SESSIONS_CHANGED_EVENT } from "../../shared/sessions.ts";
 import { LIVE_NOW_CHANGED_EVENT, LIVE_NOW_ICON } from "../../shared/live-now.ts";
 import { createApi } from "../interfaces/api.ts";
 import { followPomade } from "../interfaces/platform.ts";
-import { openRecordStore, type RecordStore } from "../records/record-store.ts";
+import { SETTINGS_FILE, openRecordStore, type RecordStore } from "../records/record-store.ts";
 import type { ProjectReads } from "../roster/connections.ts";
 import { startRoster } from "../roster/roster.ts";
 import { keepBadge, startLiveNow } from "../sessions/live-now.ts";
@@ -31,6 +32,9 @@ import { startSessionStore } from "../stores/session-store.ts";
 import { resolveHome, resolveLocations, type Env } from "./locations.ts";
 import { createRealPaths } from "./real-paths.ts";
 import { removeRunRecord, writeRunRecord } from "./run-record.ts";
+import { startSkillFolderSettings } from "../settings/settings.ts";
+import { startSkillsCatalog } from "../roster/skills-catalog.ts";
+import { SKILLS_CHANGED_EVENT } from "../../shared/skills.ts";
 
 export interface BackendOptions {
   appId: string;
@@ -75,12 +79,14 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
   let records: RecordStore | null = null;
   let noRecords = "No workspace is open in Pomade, so session records are not kept.";
   let noProfiles = "No workspace is open in Pomade, so agent profiles are not kept.";
+  let noFolders = "No workspace is open in Pomade, so the skill folders cannot be changed.";
   if (locations.dataDir !== null) {
     try {
       records = await openRecordStore({ dataDir: locations.dataDir, now: options.now, log });
     } catch (err) {
       noRecords = `The session records in ${locations.dataDir} cannot be read (${message(err)}), so they are not kept.`;
       noProfiles = `The agent profiles in ${locations.dataDir} cannot be read (${message(err)}), so they are not kept.`;
+      noFolders = `The app data in ${locations.dataDir} cannot be read (${message(err)}), so the skill folders cannot be changed.`;
       log(noRecords);
     }
   }
@@ -122,6 +128,17 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
   });
   const runs = startRunnerRuns({ live, sessions, events, realPath, log });
   const titles = startTabTitles({ sessions, log });
+  const skillFolders = startSkillFolderSettings({
+    store: records,
+    off: noFolders,
+    workspace: locations.workspace,
+    workspaceReal,
+    settingsPath: locations.dataDir === null || locations.workspace === null ? null : relative(locations.workspace, join(locations.dataDir, SETTINGS_FILE)),
+  });
+  const skills = startSkillsCatalog({ workspace: locations.workspace, workspaceReal, home, settings: skillFolders, roster });
+  skills.onChange((changed) => {
+    host?.events.publish(SKILLS_CHANGED_EVENT, changed).catch((err: unknown) => log(`could not publish ${SKILLS_CHANGED_EVENT}: ${message(err)}`));
+  });
 
   const connection = stayConnected(
     { env, role: "backend" },
@@ -140,7 +157,7 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
             },
             { sessions, live, roster, workspace: info.workspace, workspaceReal: info.workspaceReal, realPath, log },
           );
-        connected.api.serve(createApi({ info, sessions, live, tabs: bound, liveNow, realPath, roster, projects: projectReads(connected), open })).then(
+        connected.api.serve(createApi({ info, sessions, live, tabs: bound, liveNow, realPath, roster, projects: projectReads(connected), open, skills })).then(
           ({ methods }) => log(`serving ${methods.join(", ")}`),
           (err: unknown) => log(`could not serve the API: ${message(err)}`),
         );
@@ -189,6 +206,8 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
     async stop() {
       runs.stop();
       titles.stop();
+      skills.stop();
+      skillFolders.stop();
       badge.stop();
       liveNow.stop();
       await events.stop();

@@ -61,6 +61,8 @@ import { foundSessions } from "../sessions/for-runner.ts";
 import type { LiveNow } from "../sessions/live-now.ts";
 import type { LiveState } from "../sessions/live-state.ts";
 import type { SessionData } from "../sessions/session-data.ts";
+import { SETTINGS_SET_SKILL_FOLDERS_METHOD, SKILLS_CATALOG_METHOD } from "../../shared/skills.ts";
+import type { SkillsCatalogService } from "../roster/skills-catalog.ts";
 
 export interface ApiSources {
   info: AppInfo;
@@ -75,6 +77,8 @@ export interface ApiSources {
   projects: ProjectReads;
   /** Open / Resume the session, through the connection the API is served on (`open.ts`). */
   open: (id: string) => Promise<SessionsOpenResult>;
+  /** The skill folders and the skills catalog (`skills-catalog.ts`). */
+  skills: Pick<SkillsCatalogService, "read" | "setFolders">;
 }
 
 type Params = Record<string, unknown>;
@@ -183,7 +187,7 @@ function launchSpecParams(raw: unknown): LaunchSpecParams {
 /** The kit's contract shapes are interfaces, which TypeScript does not take for JSON values; they hold only JSON. */
 const json = (value: SessionsForRepoResult | SessionsLiveInResult): JsonValue => value as unknown as JsonValue;
 
-export function createApi({ info, sessions, live, tabs, liveNow, realPath, roster, projects, open }: ApiSources): Record<string, ApiHandler> {
+export function createApi({ info, sessions, live, tabs, liveNow, realPath, roster, projects, open, skills }: ApiSources): Record<string, ApiHandler> {
   const updated = async (changed: Promise<SessionsUpdated["sessions"]>): Promise<SessionsUpdated> => ({ sessions: await changed });
   /** The session `{ id }` names; `not-found` when no transcript of it is known. */
   const sessionOf = (raw: unknown): Session => {
@@ -259,6 +263,12 @@ export function createApi({ info, sessions, live, tabs, liveNow, realPath, roste
       const windows = { weekFrom: timeOf(params, "weekFrom"), projectsFrom: timeOf(params, "projectsFrom") };
       const { epoch, revision, indexing, sessions: all } = sessions.answer();
       return { epoch, revision, indexing, agents: agentCounts(all, windows) };
+    },
+    [SKILLS_CATALOG_METHOD]: () => skills.read(),
+    [SETTINGS_SET_SKILL_FOLDERS_METHOD]: (raw) => {
+      const { folders } = paramsOf(raw);
+      if (!Array.isArray(folders) || !folders.every((f) => typeof f === "string")) throw new HostError("invalid-params", '"folders" must be a list of workspace-relative folders');
+      return skills.setFolders(folders as string[]);
     },
   };
 }

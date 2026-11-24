@@ -13,12 +13,14 @@ describe("viewFor", () => {
     expect(viewFor("tab", "sessions/5b0e8f52-3c1d-4a7e-9f21-6d8c0b4a7e13")).toBe("sessions");
     expect(viewFor("tab", "roster")).toBe("roster");
     expect(viewFor("tab", "roster/claude-libra")).toBe("roster");
+    expect(viewFor("tab", "settings")).toBe("settings");
   });
 
   it("shows Sessions in a tab opened at the default or an unknown route", () => {
     expect(viewFor("tab", "")).toBe("sessions");
     expect(viewFor("tab", "rosters")).toBe("sessions");
     expect(viewFor("tab", "nope")).toBe("sessions");
+    expect(viewFor("tab", "settingsx")).toBe("sessions");
   });
 });
 

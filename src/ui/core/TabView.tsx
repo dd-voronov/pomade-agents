@@ -5,8 +5,8 @@
 
 import type { ReactElement, ReactNode } from "react";
 
-import { RosterIcon, SessionsIcon } from "./icons.tsx";
-import { ROSTER_ROUTE, SESSIONS_ROUTE, type View } from "./routes.ts";
+import { GearIcon, RosterIcon, SessionsIcon } from "./icons.tsx";
+import { ROSTER_ROUTE, SESSIONS_ROUTE, SETTINGS_ROUTE, type View } from "./routes.ts";
 import styles from "./TabView.module.css";
 
 type TabViewName = Exclude<View, "live-now">;
@@ -35,6 +35,17 @@ export function TabView({ view, navigate, children }: { view: TabViewName; navig
             </button>
           ))}
         </div>
+        <button
+          type="button"
+          className={styles.gear}
+          aria-label="Settings"
+          title="Settings — skill folders"
+          aria-current={view === "settings" ? "page" : undefined}
+          data-testid="view-settings"
+          onClick={() => navigate(SETTINGS_ROUTE)}
+        >
+          <GearIcon />
+        </button>
       </nav>
       <main className={styles.view}>{children}</main>
     </div>

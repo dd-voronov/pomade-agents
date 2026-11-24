@@ -26,9 +26,9 @@ folder without a `SKILL.md` whose frontmatter `name` is the folder's and whose `
 |---|---|
 | `id` · `name` | `pomade-agents` · Agents |
 | `hostApi` | `0` |
-| `capabilities` | `project.read` (projects, their stable ids, names and folders, their visible agents) · `agentTabs.read` (each agent tab's session, folder, title and live state) · `agentTabs.write` (an agent tab's title, the unnamed mark) — the backend's project attribution, live state, tab titles and the project ↔ agent connection; the Sessions tab's and Live now's project names · `tabs.open` — Live now focuses agent tabs (`agentTabs.focus`) and opens a Runner run's attached terminal (`tabs.openAttached`); the backend's `sessions.open` does the same and resumes sessions (`agentTabs.resume`) |
+| `capabilities` | `project.read` (projects, their stable ids, names and folders, their visible agents) · `agentTabs.read` (each agent tab's session, folder, title and live state) · `agentTabs.write` (an agent tab's title, the unnamed mark) — the backend's project attribution, live state, tab titles and the project ↔ agent connection; the Sessions tab's and Live now's project names · `tabs.open` — Live now focuses agent tabs (`agentTabs.focus`) and opens a Runner run's attached terminal (`tabs.openAttached`); the backend's `sessions.open` does the same and resumes sessions (`agentTabs.resume`) · `files.read` — the Settings page's **Add folder…** asks Pomade's folder picker (`files.pickFolder`) |
 | `strip` | one icon, `agents` — action `panel` |
-| `events` | publishes `sessions.changed`, `roster.changed` and `liveNow.changed` (for its own UI frames) and `session.turnFinished` (declared, never published), `session.closed`, `session.statusChanged` ("Published events" below); subscribes to `pomade-agents:sessions.changed`, `pomade-agents:roster.changed` and `pomade-agents:liveNow.changed` (its own, for its UI frames), `project.created`, `project.renamed` and `project.removed` (the backend, and the UI frames for project names) and, for the backend, `pomade.ready`, `agentTab.changed`, `agentTab.exited` and Runner's `pomade-runner:run.started`, `pomade-runner:run.finished` ("Subscribed events" below) |
+| `events` | publishes `sessions.changed`, `roster.changed` and `liveNow.changed` (for its own UI frames) and `session.turnFinished` (declared, never published), `session.closed`, `session.statusChanged` ("Published events" below); subscribes to `pomade-agents:sessions.changed`, `pomade-agents:roster.changed` and `pomade-agents:liveNow.changed` (its own, for its UI frames), `project.created`, `project.renamed` and `project.removed` (the backend, and the UI frames for project names) and, for the backend, `pomade.ready`, `agentTab.changed`, `agentTab.exited` and Runner's `pomade-runner:run.started`, `pomade-runner:run.finished` ("Subscribed events" below); publishes `skills.changed` and subscribes to `pomade-agents:skills.changed` (its own, for the Settings page; "Skills" below) |
 | `backend` | `backend/main.mjs`, mode `with-pomade` |
 | `api` | the methods of "Published API" below — `sessions.forRepo`, `sessions.liveIn` and `roster.list` among them, which Pomade reads (HOST-API §4, "Platform reads of app APIs") |
 | `commands` | one, `pomade-agents` — entry `cli/pomade-agents.mjs` ("Command" below) |
@@ -45,6 +45,7 @@ One UI bundle; `welcome.surface` and the frame's route pick the view (`src/ui/co
 | tab | `sessions`, `""`, anything else | Sessions — the table |
 | tab | `sessions/<id>` | Sessions — the list with the detail panel, session `<id>` selected |
 | tab | `roster`, `roster/…` | Roster |
+| tab | `settings` | the app's Settings — the skill folders ("Skills" below) |
 
 - `sessions` is the route Pomade's History icon opens (HOST-API §4 `apps`, "Platform reads of app
   APIs").
@@ -103,6 +104,9 @@ One UI bundle; `welcome.surface` and the frame's route pick the view (`src/ui/co
   or navigates it (the panel's Sessions and Roster); the frame follows `route.changed`. The tab's
   Sessions | Roster switch is the tab navigating by itself (`navigate`, `tabs.setRoute`), as the
   selection is (`src/ui/core/TabView.tsx`).
+- **Settings** — the gear at the right end of that bar navigates the tab to `settings` the same
+  way; while it is open neither Sessions nor Roster is marked current and the gear is
+  (`aria-current="page"`).
 
 ## Published API
 
@@ -131,6 +135,8 @@ it the same way. Method names and shapes are in `src/shared/api.ts`, `src/shared
 | `roster.agents` | — | `RosterAgentsAnswer` (the app's own frames) |
 | `sessions.ofTab` | `SessionsOfTabParams` `{ tabId }` | `SessionsOfTabResult` `{ agentTab, session: Session \| null }` (the command) |
 | `sessions.agentCounts` | `AgentCountsParams` `{ weekFrom, projectsFrom }` | `AgentCountsAnswer` (the app's own frames) |
+| `skills.catalog` | — | `SkillsCatalog` (the app's own frames) |
+| `settings.setSkillFolders` | `SetSkillFoldersParams` `{ folders: string[] }` | `SetSkillFoldersResult` (the app's own frames) |
 
 ```ts
 interface AppInfo {
@@ -667,6 +673,80 @@ type ProjectCounts = {
   the Roster's windows — the local calendar week from Monday 00:00, and the last 90 days from 00:00
   local — the same all day.
 - Errors: `invalid-params` when either time is missing or not ISO 8601 with a zone.
+### Skills
+
+The skill folders and the skills catalog (DESIGN §3.4, §3.8), all shapes in
+`src/shared/skills.ts`; `src/backend/settings/` keeps the folder list, `src/backend/roster/skills-catalog.ts`
+reads the catalog. The agent page's Skills tab and **Add skill** read `skills.catalog`; the
+Settings page (`src/ui/settings/`) reads it and changes the list.
+
+**The folder list** — `settings.yaml`'s `skillFolders` ("Backend" below): workspace-relative POSIX
+folders, each read with its subfolders. No key (or no file): `Agents/_shared/skills`,
+`Knowledge/_skills` (`DEFAULT_SKILL_FOLDERS`); `[]` is no folders.
+
+```ts
+type SkillFolder = {
+  path: string;                   // as listed
+  state: "ok" | "missing";        // missing: no folder at the path
+  skills: number;                 // the skills it holds, at any depth
+  nested: boolean;                // some sit in a subfolder ("and its subfolders")
+  links: number;                  // agents' skills/ links whose target lies in it
+  agents: string[];               // whose links those are, roster order
+};
+type CatalogSkill = {
+  name: string;                   // SKILL.md frontmatter `name`, else the folder's name
+  folder: string;                 // the listed folder holding it
+  path: string;                   // the skill's folder, workspace-relative
+  description: string | null;     // SKILL.md frontmatter `description`
+  agents: string[];               // agents whose skills/ links point at it, roster order
+};
+type AgentSkillEntry = {
+  name: string;                   // the entry's name in skills/
+  kind: "link" | "own";           // a symlink (on/off) or a real folder (the agent's own)
+  target: string | null;          // a link's target, absolute, as the link names it; null: own
+  targetPath: string | null;      // the target, symlinks resolved: workspace-relative inside it, else absolute; null: own, broken
+  broken: boolean;                // nothing at the target
+  folder: string | null;          // the listed folder the target lies in; null: own, or not listed
+  listed: boolean;                // folder !== null
+  targetFolder: string | null;    // the target's parent, as targetPath is written: where a link into a folder no longer listed groups
+};
+type AgentSkills = { agent: string; dir: string; entries: AgentSkillEntry[] };   // dir: <config folder>/skills, absolute; entries by name
+type SkillsCatalog = {
+  epoch: string;                  // one backend run
+  revision: number;               // counts changes of the folder list
+  folders: SkillFolder[];         // the list's order
+  skills: CatalogSkill[];         // by folder, then path
+  agents: AgentSkills[];          // every Claude Code agent that is not an orphan, roster order (built-in claude: ~/.claude/skills)
+  foldersOff: string | null;      // why the list cannot be changed now; null while it can
+};
+type SetSkillFoldersResult = { ok: true; catalog: SkillsCatalog } | { ok: false; folder: string; reason: string };
+```
+
+- **A skill** is a folder holding `SKILL.md`, at any depth of a listed folder (at most 8 deep);
+  its own subfolders are not searched. Folders starting with `.` and `node_modules` are skipped;
+  a symlinked folder is followed once (by real path). A skill reached through two listed
+  folders belongs to the first.
+- **Links** are matched by real path: a link points at a skill when both resolve to the same
+  folder, and into a listed folder when its target resolves inside it — a broken one when the
+  path it names lies inside it. Only folders and symlinks in `skills/` are entries; names
+  starting with `.` are skipped. Codex has no `skills/`.
+- **Read on request.** Every `skills.catalog` walks the listed folders and the agents' `skills/`
+  folders anew: a skill or a link added or removed on disk shows on the next read. The frames
+  read again on `skills.changed` and when the tab comes back into view.
+- **`settings.setSkillFolders({ folders })`** replaces the whole list (Add, Remove and their Undo
+  are each one call) and answers the catalog it makes. A folder is refused — nothing written,
+  `{ ok: false, folder, reason }` — when it is the workspace itself, outside it (`..`, an
+  absolute path elsewhere), `.pomade`, listed twice, inside a listed folder or around one; a
+  folder new to the list also when it is not a folder now, or leads outside the workspace by
+  its real path. An absolute path inside the workspace is taken workspace-relative. A folder
+  already listed may be missing. `not-ready` with `foldersOff`'s words while the list cannot be
+  changed; `io-error` when the file cannot be written. Removing a folder never touches a link.
+- **`foldersOff`**: no workspace open, the app data folder unreadable, or `settings.yaml`
+  unusable (not YAML, not a mapping, a malformed `adoptedAt` or `skillFolders`) — then the
+  catalog reads the default folders and the file is never written over.
+
+**Change notice — `skills.changed`** `{ epoch, revision }`: published whenever the folder list
+(or `foldersOff`) changes — through the app or by hand in `settings.yaml`.
 
 ## Command
 
@@ -872,7 +952,10 @@ type AgentRunFinished = AgentRunStarted & {
     every change, under the same rules as a record: keys changed one by one, linked into place, never
     over an unusable file. A profile deleted by hand is written again with its first-sight values
     while its agent exists.
-  - `settings.yaml` — `adoptedAt`: when the first run adopted the sessions that existed. The first
+  - `settings.yaml` — `skillFolders`: the skill folders ("Skills" above), written through the
+    same document model, so the file's other keys, comments and order stay; a settings write
+    is one at a time with the first run's, starts from the file on disk, and is never made over
+    an unusable file. `adoptedAt`: when the first run adopted the sessions that existed. The first
     run waits for the first walk of the stores, writes a Done record for every session found (no
     notice, no prompt), then sets `adoptedAt`, keeping anything else in the file. Afterwards a
     session without a record gets one: Done when it started before `adoptedAt`, else Active and

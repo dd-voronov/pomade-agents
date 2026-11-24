@@ -8,7 +8,8 @@
     "project.read",
     "agentTabs.read",
     "agentTabs.write",
-    "tabs.open"
+    "tabs.open",
+    "files.read"
   ],
   "strip": [
     {
@@ -24,7 +25,8 @@
       "liveNow.changed",
       "session.turnFinished",
       "session.closed",
-      "session.statusChanged"
+      "session.statusChanged",
+      "skills.changed"
     ],
     "subscribe": [
       "pomade-agents:sessions.changed",
@@ -37,7 +39,8 @@
       "agentTab.changed",
       "agentTab.exited",
       "pomade-runner:run.started",
-      "pomade-runner:run.finished"
+      "pomade-runner:run.finished",
+      "pomade-agents:skills.changed"
     ]
   },
   "backend": {
@@ -63,7 +66,9 @@
     "roster.agentsFor",
     "roster.agents",
     "sessions.ofTab",
-    "sessions.agentCounts"
+    "sessions.agentCounts",
+    "skills.catalog",
+    "settings.setSkillFolders"
   ],
   "commands": [
     {

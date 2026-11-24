@@ -1,0 +1,250 @@
+/* The app's Settings page: a plain header over one scrolling column of sections. */
+
+.page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.head {
+  flex: none;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.title {
+  margin: 2px 0 0;
+  overflow: hidden;
+  font-size: 18px;
+  font-weight: var(--fw-semibold);
+  line-height: 28px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sub {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-4) var(--space-4) var(--space-6);
+  overflow-y: auto;
+  container: settings / inline-size;
+}
+
+.content {
+  max-width: 760px;
+}
+
+.page code {
+  padding: 1px 4px;
+  border-radius: var(--radius-sm);
+  background: var(--active-bg);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+}
+
+.secHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 24px;
+  margin-bottom: var(--space-2);
+}
+
+.secHead h2 {
+  flex: 1;
+  margin: 0;
+  font-size: var(--fs-base);
+  font-weight: var(--fw-semibold);
+}
+
+.hint {
+  margin: -4px 0 var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  line-height: 17px;
+}
+
+.block {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel-raised);
+}
+
+.none {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  color: var(--text-faint);
+  font-size: var(--fs-sm);
+}
+
+/* One folder: its row, and the Remove warning under it. */
+.item + .item {
+  border-top: 1px solid var(--border);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  column-gap: var(--space-3);
+  min-height: 36px;
+  padding: 4px var(--space-4);
+  font-size: var(--fs-sm);
+}
+
+.ico {
+  display: inline-flex;
+  color: var(--text-faint);
+}
+
+.path {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.path code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.faint {
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: var(--fs-xs);
+  text-overflow: ellipsis;
+}
+
+.count {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: var(--radius-sm);
+  background: var(--warning-soft);
+  color: var(--text);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+}
+
+.links {
+  min-width: 112px;
+  color: var(--text-faint);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@container settings (max-width: 560px) {
+  .row {
+    grid-template-columns: 16px minmax(0, 1fr) auto auto;
+  }
+
+  .links,
+  .path .faint {
+    display: none;
+  }
+}
+
+/* Notices: the warning before a Remove, and why the list cannot be changed now. */
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: 7px 10px;
+  border-radius: var(--radius-md);
+  background: var(--warning-soft);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  line-height: 17px;
+}
+
+.notice > svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--warning);
+}
+
+.notice > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.notice b {
+  font-weight: var(--fw-semibold);
+}
+
+.confirm {
+  margin: 0 var(--space-3) var(--space-3);
+}
+
+.offNotice {
+  margin-bottom: var(--space-4);
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+/* Buttons: the small bordered button of the Roster screens; `danger` for the destructive one. */
+.btn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--panel-raised);
+  color: var(--text);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+}
+
+.btn:hover:not(:disabled) {
+  background: linear-gradient(var(--hover-bg), var(--hover-bg)), var(--panel-raised);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.danger {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: var(--accent-contrast);
+}
+
+.danger:hover:not(:disabled) {
+  background: linear-gradient(var(--hover-bg), var(--hover-bg)), var(--danger);
+}

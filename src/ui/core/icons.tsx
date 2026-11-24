@@ -219,3 +219,31 @@ export function SearchIcon({ size = 16 }: IconProps): ReactElement {
     </Glyph>
   );
 }
+
+/** A gear — the app's Settings. */
+export function GearIcon({ size = 16 }: IconProps): ReactElement {
+  return (
+    <Glyph size={size}>
+      <circle cx="8" cy="8" r="2" />
+      <path d="M8 1.75v2M8 12.25v2M1.75 8h2M12.25 8h2M3.6 3.6L5 5M11 11l1.4 1.4M12.4 3.6L11 5M5 11l-1.4 1.4" />
+    </Glyph>
+  );
+}
+
+/** A plus — add one. */
+export function PlusIcon({ size = 16 }: IconProps): ReactElement {
+  return (
+    <Glyph size={size}>
+      <path d="M8 3.5v9M3.5 8h9" />
+    </Glyph>
+  );
+}
+
+/** A bin — remove. */
+export function TrashIcon({ size = 16 }: IconProps): ReactElement {
+  return (
+    <Glyph size={size}>
+      <path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5" />
+    </Glyph>
+  );
+}

@@ -13,6 +13,7 @@ import { LIVE_NOW_CHANGED_EVENT } from "./live-now.ts";
 import { ROSTER_CHANGED_EVENT } from "./roster.ts";
 import { RUN_FINISHED_EVENT, RUN_STARTED_EVENT } from "./runner-events.ts";
 import { SESSION_CLOSED_EVENT, SESSION_STATUS_CHANGED_EVENT, SESSION_TURN_FINISHED_EVENT } from "./session-events.ts";
+import { SKILLS_CHANGED_EVENT } from "./skills.ts";
 
 const read = (path: string): unknown => JSON.parse(readFileSync(new URL(path, import.meta.url), "utf8"));
 const raw = read("../../public/manifest.json");
@@ -33,10 +34,10 @@ describe("manifest.json", () => {
     // The UI hears the backend's change notices through the app's own published events; other apps
     // hear the session events; the backend follows Pomade's projects and agent tabs, and Runner's
     // runs, for project attribution, live state and event B; Live now focuses agent tabs.
-    expect(parsed.manifest.capabilities).toEqual(["project.read", "agentTabs.read", "agentTabs.write", "tabs.open"]);
+    expect(parsed.manifest.capabilities).toEqual(["project.read", "agentTabs.read", "agentTabs.write", "tabs.open", "files.read"]);
     expect(parsed.manifest.events).toEqual({
-      publish: ["sessions.changed", ROSTER_CHANGED_EVENT, LIVE_NOW_CHANGED_EVENT, SESSION_TURN_FINISHED_EVENT, SESSION_CLOSED_EVENT, SESSION_STATUS_CHANGED_EVENT],
-      subscribe: ["pomade-agents:sessions.changed", "pomade-agents:roster.changed", `pomade-agents:${LIVE_NOW_CHANGED_EVENT}`, "pomade.ready", "project.created", "project.renamed", "project.removed", "agentTab.changed", "agentTab.exited", RUN_STARTED_EVENT, RUN_FINISHED_EVENT],
+      publish: ["sessions.changed", ROSTER_CHANGED_EVENT, LIVE_NOW_CHANGED_EVENT, SESSION_TURN_FINISHED_EVENT, SESSION_CLOSED_EVENT, SESSION_STATUS_CHANGED_EVENT, SKILLS_CHANGED_EVENT],
+      subscribe: ["pomade-agents:sessions.changed", "pomade-agents:roster.changed", `pomade-agents:${LIVE_NOW_CHANGED_EVENT}`, "pomade.ready", "project.created", "project.renamed", "project.removed", "agentTab.changed", "agentTab.exited", RUN_STARTED_EVENT, RUN_FINISHED_EVENT, `pomade-agents:${SKILLS_CHANGED_EVENT}`],
     });
   });
 
@@ -60,7 +61,7 @@ describe("manifest.json", () => {
     const live = { entries: () => [] };
     const roster = { answer: () => ({ epoch: "e", revision: 0, agents: [], profilesOff: null }), list: () => [], agent: () => undefined };
     const projects = { projects: none, visibleAgents: none };
-    expect(Object.keys(createApi({ info, sessions, live, liveNow: { answer: () => ({ epoch: "l", revision: 0, rows: [] }) }, realPath: (p: string) => Promise.resolve(p), roster, projects, open: none, tabs: { ofTab: () => null } }))).toEqual(api);
+    expect(Object.keys(createApi({ info, sessions, live, liveNow: { answer: () => ({ epoch: "l", revision: 0, rows: [] }) }, realPath: (p: string) => Promise.resolve(p), roster, projects, open: none, tabs: { ofTab: () => null }, skills: { read: none, setFolders: none } }))).toEqual(api);
   });
 
   it("declares the pomade-agents command, built from the command's entry", () => {

@@ -73,7 +73,7 @@ function api() {
   return { handlers: createApi({ info, sessions, live, tabs, liveNow: { answer: () => ({ epoch: "l", revision: 0, rows: [] }) }, realPath: (p) => Promise.resolve(p), roster, projects, open: (id) => {
     calls.push(["open", id]);
     return Promise.resolve({ opened: "resumed", tabId: "t1", session: testSession({ id }) });
-  } }), calls };
+  }, skills: { read: () => Promise.reject(new Error("not called")), setFolders: () => Promise.reject(new Error("not called")) } }), calls };
 }
 
 const call = (method: string, params: unknown): unknown => {
