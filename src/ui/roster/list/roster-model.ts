@@ -2,7 +2,7 @@
 // agent's counts and its connected projects, put together as the cards and rows read them, in the
 // order the Roster lists them.
 
-import type { AgentProvider, RosterAgentsAnswer } from "../../../shared/roster.ts";
+import type { AgentProvider, RosterAgentsAnswer, RosterEntry } from "../../../shared/roster.ts";
 import type { AgentCounts } from "../../../shared/work-sessions.ts";
 import { noCounts } from "../agent-counts-model.ts";
 import { needsLogin, setupPromptOf, type SessionFacts } from "../needs-login.ts";
@@ -22,6 +22,8 @@ export function viewOf(stored: string | null): RosterView {
 
 /** One agent as a card or a row shows it. */
 export type AgentView = {
+  /** The roster's answer for it, as its actions take it (`commands/`). */
+  entry: RosterEntry;
   id: string;
   name: string;
   provider: AgentProvider;
@@ -41,6 +43,8 @@ export type AgentView = {
   tags: string[];
   /** Connected projects, ranked (`rankConnected`). */
   connected: ConnectedProject[];
+  /** Connected project ids, in the Projects panel's order. */
+  connectedIds: readonly string[];
   lastActiveAt: string | null;
   week: AgentCounts["week"];
   /** A Claude Code folder agent with a usable profile, not an orphan: ⋯ offers Clone…. */
@@ -68,6 +72,7 @@ export function agentViews(
   return answer.agents.map((entry): AgentView => {
     const mine = counts.get(entry.id) ?? noCounts(entry.id);
     return {
+      entry,
       id: entry.id,
       name: entry.name,
       provider: entry.provider,
@@ -83,6 +88,7 @@ export function agentViews(
       role: entry.profile?.role ?? null,
       tags: entry.profile?.tags ?? [],
       connected: rankConnected(connections.get(entry.id) ?? [], mine.projects, names),
+      connectedIds: connections.get(entry.id) ?? [],
       lastActiveAt: mine.lastActiveAt,
       week: mine.week,
       cloneable: entry.profile !== null && entry.provider === "claude" && entry.kind === "folder" && !entry.orphan,

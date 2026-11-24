@@ -61,7 +61,7 @@ describe("manifest.json", () => {
       get: () => undefined,
     };
     const live = { entries: () => [] };
-    const roster = { answer: () => ({ epoch: "e", revision: 0, agents: [], profilesOff: null }), list: () => [], agent: () => undefined, updateProfile: none, permissions: none, memory: none, modelConfig: none, setModel: none };
+    const roster = { answer: () => ({ epoch: "e", revision: 0, agents: [], profilesOff: null }), list: () => [], agent: () => undefined, updateProfile: none, permissions: none, memory: none, modelConfig: none, setModel: none, unclaimedFolders: none, relink: none, removeOrphan: none, undoRelink: none };
     const projects = { projects: none, visibleAgents: none };
     expect(Object.keys(createApi({ info, sessions, live, liveNow: { answer: () => ({ epoch: "l", revision: 0, rows: [] }) }, realPath: (p: string) => Promise.resolve(p), roster, projects, open: none, tabs: { ofTab: () => null }, skills: { read: none, setFolders: none, link: none, unlink: none } }))).toEqual(api);
   });

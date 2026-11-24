@@ -2,7 +2,7 @@
 
 import type { ReactElement } from "react";
 
-import type { RosterActions } from "./actions.ts";
+import type { RosterTools } from "./AgentCard.tsx";
 import { AgentRow } from "./AgentRow.tsx";
 import type { AgentView } from "./roster-model.ts";
 import styles from "./AgentList.module.css";
@@ -11,12 +11,11 @@ export interface AgentListProps {
   /** Which of the Roster's two lists this is. */
   section: "shown" | "hidden";
   agents: readonly AgentView[];
-  actions: RosterActions;
-  projects: number;
+  tools: RosterTools;
   now: Date;
 }
 
-export function AgentList({ section, agents, actions, projects, now }: AgentListProps): ReactElement {
+export function AgentList({ section, agents, tools, now }: AgentListProps): ReactElement {
   return (
     <div className={styles.list} data-testid={`roster-list-${section}`}>
       <div className={styles.head}>
@@ -38,7 +37,7 @@ export function AgentList({ section, agents, actions, projects, now }: AgentList
         <span />
       </div>
       {agents.map((agent) => (
-        <AgentRow key={agent.id} agent={agent} actions={actions} projects={projects} now={now} />
+        <AgentRow key={agent.id} agent={agent} tools={tools} now={now} />
       ))}
     </div>
   );

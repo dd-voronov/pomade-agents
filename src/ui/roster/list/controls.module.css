@@ -66,9 +66,14 @@
 }
 
 .danger {
-  border-color: var(--danger);
+  border: 1px solid var(--danger);
   background: var(--danger);
-  color: #fff;
+  color: var(--accent-contrast);
+}
+
+.danger:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--danger) 88%, var(--text));
+  background: color-mix(in srgb, var(--danger) 88%, var(--text));
 }
 
 .iconBtn {

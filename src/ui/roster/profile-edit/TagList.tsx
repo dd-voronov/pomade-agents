@@ -2,9 +2,10 @@
 // takes a field where Enter or a comma adds the tag, leaving the field adds what is typed, Esc drops
 // it. Every change saves the whole list at once. The × and the add button have their room in every
 // state, and the field is the add button's size, so hovering and adding never move a tag. Used by
-// the agent page and the Roster's cards.
+// the agent page and the Roster's cards. On a card the list keeps to one row (`oneRow`): the tags that
+// do not fit fade out at its end, the whole list is the tooltip, and "+ tag" stays after them.
 
-import { useEffect, useRef, useState, type ReactElement } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactElement } from "react";
 
 import { TAG_MAX } from "../../../shared/roster.ts";
 import { CloseIcon, PlusIcon } from "../../core/icons.tsx";
@@ -19,14 +20,19 @@ export interface TagListProps {
   onSave: (tags: readonly string[]) => Promise<boolean>;
   /** `always`: the add button shows; `hover`: it shows while the list is hovered or has focus. */
   add?: "always" | "hover";
+  /** One row, always: the room never grows, so nothing under the list moves. */
+  oneRow?: boolean;
   testId: string;
 }
 
-export function TagList({ tags, editable, onSave, add = "always", testId }: TagListProps): ReactElement {
+export function TagList({ tags, editable, onSave, add = "always", oneRow = false, testId }: TagListProps): ReactElement {
   const [entry, setEntry] = useState<string | null>(null);
   /** The list sent and not yet answered: shown in place of the saved one meanwhile. */
   const [sent, setSent] = useState<readonly string[] | null>(null);
   const field = useRef<HTMLInputElement>(null);
+  const row = useRef<HTMLDivElement>(null);
+  /** One row's tags do not all fit: they fade out at its end. */
+  const [cut, setCut] = useState(false);
   const adding = entry !== null;
 
   useEffect(() => {
@@ -34,6 +40,16 @@ export function TagList({ tags, editable, onSave, add = "always", testId }: TagL
   }, [adding]);
 
   const shown = sent ?? tags;
+
+  useLayoutEffect(() => {
+    const el = row.current;
+    if (!oneRow || el === null) return;
+    const measure = (): void => setCut(el.scrollWidth > el.clientWidth + 0.5);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [oneRow, shown]);
 
   const save = (next: readonly string[]): void => {
     setSent(next);
@@ -50,15 +66,13 @@ export function TagList({ tags, editable, onSave, add = "always", testId }: TagL
 
   if (!editable && shown.length === 0) {
     return (
-      <div className={styles.tags} data-testid={testId}>
+      <div className={styles.tags} data-one-row={oneRow ? "" : undefined} data-testid={testId}>
         <span className={styles.none}>No tags</span>
       </div>
     );
   }
 
-  return (
-    <div className={styles.tags} data-add={add} data-testid={testId}>
-      {shown.map((tag) => (
+  const chips = shown.map((tag) => (
         <span key={tag} className={styles.tag} data-testid={`${testId}-tag`}>
           {tag}
           {editable && (
@@ -67,8 +81,9 @@ export function TagList({ tags, editable, onSave, add = "always", testId }: TagL
             </button>
           )}
         </span>
-      ))}
-      {editable &&
+      ));
+  const addOrField =
+    editable &&
         (adding ? (
           <input
             ref={field}
@@ -104,7 +119,18 @@ export function TagList({ tags, editable, onSave, add = "always", testId }: TagL
             <PlusIcon size={12} />
             tag
           </button>
-        ))}
+        ));
+
+  return (
+    <div className={styles.tags} data-add={add} data-one-row={oneRow ? "" : undefined} data-testid={testId}>
+      {oneRow ? (
+        <div ref={row} className={styles.row} data-cut={cut ? "" : undefined} title={cut ? shown.join(", ") : undefined}>
+          {chips}
+        </div>
+      ) : (
+        chips
+      )}
+      {addOrField}
     </div>
   );
 }

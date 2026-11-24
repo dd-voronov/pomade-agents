@@ -18,7 +18,7 @@ import { rosterWindows } from "../agent-counts-model.ts";
 import { useAgentCounts } from "../useAgentCounts.ts";
 import { useRoster } from "../useRoster.ts";
 import { useProfileEdit } from "../profile-edit/useProfileEdit.ts";
-import { useAgentActions } from "./agent-actions.ts";
+import { useAgentCommands, type AgentCommands } from "../commands/useAgentCommands.ts";
 import type { AgentContext } from "./agent-context.ts";
 import { AgentHeader } from "./AgentHeader.tsx";
 import type { WorkspaceRoots } from "./agent-model.ts";
@@ -40,7 +40,7 @@ export interface AgentPageProps {
 }
 
 export function AgentPage({ host, agent, tab, project, navigate }: AgentPageProps): ReactElement {
-  const { answer, patchProfile } = useRoster(host);
+  const { answer, connections, patchProfile } = useRoster(host);
   const backend = useBackendInfo(host);
   const projectList = useProjects(host);
   const projects = projectList ?? NO_PROJECTS;
@@ -52,6 +52,7 @@ export function AgentPage({ host, agent, tab, project, navigate }: AgentPageProp
   const info = backend.status === "running" ? backend.info : null;
   const roots = useMemo<WorkspaceRoots>(() => ({ workspace: info?.workspace ?? null, workspaceReal: info?.workspaceReal ?? null }), [info?.workspace, info?.workspaceReal]);
   const openFile = useOpenFile(host, roots, show);
+  const commands = useAgentCommands(host, show, roots, patchProfile);
   const entry = answer?.agents.find((a) => a.id === agent);
 
   const context: AgentContext | null =
@@ -79,17 +80,18 @@ export function AgentPage({ host, agent, tab, project, navigate }: AgentPageProp
     );
   }
 
-  return <LoadedPage context={context} tab={tab} toast={toasts.toast} />;
+  return <LoadedPage context={context} tab={tab} toast={toasts.toast} commands={commands} connected={connections?.get(agent) ?? NO_CONNECTIONS} />;
 }
 
-function LoadedPage({ context, tab, toast }: { context: AgentContext; tab: AgentTab; toast: ToastData | null }): ReactElement {
+const NO_CONNECTIONS: readonly string[] = [];
+
+function LoadedPage({ context, tab, toast, commands, connected }: { context: AgentContext; tab: AgentTab; toast: ToastData | null; commands: AgentCommands; connected: readonly string[] }): ReactElement {
   const { entry, navigate } = context;
   const agent = entry.id;
-  const actions = useAgentActions(context);
   const { View } = AGENT_TAB_VIEWS[tab];
   return (
     <div className={styles.page} data-testid="agent-page" data-agent={agent} data-tab={tab}>
-      <AgentHeader context={context} actions={actions}>
+      <AgentHeader context={context} commands={commands} connected={connected}>
         <nav className={styles.tabs} role="tablist" aria-label={agent}>
           {AGENT_TABS.map((id) => (
             <button key={id} type="button" role="tab" className={styles.tab} aria-selected={id === tab} data-testid={`agent-tab-${id}`} onClick={() => id !== tab && navigate(agentRoute(agent, id))}>

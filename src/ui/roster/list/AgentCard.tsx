@@ -1,27 +1,38 @@
 // One agent as a card (DESIGN §3.3): name and state chips, provider and model, the role line, the
-// tags, Connected to, Last active, This week, and the actions. The role line and the tags each have
-// their space reserved (two lines, one row), so editing them in place moves nothing; the actions
-// stay inside the card at every width. An agent that has never run a session shows Needs login and,
-// as the card's notice, the setup prompt to copy.
+// tags, Connected to, Last active, This week, and the actions. The role line (two lines) and the
+// tags (one row) are edited in place — the agent page's `RoleLine` and `TagList` — in a room of fixed
+// height, so hovering or editing them moves nothing; the actions stay inside the card at every width.
+// An agent that has never run a session shows Needs login and, as the card's notice, the setup
+// prompt to copy. An orphan shows Re-link ▾ and Remove, which asks in the notice first.
 
 import { useRef, useState, type ReactElement } from "react";
 
-import { CaretIcon, ChevronIcon, MoreIcon, ResumeIcon, SessionsIcon, WarningIcon } from "../../core/icons.tsx";
-import { Menu, type MenuAnchor, type MenuEntry } from "../../core/Menu.tsx";
+import { ChevronIcon, MoreIcon, SessionsIcon, WarningIcon } from "../../core/icons.tsx";
+import { Menu, type MenuAnchor } from "../../core/Menu.tsx";
+import { agentMenuEntries, OrphanActions, StartSession, type RosterScope } from "../commands/AgentMenus.tsx";
+import type { AgentCommands } from "../commands/useAgentCommands.ts";
 import { NeedsLoginChip, NeedsLoginNotice } from "../NeedsLogin.tsx";
+import { RoleLine } from "../profile-edit/RoleLine.tsx";
+import { TagList } from "../profile-edit/TagList.tsx";
+import type { ProfileEdit } from "../profile-edit/useProfileEdit.ts";
 import type { RosterActions } from "./actions.ts";
 import { ConnectedTo } from "./ConnectedTo.tsx";
 import { CARD_NAMES } from "./connected-model.ts";
-import { LinkIcon } from "./list-icons.tsx";
 import { chipsOf, lastActiveText, modelLabel, weekText, type AgentView } from "./roster-model.ts";
 import controls from "./controls.module.css";
 import styles from "./AgentCard.module.css";
 
+/** What a card or a row acts with: the tab's navigation, the agents' commands, the profile edits, the projects. */
+export interface RosterTools {
+  actions: RosterActions;
+  commands: AgentCommands;
+  edit: ProfileEdit;
+  scope: RosterScope;
+}
+
 export interface AgentCardProps {
   agent: AgentView;
-  actions: RosterActions;
-  /** How many projects the workspace has. */
-  projects: number;
+  tools: RosterTools;
   now: Date;
 }
 
@@ -49,30 +60,43 @@ export function StateChips({ agent }: { agent: AgentView }): ReactElement {
   );
 }
 
-export function OrphanActions({ agent, small }: { agent: AgentView; small?: boolean }): ReactElement {
+/** An orphan's buttons in a card's or a row's look. */
+export function OrphanButtons({ agent, tools, small, removing, onRemoving }: { agent: AgentView; tools: RosterTools; small?: boolean; removing: boolean; onRemoving: (removing: boolean) => void }): ReactElement {
   const size = small === true ? controls.small : "";
   return (
-    <>
-      <button type="button" className={`${controls.primary} ${size}`} data-testid={`agent-relink-${agent.id}`}>
-        <LinkIcon />
-        Re-link
-        <span className={controls.caret}>
-          <CaretIcon />
-        </span>
-      </button>
-      <button type="button" className={`${controls.btn} ${size}`} data-testid={`agent-remove-${agent.id}`}>
-        Remove
-      </button>
-    </>
+    <OrphanActions
+      entry={agent.entry}
+      commands={tools.commands}
+      removing={removing}
+      onRemoving={onRemoving}
+      primary={`${controls.primary} ${size}`}
+      plain={`${controls.btn} ${size}`}
+      danger={`${controls.btn} ${controls.danger} ${size}`}
+      caretClassName={controls.caret ?? ""}
+    />
   );
 }
 
-/** The ⋯ button and its menu: the agent's page, and Clone… for an agent that can be cloned. */
-export function MoreButton({ agent, actions, className }: { agent: AgentView; actions: RosterActions; className: string }): ReactElement {
+/** Start session ▾ in a card's or a row's look. */
+export function StartButton({ agent, tools, small }: { agent: AgentView; tools: RosterTools; small?: boolean }): ReactElement {
+  return (
+    <StartSession
+      entry={agent.entry}
+      connected={agent.connectedIds}
+      scope={tools.scope}
+      commands={tools.commands}
+      className={small === true ? `${controls.primary} ${controls.small}` : `${controls.primary}`}
+      caretClassName={controls.caret ?? ""}
+      testId={`agent-start-${agent.id}`}
+    />
+  );
+}
+
+/** The ⋯ button and its menu: the agent's page and sessions, then Clone…, Hide / Show, its files. */
+export function MoreButton({ agent, tools, className }: { agent: AgentView; tools: RosterTools; className: string }): ReactElement {
   const [menu, setMenu] = useState<MenuAnchor | null>(null);
   const button = useRef<HTMLButtonElement>(null);
-  const entries: MenuEntry[] = [{ kind: "item", id: "open-agent", label: "Open agent page", run: () => actions.openAgent(agent.id) }];
-  if (agent.cloneable) entries.push({ kind: "item", id: "clone", label: "Clone…", run: () => actions.cloneAgent(agent.id) });
+  const { actions, commands, scope } = tools;
   return (
     <>
       <button
@@ -88,12 +112,29 @@ export function MoreButton({ agent, actions, className }: { agent: AgentView; ac
       >
         <MoreIcon />
       </button>
-      {menu !== null && <Menu entries={entries} anchor={menu} onClose={() => setMenu(null)} label={`${agent.name} actions`} testId={`agent-menu-${agent.id}`} />}
+      {menu !== null && (
+        <Menu
+          entries={agentMenuEntries(agent.entry, { scope, commands, roster: { openAgent: () => actions.openAgent(agent.id) }, clone: () => actions.cloneAgent(agent.id) })}
+          anchor={menu}
+          onClose={() => setMenu(null)}
+          label={`${agent.name} actions`}
+          testId={`agent-menu-${agent.id}`}
+        />
+      )}
     </>
   );
 }
 
-function Notice({ agent }: { agent: AgentView }): ReactElement | null {
+function Notice({ agent, tools, removing }: { agent: AgentView; tools: RosterTools; removing: boolean }): ReactElement | null {
+  if (agent.orphan && removing) {
+    return (
+      <div className={styles.notice} data-tone="danger" data-testid={`agent-notice-${agent.id}`}>
+        <span>
+          Remove <b>{agent.name}</b>’s profile? This deletes <code>Apps/pomade-agents/agents/{agent.id}/</code>. No agent folder is touched.
+        </span>
+      </div>
+    );
+  }
   if (agent.orphan) {
     return (
       <div className={styles.notice} data-testid={`agent-notice-${agent.id}`}>
@@ -105,12 +146,13 @@ function Notice({ agent }: { agent: AgentView }): ReactElement | null {
     );
   }
   if (agent.problem !== null) {
+    const profileFile = tools.scope.dataDir === null ? null : `${tools.scope.dataDir}/agents/${agent.id}/agent.yaml`;
     return (
       <div className={styles.notice} data-testid={`agent-notice-${agent.id}`}>
         <WarningIcon size={14} />
         <span>
           <code>agent.yaml</code> can’t be used: {agent.problem}. The agent runs on its first-sight values; the file is never written over.{" "}
-          <button type="button" className={styles.link} data-testid={`agent-open-yaml-${agent.id}`}>
+          <button type="button" className={styles.link} disabled={profileFile === null} data-testid={`agent-open-yaml-${agent.id}`} onClick={() => profileFile !== null && tools.commands.openFile(profileFile)}>
             Open agent.yaml
           </button>
         </span>
@@ -121,8 +163,11 @@ function Notice({ agent }: { agent: AgentView }): ReactElement | null {
   return null;
 }
 
-export function AgentCard({ agent, actions, projects, now }: AgentCardProps): ReactElement {
+export function AgentCard({ agent, tools, now }: AgentCardProps): ReactElement {
   const { orphan } = agent;
+  const { actions, edit, scope } = tools;
+  const [removing, setRemoving] = useState(false);
+  const editable = !agent.readOnly;
   return (
     <article className={styles.card} data-testid={`agent-card-${agent.id}`} data-orphan={orphan ? "" : undefined} data-hidden={agent.hidden ? "" : undefined}>
       <div className={styles.top}>
@@ -131,33 +176,23 @@ export function AgentCard({ agent, actions, projects, now }: AgentCardProps): Re
         </button>
         <StateChips agent={agent} />
         <span className={styles.spacer} />
-        {!orphan && <MoreButton agent={agent} actions={actions} className={`${controls.iconBtn} ${styles.more}`} />}
+        {!orphan && <MoreButton agent={agent} tools={tools} className={`${controls.iconBtn} ${styles.more}`} />}
       </div>
       <div className={styles.sub}>
         {agent.providerLabel}
         <span className={styles.sep}>·</span>
         <ModelLine agent={agent} />
       </div>
-      <p className={styles.role} data-testid={`agent-role-${agent.id}`} title={agent.role ?? undefined}>
-        {agent.role ?? <span className={styles.faint}>No role line</span>}
-      </p>
-      <div className={styles.tags} data-testid={`agent-tags-${agent.id}`} title={agent.tags.length > 0 ? agent.tags.join(", ") : undefined}>
-        {agent.tags.length === 0 ? (
-          <span className={styles.faint}>No tags</span>
-        ) : (
-          agent.tags.map((tag) => (
-            <span key={tag} className={styles.tag}>
-              {tag}
-            </span>
-          ))
-        )}
+      <div className={styles.role} data-testid={`agent-role-room-${agent.id}`}>
+        <RoleLine role={agent.role ?? undefined} editable={editable} onSave={(role) => edit.saveRole(agent.id, role)} lines={2} testId={`agent-role-${agent.id}`} />
       </div>
-      <Notice agent={agent} />
+      <TagList tags={agent.tags} editable={editable} onSave={(tags) => edit.saveTags(agent.id, tags)} add="hover" oneRow testId={`agent-tags-${agent.id}`} />
+      <Notice agent={agent} tools={tools} removing={removing} />
       {!orphan && (
         <dl className={styles.facts}>
           <dt>Connected to</dt>
           <dd>
-            <ConnectedTo agent={agent.id} agentName={agent.name} ranked={agent.connected} projects={projects} max={CARD_NAMES} onOpen={() => actions.openProjects(agent.id)} />
+            <ConnectedTo agent={agent.id} agentName={agent.name} ranked={agent.connected} projects={scope.projects.size} max={CARD_NAMES} onOpen={() => actions.openProjects(agent.id)} />
           </dd>
           <dt>Last active</dt>
           <dd data-testid={`agent-last-${agent.id}`}>{lastActiveText(agent.lastActiveAt, now)}</dd>
@@ -169,17 +204,18 @@ export function AgentCard({ agent, actions, projects, now }: AgentCardProps): Re
       )}
       <div className={styles.actions}>
         {orphan ? (
-          <OrphanActions agent={agent} />
+          <OrphanButtons agent={agent} tools={tools} removing={removing} onRemoving={setRemoving} />
         ) : (
           <>
-            <button type="button" className={controls.primary} data-testid={`agent-start-${agent.id}`}>
-              <ResumeIcon size={12} />
-              Start session
-              <span className={controls.caret}>
-                <CaretIcon />
-              </span>
-            </button>
-            <button type="button" className={controls.btn} title="This agent's sessions" aria-label={`${agent.name}'s sessions`} data-testid={`agent-sessions-${agent.id}`}>
+            <StartButton agent={agent} tools={tools} />
+            <button
+              type="button"
+              className={controls.btn}
+              title="This agent's sessions"
+              aria-label={`${agent.name}'s sessions`}
+              data-testid={`agent-sessions-${agent.id}`}
+              onClick={() => tools.commands.openSessions(agent.id)}
+            >
               <SessionsIcon size={14} />
               <span className={styles.sessionsLabel}>Sessions</span>
             </button>

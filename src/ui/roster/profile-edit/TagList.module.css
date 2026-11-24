@@ -112,3 +112,26 @@
 .field::placeholder {
   color: var(--text-faint);
 }
+
+/* One row: the tags shrink as a whole and are cut at its end; the add button keeps its place after them. */
+.tags[data-one-row] {
+  flex-wrap: nowrap;
+  height: 20px;
+}
+
+.row {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.row[data-cut] {
+  mask-image: linear-gradient(to right, black calc(100% - 20px), transparent);
+}
+
+.row .tag {
+  flex: none;
+}

@@ -1,49 +1,39 @@
 // The agent page's header: ← Roster, the name with its state chips, Start session ▾ and the ⋯
-// menu; then the provider, the model and the launch command; then a notice for what needs the
-// user's attention — an orphan, an unreadable profile, Needs login with its setup prompt; the tab
-// bar closes it (`children`). Start session and Hide belong to other tickets (`agent-actions.ts`):
-// they show here, disabled, until those are wired.
+// menu — the Roster card's own (`commands/`): Clone…, Hide / Show in the "+" menu, Open CLAUDE.md,
+// Open agent.yaml; then the provider, the model and the launch command; then a notice for what needs
+// the user's attention — an orphan, an unreadable profile, Needs login with its setup prompt; the
+// tab bar closes it (`children`).
 
 import { useRef, useState, type ReactElement, type ReactNode } from "react";
 
-import { BackIcon, CaretIcon, DocIcon, MoreIcon, ResumeIcon, WarningIcon } from "../../core/icons.tsx";
-import { Menu, type MenuAnchor, type MenuEntry } from "../../core/Menu.tsx";
+import { newAgentRoute } from "../../core/routes.ts";
+import { BackIcon, MoreIcon, WarningIcon } from "../../core/icons.tsx";
+import { Menu, type MenuAnchor } from "../../core/Menu.tsx";
+import { agentMenuEntries, StartSession, type RosterScope } from "../commands/AgentMenus.tsx";
+import type { AgentCommands } from "../commands/useAgentCommands.ts";
 import { needsLogin, setupPromptOf } from "../needs-login.ts";
 import { NeedsLoginChip, NeedsLoginNotice } from "../NeedsLogin.tsx";
-import type { AgentActions } from "./agent-actions.ts";
 import type { AgentContext } from "./agent-context.ts";
-import { PROVIDER_LABELS, chipsOf, claudeMdOf, isEditable, modelText, profileFileOf, providerOf } from "./agent-model.ts";
+import { PROVIDER_LABELS, chipsOf, modelText, providerOf } from "./agent-model.ts";
 import styles from "./page.module.css";
 
-const LATER = { why: "Not available yet" };
+export interface AgentHeaderProps {
+  context: AgentContext;
+  commands: AgentCommands;
+  /** The agent's connected project ids, in the Projects panel's order. */
+  connected: readonly string[];
+  children: ReactNode;
+}
 
-export function AgentHeader({ context, actions, children }: { context: AgentContext; actions: AgentActions; children: ReactNode }): ReactElement {
-  const { entry, openFile, navigate, dataDir, counts } = context;
+export function AgentHeader({ context, commands, connected, children }: AgentHeaderProps): ReactElement {
+  const { entry, navigate, dataDir, counts, projects, profilesOff } = context;
   const { profile } = entry;
   const [menu, setMenu] = useState<MenuAnchor | null>(null);
   const more = useRef<HTMLButtonElement>(null);
-  const start = useRef<HTMLButtonElement>(null);
-  const claudeMd = claudeMdOf(entry);
-  const profileFile = profileFileOf(dataDir, entry.id);
   const model = modelText(entry);
   const chips = chipsOf(entry);
   const loggedOut = needsLogin(entry, counts);
-  const hidden = profile?.hidden === true;
-  const cloneable = profile !== null && profile.provider === "claude" && profile.kind === "folder" && !entry.orphan;
-
-  const entries: MenuEntry[] = [];
-  if (cloneable) entries.push({ kind: "item", id: "clone", label: "Clone…", ...(actions.clone === null ? { disabled: LATER } : {}), run: () => actions.clone?.() });
-  entries.push({
-    kind: "item",
-    id: "hide",
-    label: hidden ? "Show in the “+” menu" : "Hide from the “+” menu",
-    ...(actions.setHidden === null || !isEditable(entry) ? { disabled: actions.setHidden === null ? LATER : { why: "The agent’s profile cannot be written" } } : {}),
-    run: () => actions.setHidden?.(!hidden),
-  });
-  if (providerOf(entry) === "claude") {
-    entries.push({ kind: "item", id: "open-claude-md", label: "Open CLAUDE.md", glyph: <DocIcon size={14} />, ...(claudeMd === null ? { disabled: { why: "No config folder" } } : {}), run: () => claudeMd !== null && openFile(claudeMd) });
-  }
-  entries.push({ kind: "item", id: "open-agent-yaml", label: "Open agent.yaml", glyph: <DocIcon size={14} />, ...(profileFile === null ? { disabled: { why: "No workspace is open" } } : {}), run: () => profileFile !== null && openFile(profileFile) });
+  const scope: RosterScope = { projects, profilesOff, dataDir };
 
   return (
     <header className={styles.head} data-testid="agent-header">
@@ -68,21 +58,15 @@ export function AgentHeader({ context, actions, children }: { context: AgentCont
         <span className={styles.spacer} />
         <div className={styles.actions}>
           {!entry.orphan && (
-            <button
-              ref={start}
-              type="button"
-              className={styles.btnPrimary}
-              disabled={actions.startSession === null}
-              title={actions.startSession === null ? LATER.why : undefined}
-              data-testid="agent-start-session"
-              onClick={() => start.current !== null && actions.startSession?.(start.current.getBoundingClientRect())}
-            >
-              <ResumeIcon size={12} />
-              Start session
-              <span className={styles.caret}>
-                <CaretIcon size={12} />
-              </span>
-            </button>
+            <StartSession
+              entry={entry}
+              connected={connected}
+              scope={scope}
+              commands={commands}
+              className={`${styles.btnPrimary}`}
+              caretClassName={`${styles.caret}`}
+              testId="agent-start-session"
+            />
           )}
           <button
             ref={more}
@@ -132,7 +116,15 @@ export function AgentHeader({ context, actions, children }: { context: AgentCont
         </div>
       )}
       {children}
-      {menu !== null && <Menu entries={entries} anchor={menu} onClose={() => setMenu(null)} label="Agent actions" testId="agent-menu" />}
+      {menu !== null && (
+        <Menu
+          entries={agentMenuEntries(entry, { scope, commands, roster: null, clone: () => navigate(newAgentRoute(entry.id)) })}
+          anchor={menu}
+          onClose={() => setMenu(null)}
+          label="Agent actions"
+          testId="agent-menu"
+        />
+      )}
     </header>
   );
 }

@@ -302,6 +302,13 @@ modes:
 - **Orphans:** a folder agent's `agent.yaml` whose `configDir` no longer exists (the folder was
   renamed outside the app). It stays out of the "+" menu and launches, and is shown on a card, with
   **Re-link** to an unclaimed agent folder or **Remove**. A built-in is never an orphan.
+  - **An unclaimed agent folder** is one no profile has made its own: none names it but the
+    first-sight profile written when it appeared, still as written — the case of a folder renamed
+    outside the app. Re-link points the orphan's `configDir` at it and drops that first-sight
+    profile; the agent keeps its id. Its toast offers Undo, which puts both profiles back as they
+    were.
+  - **Remove** deletes the orphan's profile (its `agents/<id>/` folder), never an agent folder,
+    after asking in place.
 - **Known limit:** command edits made in the app don't reach Pomade's `.pomade/agents.json`. The
   platform's fallback (§3.7) uses the last commands it knew itself.
 
@@ -323,9 +330,9 @@ One entry per agent, in two views the user switches between with two icon button
   - **Connected to** (below)
   - last active
   - this week: work sessions and ~$
-  - **Start session ▾** · **Sessions** · **Open ›** (the agent's page); a ⋯ menu with Clone…,
-    Hide / Show in the "+" menu, Open CLAUDE.md, Open agent.yaml. The buttons stay inside the card
-    at every width.
+  - **Start session ▾** · **Sessions** · **Open ›** (the agent's page); a ⋯ menu with Open agent
+    page and Sessions (the list row's way to them), then Clone…, Hide / Show in the "+" menu, Open
+    CLAUDE.md, Open agent.yaml. The buttons stay inside the card at every width.
 - **A list row shows** the same without tags: name and role line, provider and model, Connected
   to, last active, this week, **Start session ▾** and the ⋯ menu.
 - **Connected to** — one field, the projects whose "+" menu offers the agent (the project
@@ -341,6 +348,7 @@ One entry per agent, in two views the user switches between with two icon button
   - the field is a button: it opens the agent's page on its Projects tab
 - **Start session ▾:** the mode (Normal / Full autonomy — only the enabled ones; no choice when
   only Normal is), then the project: connected ones first, then the others, then the Workspace.
+  Off for a hidden agent (Pomade launches only what its "+" menu offers) and an orphan.
 - **Sessions:** the Sessions tab in the Workspace scope with the Agent filter set.
 - **Orphan:** **Re-link** to an unclaimed agent folder, or **Remove**.
 - **No workspace open:** the two built-ins, read-only.

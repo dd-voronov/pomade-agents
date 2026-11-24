@@ -2,7 +2,8 @@
 // scrim, placed at a point (a right-click) or under an element (a ⋯ button) and kept inside the
 // window. The first item takes focus; ↑ ↓ move between items, Enter or a click runs one and closes
 // the menu, Esc or a click outside closes it. A menu with a search field (a long list to pick from)
-// focuses the field instead: typing filters, ↓ moves to the items, Enter runs the first one.
+// focuses the field instead: typing filters, ↓ moves to the items, Enter runs the first one. A
+// segment (one option of a few on) is picked in place: the menu stays open.
 
 import { useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactElement, type ReactNode } from "react";
 
@@ -36,7 +37,9 @@ export type MenuEntry =
   /** A search field at the top; the caller filters the entries by its value. */
   | { kind: "search"; value: string; placeholder: string; onChange: (value: string) => void }
   /** A faint line of text, such as why a list is empty. */
-  | { kind: "note"; text: string };
+  | { kind: "note"; text: string }
+  /** A row of options of which one is on, picked without closing the menu (a launch's mode). */
+  | { kind: "segment"; id: string; label: string; options: readonly { id: string; label: string }[]; value: string; onChange: (id: string) => void };
 
 /** Where the menu opens: at a point, or under (else over) an element's box. */
 export type MenuAnchor = { x: number; y: number } | DOMRect;
@@ -167,6 +170,22 @@ export function Menu({ entries, anchor, onClose, label, testId = "menu", wide = 
               );
             case "separator":
               return <div key={i} className={styles.separator} role="separator" />;
+            case "segment":
+              return (
+                <div key={i} className={styles.segment} role="group" aria-label={entry.label} data-testid={`menu-segment-${entry.id}`}>
+                  {entry.options.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      aria-pressed={option.id === entry.value}
+                      data-testid={`menu-segment-${entry.id}-${option.id}`}
+                      onClick={() => entry.onChange(option.id)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              );
             case "item":
               return (
                 <button

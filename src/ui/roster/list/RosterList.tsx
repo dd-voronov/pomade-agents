@@ -1,20 +1,25 @@
 // The Roster tab's list state (DESIGN §3.3): every agent as a card or a row — the built-ins first,
 // then by id, hidden ones in a collapsible section at the end — over what the roster, the
 // connections, the projects and the agents' counts say. A state page shows until all four have
-// answered.
+// answered. The cards' and rows' actions (`commands/`) say what they did in the tab's toast.
 
 import { useMemo, useState, type ReactElement } from "react";
 import type { HostClient } from "pomade-kit/sdk";
 
 import { ChevronIcon, RosterIcon, WarningIcon } from "../../core/icons.tsx";
 import { StatePage } from "../../core/StatePage.tsx";
+import { useBackendInfo } from "../../core/useBackendInfo.ts";
 import { useNow } from "../../core/useNow.ts";
 import { useProjects } from "../../core/useProjects.ts";
+import { Toast } from "../../sessions/Toast.tsx";
+import { useToast } from "../../sessions/useToast.ts";
 import { rosterWindows, weekTotal } from "../agent-counts-model.ts";
+import { useAgentCommands } from "../commands/useAgentCommands.ts";
+import { useProfileEdit } from "../profile-edit/useProfileEdit.ts";
 import { useAgentCounts } from "../useAgentCounts.ts";
 import { useRoster } from "../useRoster.ts";
 import type { RosterActions } from "./actions.ts";
-import { AgentCard } from "./AgentCard.tsx";
+import { AgentCard, type RosterTools } from "./AgentCard.tsx";
 import { AgentList } from "./AgentList.tsx";
 import { agentViews, sections, type AgentView, type RosterView } from "./roster-model.ts";
 import { PlusIcon } from "./list-icons.tsx";
@@ -26,12 +31,14 @@ import styles from "./RosterList.module.css";
 /** Relative times ("5m") are renewed this often. */
 const CLOCK_MS = 30_000;
 
-function Agents({ section, agents, view, actions, projects, now }: { section: "shown" | "hidden"; agents: readonly AgentView[]; view: RosterView; actions: RosterActions; projects: number; now: Date }): ReactElement {
-  if (view === "list") return <AgentList section={section} agents={agents} actions={actions} projects={projects} now={now} />;
+const NO_PROJECTS = new Map();
+
+function Agents({ section, agents, view, tools, now }: { section: "shown" | "hidden"; agents: readonly AgentView[]; view: RosterView; tools: RosterTools; now: Date }): ReactElement {
+  if (view === "list") return <AgentList section={section} agents={agents} tools={tools} now={now} />;
   return (
     <div className={styles.cards} data-testid={`roster-cards-${section}`}>
       {agents.map((agent) => (
-        <AgentCard key={agent.id} agent={agent} actions={actions} projects={projects} now={now} />
+        <AgentCard key={agent.id} agent={agent} tools={tools} now={now} />
       ))}
     </div>
   );
@@ -54,12 +61,24 @@ function FirstAgent({ onNewAgent }: { onNewAgent: () => void }): ReactElement {
 }
 
 export function RosterList({ host, actions }: { host: HostClient; actions: RosterActions }): ReactElement {
-  const { answer, connections } = useRoster(host);
+  const { answer, connections, patchProfile } = useRoster(host);
   const projects = useProjects(host);
   const now = useNow(CLOCK_MS);
   const counts = useAgentCounts(host, rosterWindows(now));
   const [view, setView] = useRosterView();
   const [hiddenOpen, setHiddenOpen] = useState(true);
+  const { toast, show } = useToast();
+  const backend = useBackendInfo(host);
+  const info = backend.status === "running" ? backend.info : null;
+  const roots = useMemo(() => ({ workspace: info?.workspace ?? null, workspaceReal: info?.workspaceReal ?? null }), [info?.workspace, info?.workspaceReal]);
+  const commands = useAgentCommands(host, show, roots, patchProfile);
+  const edit = useProfileEdit(host, show, patchProfile);
+  const profilesOff = answer?.profilesOff ?? null;
+  const dataDir = info?.dataDir ?? null;
+  const tools = useMemo<RosterTools>(
+    () => ({ actions, commands, edit, scope: { projects: projects ?? NO_PROJECTS, profilesOff, dataDir } }),
+    [actions, commands, edit, projects, profilesOff, dataDir],
+  );
 
   const names = useMemo(() => new Map([...(projects ?? [])].map(([id, p]) => [id, p.name])), [projects]);
   const agents = useMemo(
@@ -93,7 +112,7 @@ export function RosterList({ host, actions }: { host: HostClient; actions: Roste
         </div>
       )}
       <div className={styles.body} data-testid="roster-body">
-        <Agents section="shown" agents={shown} view={view} actions={actions} projects={projects.size} now={now} />
+        <Agents section="shown" agents={shown} view={view} tools={tools} now={now} />
         {first !== null && <div className={styles.first1}>{first}</div>}
         {hidden.length > 0 && (
           <>
@@ -108,10 +127,11 @@ export function RosterList({ host, actions }: { host: HostClient; actions: Roste
                 </span>
               </button>
             </div>
-            {hiddenOpen && <Agents section="hidden" agents={hidden} view={view} actions={actions} projects={projects.size} now={now} />}
+            {hiddenOpen && <Agents section="hidden" agents={hidden} view={view} tools={tools} now={now} />}
           </>
         )}
       </div>
+      {toast !== null && <Toast toast={toast} />}
     </div>
   );
 }

@@ -238,6 +238,113 @@ describe("the roster", () => {
     expect(await r.memory("codex")).toEqual({ folders: [] });
   });
 
+  it("hides an agent from the list and shows it again, keeping it in the roster's answer", async () => {
+    const r = await start();
+    await expect.poll(() => r.agent("claude-libra")?.profile.role, SOON).toBe("The claude-libra agent.");
+    await r.updateProfile("claude-libra", { hidden: true });
+    expect(await readFile(profilePath("claude-libra"), "utf8")).toContain("hidden: true");
+    expect(ids(r)).not.toContain("claude-libra");
+    expect(r.answer().agents.find((a) => a.id === "claude-libra")?.hidden).toBe(true);
+    await r.updateProfile("claude-libra", { hidden: false });
+    expect(ids(r)).toContain("claude-libra");
+  });
+
+  describe("an orphan", () => {
+    /** claude-libra's folder renamed outside the app: the profile is an orphan, the new folder an agent of its own. */
+    const renamed = async (r: Roster): Promise<void> => {
+      await expect.poll(() => readFile(profilePath("claude-libra"), "utf8").catch(() => ""), SOON).toContain("id: claude-libra");
+      await r.updateProfile("claude-libra", { tags: ["vault"] });
+      await rename(join(workspace, "Agents", "claude-libra"), join(workspace, "Agents", "claude-librarian"));
+      await expect.poll(() => r.agent("claude-libra")?.orphan, SOON).toBe(true);
+      await expect.poll(() => readFile(profilePath("claude-librarian"), "utf8").catch(() => ""), SOON).toContain("id: claude-librarian");
+    };
+
+    it("is re-linked to the folder it was renamed to: its profile names that folder, the folder's first-sight profile goes, and it is back in the list", async () => {
+      const r = await start();
+      await agentFolder("claude-coder");
+      await renamed(r);
+      await expect.poll(() => readFile(profilePath("claude-coder"), "utf8").catch(() => ""), SOON).toContain("id: claude-coder");
+      await r.updateProfile("claude-coder", { tags: ["code"] });
+      // claude-coder's own profile was edited: it is that agent's folder now, not unclaimed.
+      expect(await r.unclaimedFolders()).toEqual([{ name: "claude-librarian", configDir: "Agents/claude-librarian" }]);
+      const { profile: written } = await r.relink("claude-libra", "claude-librarian");
+      expect(written).toMatchObject({ id: "claude-libra", configDir: "Agents/claude-librarian", tags: ["vault"] });
+      expect(await readFile(profilePath("claude-libra"), "utf8")).toContain("configDir: Agents/claude-librarian");
+      await expect(readFile(profilePath("claude-librarian"), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+      expect(r.agent("claude-libra")?.orphan).toBe(false);
+      expect(ids(r)).toContain("claude-libra");
+      expect(ids(r)).not.toContain("claude-librarian");
+      // A tick later the folder is still claude-libra's: no first-sight profile comes back.
+      await new Promise((done) => setTimeout(done, 300));
+      expect(r.answer().agents.map((a) => a.id)).not.toContain("claude-librarian");
+      expect(await r.unclaimedFolders()).toEqual([]);
+    });
+
+    it("is re-linked and the re-link taken back: both agent.yaml files and the roster are exactly as before", async () => {
+      const r = await start();
+      await renamed(r);
+      const files = async (): Promise<string[]> => Promise.all(["claude-libra", "claude-librarian"].map((id) => readFile(profilePath(id), "utf8")));
+      const roster = (): unknown => r.answer().agents.map(({ id, orphan, hidden, profile }) => ({ id, orphan, hidden, profile }));
+      await expect.poll(() => r.answer().agents.find((a) => a.id === "claude-librarian")?.profile?.id, SOON).toBe("claude-librarian");
+      const before = await files();
+      const listed = ids(r);
+      const answer = roster();
+      const { undo } = await r.relink("claude-libra", "claude-librarian");
+      expect(undo).toEqual({ agent: "claude-libra", agentText: before[0], folder: "claude-librarian", profileText: before[1] });
+      await r.undoRelink(undo);
+      expect(await files()).toEqual(before);
+      expect(r.agent("claude-libra")?.orphan).toBe(true);
+      expect(ids(r)).toEqual(listed);
+      expect(roster()).toEqual(answer);
+      // A tick later first sight has nothing to rewrite.
+      await new Promise((done) => setTimeout(done, 300));
+      expect(await files()).toEqual(before);
+      expect(roster()).toEqual(answer);
+      // Taken back once: a second Undo has nothing to take back.
+      await expect(r.undoRelink(undo)).rejects.toMatchObject({ code: "invalid-params" });
+    });
+
+    it("takes nothing back from a text that is not the folder's profile: the re-link stands", async () => {
+      const r = await start();
+      await renamed(r);
+      const { undo } = await r.relink("claude-libra", "claude-librarian");
+      await expect(r.undoRelink({ ...undo, profileText: "id: someone-else\n" })).rejects.toMatchObject({ code: "invalid-params" });
+      expect(r.agent("claude-libra")?.orphan).toBe(false);
+      expect(await readFile(profilePath("claude-libra"), "utf8")).toContain("configDir: Agents/claude-librarian\n");
+    });
+
+    it("refuses a re-link to a folder that is not unclaimed, and of an agent that is not an orphan", async () => {
+      const r = await start();
+      await agentFolder("claude-coder");
+      await renamed(r);
+      await expect.poll(() => readFile(profilePath("claude-coder"), "utf8").catch(() => ""), SOON).toContain("id: claude-coder");
+      await r.updateProfile("claude-coder", { role: "Mine." });
+      await expect(r.relink("claude-libra", "claude-coder")).rejects.toMatchObject({ code: "invalid-params" });
+      await expect(r.relink("claude-libra", "nowhere")).rejects.toMatchObject({ code: "invalid-params" });
+      await expect(r.relink("claude-coder", "claude-librarian")).rejects.toMatchObject({ code: "invalid-params" });
+      await expect(r.relink("ghost", "claude-librarian")).rejects.toMatchObject({ code: "not-found" });
+      await expect(r.removeOrphan("claude-coder")).rejects.toMatchObject({ code: "invalid-params" });
+      expect(await readFile(profilePath("claude-libra"), "utf8")).toContain("configDir: Agents/claude-libra\n");
+    });
+
+    it("is removed: its profile and its folder go, no agent folder is touched", async () => {
+      const r = await start();
+      await renamed(r);
+      await r.removeOrphan("claude-libra");
+      await expect(readdir(join(dataDir, "agents", "claude-libra"))).rejects.toMatchObject({ code: "ENOENT" });
+      expect(r.answer().agents.map((a) => a.id)).not.toContain("claude-libra");
+      expect(await readdir(join(workspace, "Agents"))).toContain("claude-librarian");
+      await expect(r.removeOrphan("claude-libra")).rejects.toMatchObject({ code: "not-found" });
+    });
+
+    it("cannot be re-linked or removed when no profiles are kept", async () => {
+      const r = await start({ workspace: null });
+      expect(await r.unclaimedFolders()).toEqual([]);
+      await expect(r.relink("claude", "x")).rejects.toMatchObject({ code: "not-ready" });
+      await expect(r.removeOrphan("claude")).rejects.toMatchObject({ code: "not-ready" });
+    });
+  });
+
   it("resolves a config folder under the home folder, the workspace, or as it is", () => {
     expect(resolveConfigDir("~/.claude", "/h", "/w")).toBe("/h/.claude");
     expect(resolveConfigDir("Agents/x", "/h", "/w")).toBe("/w/Agents/x");

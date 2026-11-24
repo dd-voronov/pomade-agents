@@ -40,6 +40,13 @@ import {
   type RosterProjectsForResult,
   ROSTER_MODEL_CONFIG_METHOD,
   ROSTER_SET_MODEL_METHOD,
+  ROSTER_UNCLAIMED_FOLDERS_METHOD,
+  ROSTER_RELINK_METHOD,
+  ROSTER_REMOVE_ORPHAN_METHOD,
+  ROSTER_UNDO_RELINK_METHOD,
+  PROFILE_TEXT_MAX,
+  type RemoveOrphanResult,
+  type UnclaimedFoldersAnswer,
 } from "../../shared/roster.ts";
 import { isEffortLevel, EFFORT_LEVELS } from "../../shared/model-choices.ts";
 import type { ModelChange } from "../roster/model-config.ts";
@@ -89,7 +96,7 @@ export interface ApiSources {
   tabs: Pick<BoundTabs, "ofTab">;
   liveNow: Pick<LiveNow, "answer">;
   realPath: RealPath;
-  roster: Pick<Roster, "answer" | "list" | "agent" | "updateProfile" | "permissions" | "memory" | "modelConfig" | "setModel">;
+  roster: Pick<Roster, "answer" | "list" | "agent" | "updateProfile" | "permissions" | "memory" | "modelConfig" | "setModel" | "unclaimedFolders" | "relink" | "removeOrphan" | "undoRelink">;
   /** Pomade's projects, through the connection the API is served on. */
   projects: ProjectReads;
   /** Open / Resume the session, through the connection the API is served on (`open.ts`). */
@@ -366,7 +373,7 @@ export function createApi({ info, sessions, live, tabs, liveNow, realPath, roste
     },
     [ROSTER_UPDATE_PROFILE_METHOD]: async (raw) => {
       const params = paramsOf(raw);
-      const checked = checkProfileEdit(params.role, params.tags, params.modes);
+      const checked = checkProfileEdit(params.role, params.tags, params.modes, params.hidden);
       if (!checked.ok) throw new HostError("invalid-params", checked.problem);
       return { profile: await roster.updateProfile(nameOf(params, "agent", "a roster id"), checked.edit) } as unknown as JsonValue;
     },
@@ -391,6 +398,29 @@ export function createApi({ info, sessions, live, tabs, liveNow, realPath, roste
       const ids = agents.filter((entry) => roster.agent(entry.id)?.orphan === false).map((entry) => entry.id);
       // With no workspace open there is no project for an agent to be connected to.
       return { connections: profilesOff === null ? await connectionsOf(ids, projects) : ids.map((agent) => ({ agent, projects: [] })) };
+    },
+    [ROSTER_UNCLAIMED_FOLDERS_METHOD]: async (): Promise<UnclaimedFoldersAnswer> => ({ folders: await roster.unclaimedFolders() }),
+    [ROSTER_RELINK_METHOD]: async (raw) => {
+      const params = paramsOf(raw);
+      const agent = nameOf(params, "agent", "a roster id");
+      return (await roster.relink(agent, nameOf(params, "folder", "an agent folder's name"))) as unknown as JsonValue;
+    },
+    [ROSTER_REMOVE_ORPHAN_METHOD]: async (raw): Promise<RemoveOrphanResult> => {
+      const agent = nameOf(paramsOf(raw), "agent", "a roster id");
+      await roster.removeOrphan(agent);
+      return { agent };
+    },
+    [ROSTER_UNDO_RELINK_METHOD]: async (raw) => {
+      const params = paramsOf(raw);
+      const { profileText, agentText } = params;
+      if (profileText !== null && (typeof profileText !== "string" || profileText.length > PROFILE_TEXT_MAX)) {
+        throw new HostError("invalid-params", `"profileText" must be the removed profile's text, at most ${PROFILE_TEXT_MAX} characters, or null`);
+      }
+      if (typeof agentText !== "string" || agentText === "" || agentText.length > PROFILE_TEXT_MAX) {
+        throw new HostError("invalid-params", `"agentText" must be the agent's profile text before the re-link, at most ${PROFILE_TEXT_MAX} characters`);
+      }
+      const undo = { agent: nameOf(params, "agent", "a roster id"), agentText, folder: nameOf(params, "folder", "an agent folder's name"), profileText };
+      return { profile: await roster.undoRelink(undo) } as unknown as JsonValue;
     },
   };
 }

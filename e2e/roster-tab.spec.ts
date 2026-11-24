@@ -65,18 +65,33 @@ function layoutProblems(): string[] {
       if (el.getBoundingClientRect().right > header.getBoundingClientRect().right + 0.5) out.push(`the header's ${name(el)} hangs over its edge`);
     }
   }
+  /** What of an element shows: its box cut by every ancestor up to `top` that clips (a tag row's
+   *  tags past its end); `null` when nothing of it does. */
+  const shownRect = (el: HTMLElement, top: HTMLElement): DOMRect | null => {
+    let { left, top: y0, right, bottom } = el.getBoundingClientRect();
+    for (let up = el.parentElement; up !== null && up !== top; up = up.parentElement) {
+      if (getComputedStyle(up).overflowX === "visible") continue;
+      const clip = up.getBoundingClientRect();
+      left = Math.max(left, clip.left);
+      right = Math.min(right, clip.right);
+      y0 = Math.max(y0, clip.top);
+      bottom = Math.min(bottom, clip.bottom);
+    }
+    return right - left > 0.5 && bottom - y0 > 0.5 ? new DOMRect(left, y0, right - left, bottom - y0) : null;
+  };
   for (const box of document.querySelectorAll<HTMLElement>('[data-testid^="agent-card-"]')) {
     const id = box.getAttribute("data-testid") ?? "";
     const outer = box.getBoundingClientRect();
-    const buttons = [...box.querySelectorAll<HTMLElement>("button")].filter((b) => b.getClientRects().length > 0);
+    const buttons = [...box.querySelectorAll<HTMLElement>("button")].filter((b) => b.getClientRects().length > 0 && shownRect(b, box) !== null);
+    const rectOf = (b: HTMLElement): DOMRect => shownRect(b, box) ?? b.getBoundingClientRect();
     for (const b of buttons) {
       // A Connected to field hangs 6 px to each side of its column on purpose.
-      if (b.dataset.testid?.startsWith("connected-") !== true && !within(b.getBoundingClientRect(), outer)) out.push(`${id}: ${name(b)} is outside its box`);
+      if (b.dataset.testid?.startsWith("connected-") !== true && !within(rectOf(b), outer)) out.push(`${id}: ${name(b)} is outside its box`);
     }
     for (const [i, a] of buttons.entries()) {
       for (const b of buttons.slice(i + 1)) {
-        const x = a.getBoundingClientRect();
-        const y = b.getBoundingClientRect();
+        const x = rectOf(a);
+        const y = rectOf(b);
         if (x.left < y.right - 0.5 && y.left < x.right - 0.5 && x.top < y.bottom - 0.5 && y.top < x.bottom - 0.5) out.push(`${id}: ${name(a)} overlaps ${name(b)}`);
       }
     }
@@ -180,7 +195,7 @@ test.describe("the Roster with a full roster", () => {
     const coder = planned("claude-coder", windows);
     await expect(tab.getByTestId("agent-role-claude-coder")).toHaveText("Builds and tests the Pomade family's code to the Owner's engineering bar.");
     await expect(tab.getByTestId("agent-tags-claude-coder")).toContainText("typescript");
-    await expect(tab.getByTestId("agent-tags-claude-pm")).toHaveText("No tags");
+    await expect(tab.getByTestId("agent-tags-claude-pm-tag")).toHaveCount(0);
     await expect(tab.getByTestId("agent-role-claude-libra")).toHaveText("A meticulous librarian for the fixture workspace.");
     await expect(tab.getByTestId("agent-week-claude-coder")).toHaveText(weekCount(coder.week));
     await expect(tab.getByTestId("agent-week-claude-personal")).toHaveText(weekCount(planned("claude-personal", windows).week));
@@ -321,7 +336,7 @@ test.describe("the Roster with a full roster", () => {
     await page.setViewportSize(viewport(1316));
     const tab = await openRoster(page, openShell);
     await expect(tab.getByTestId("agent-role-claude-coder"), backend.output()).toBeVisible();
-    const heights = async (kind: "role" | "tags"): Promise<number[]> => {
+    const heights = async (kind: "role-room" | "tags"): Promise<number[]> => {
       const set = new Set<number>();
       for (const id of [...SHOWN, ...HIDDEN]) {
         const box = await tab.getByTestId(`agent-${kind}-${id}`).boundingBox();
@@ -329,7 +344,7 @@ test.describe("the Roster with a full roster", () => {
       }
       return [...set];
     };
-    expect(await heights("role")).toHaveLength(1);
+    expect(await heights("role-room")).toHaveLength(1);
     expect(await heights("tags")).toEqual([20]);
   });
 

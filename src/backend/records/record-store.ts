@@ -22,7 +22,7 @@
 //   more `RECHECK_MS` later, until a read finds it as it was.
 
 import { watch, type FSWatcher } from "node:fs";
-import { link, mkdir, readFile, readdir, rename, unlink, writeFile } from "node:fs/promises";
+import { link, mkdir, readFile, readdir, rename, rmdir, unlink, writeFile } from "node:fs/promises";
 import { basename, dirname, join, sep } from "node:path";
 
 import type { AgentProfile } from "../../shared/roster.ts";
@@ -83,11 +83,19 @@ export interface FileSet<T> {
   get(id: string): Held<T> | undefined;
   /** Every id with a file, usable or not. */
   ids(): string[];
+  /** The id's file as last read or written; `null` when there is none. */
+  text(id: string): string | null;
   /** Write a new file, unless one for the id is there already (then that file is read). */
   create(value: T): Promise<void>;
   /** Apply `change` to the file's value as the disk holds it now and write the result (when it
    *  differs). Rejects with `RecordError` when the file is missing or unreadable. */
   update(id: string, change: (value: T) => T): Promise<T>;
+  /** Delete the id's file, and the folder of its own that held it when nothing else is left there;
+   *  resolves the text it held (`null`: it was gone already, which is no error). */
+  remove(id: string): Promise<string | null>;
+  /** Put back the text `remove` answered: written new, or over the file that is there when that holds
+   *  other text. Rejects with `RecordError` (`unreadable`) for a text that is not a usable file of the id. */
+  restore(id: string, text: string): Promise<void>;
   /** Called after a file changed in memory; returns an unsubscribe function. */
   onChange(listener: (id: string) => void): () => void;
 }
@@ -326,6 +334,7 @@ function openFileSet<T extends { id: string }>(kind: FileKind<T>, shared: Shared
 
     get: (id) => held.get(id),
     ids: () => [...held.keys()],
+    text: (id) => texts.get(id) ?? null,
 
     create(value) {
       const { id } = value;
@@ -362,6 +371,34 @@ function openFileSet<T extends { id: string }>(kind: FileKind<T>, shared: Shared
         await replace(path, nextText);
         if (take(id, nextText)) changed(id);
         return written;
+      });
+    },
+
+    remove(id) {
+      return queue(keyOf(id), async () => {
+        const path = pathOf(id);
+        const text = await readText(path);
+        try {
+          await unlink(path);
+        } catch (err) {
+          if (code(err) !== "ENOENT") throw new Error(`${path} could not be removed (${message(err).split(", ")[0] ?? ""})`);
+        }
+        const own = dirname(path);
+        // A folder that still holds something (another file of the id's) stays.
+        if (own !== folder) await rmdir(own).catch(() => undefined);
+        if (take(id, null)) changed(id);
+        return text;
+      });
+    },
+
+    restore(id, text) {
+      return queue(keyOf(id), async () => {
+        const path = pathOf(id);
+        const parsed = kind.parse(id, text);
+        if (!parsed.ok) throw new RecordError("unreadable", `The text to restore as ${path} cannot be used: ${parsed.problem}`);
+        await mkdir(dirname(path), { recursive: true });
+        if (!(await writeNew(path, text)) && (await readText(path)) !== text) await replace(path, text);
+        if (take(id, text)) changed(id);
       });
     },
 

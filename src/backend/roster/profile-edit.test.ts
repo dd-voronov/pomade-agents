@@ -54,3 +54,17 @@ describe("modes", () => {
     expect(editedProfile(on, { role: "x" }).modes).toEqual(on.modes);
   });
 });
+
+describe("hidden", () => {
+  it("takes true or false alone, and refuses anything else", () => {
+    expect(checkProfileEdit(undefined, undefined, undefined, true)).toEqual({ ok: true, edit: { hidden: true } });
+    expect(checkProfileEdit(undefined, undefined, undefined, false)).toEqual({ ok: true, edit: { hidden: false } });
+    expect(checkProfileEdit(undefined, undefined, undefined, "yes")).toMatchObject({ ok: false, problem: expect.stringContaining("hidden") as unknown });
+    expect(checkProfileEdit(undefined, undefined, undefined, null)).toMatchObject({ ok: false });
+  });
+
+  it("sets only the mark", () => {
+    expect(editedProfile(PROFILE, { hidden: true })).toEqual({ ...PROFILE, hidden: true });
+    expect(editedProfile({ ...PROFILE, hidden: true }, { role: "x" }).hidden).toBe(true);
+  });
+});

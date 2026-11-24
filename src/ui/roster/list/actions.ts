@@ -1,6 +1,6 @@
-// What the Roster's frames do. Navigation is the Roster tab's own; a card's or row's other buttons
-// (Start session ▾, Sessions, the ⋯ menu, Re-link, Remove, Open agent.yaml, editing the role line
-// and tags) are rendered in their places and take their behaviour from here as they are given it.
+// Where the Roster's cards and rows lead: the tab's own navigation. What their other buttons do —
+// Start session ▾, Sessions, the ⋯ menu, Re-link, Remove — is `commands/` (`useAgentCommands`),
+// shared with the agent's page.
 
 export interface RosterActions {
   /** The agent's page, at its Overview. */

@@ -83,7 +83,11 @@
     "roster.setModel",
     "skills.link",
     "skills.unlink",
-    "roster.connections"
+    "roster.connections",
+    "roster.unclaimedFolders",
+    "roster.relink",
+    "roster.removeOrphan",
+    "roster.undoRelink"
   ],
   "commands": [
     {

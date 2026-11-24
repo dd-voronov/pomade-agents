@@ -1,4 +1,4 @@
-// A change of an agent's role line, tags and modes (`roster.updateProfile`): what it may hold, and
+// A change of an agent's role line, tags, modes and hidden mark (`roster.updateProfile`): what it may hold, and
 // the profile it makes. Only these keys are edited here; the profile's other keys are never touched.
 // Normal is always on (DESIGN §3.4): an edit can switch only the other modes off.
 
@@ -11,6 +11,8 @@ export type ProfileEdit = {
   tags?: string[];
   /** Modes switched on or off. Absent: unchanged. */
   modes?: Partial<Record<ModeId, boolean>>;
+  /** Left out of Pomade's "+" menu, or offered there. Absent: unchanged. */
+  hidden?: boolean;
 };
 
 /** The most tags one agent holds. */
@@ -19,7 +21,7 @@ export const TAGS_MAX = 20;
 const oneLine = (text: string): boolean => text.trim() !== "" && !/[\r\n\0]/.test(text);
 
 /** `raw` as an edit, or what is wrong with it. */
-export function checkProfileEdit(role: unknown, tags: unknown, modes?: unknown): { ok: true; edit: ProfileEdit } | { ok: false; problem: string } {
+export function checkProfileEdit(role: unknown, tags: unknown, modes?: unknown, hidden?: unknown): { ok: true; edit: ProfileEdit } | { ok: false; problem: string } {
   const edit: ProfileEdit = {};
   if (role !== undefined) {
     if (role !== null && (typeof role !== "string" || !oneLine(role) || role.trim().length > ROLE_MAX)) {
@@ -43,7 +45,11 @@ export function checkProfileEdit(role: unknown, tags: unknown, modes?: unknown):
     if ((modes as Record<string, boolean>).normal === false) return { ok: false, problem: "Normal is always on: it cannot be switched off" };
     edit.modes = modes as Partial<Record<ModeId, boolean>>;
   }
-  if (edit.role === undefined && edit.tags === undefined && edit.modes === undefined) return { ok: false, problem: 'give "role", "tags", "modes" or some of them' };
+  if (hidden !== undefined) {
+    if (typeof hidden !== "boolean") return { ok: false, problem: '"hidden" must be true or false' };
+    edit.hidden = hidden;
+  }
+  if (edit.role === undefined && edit.tags === undefined && edit.modes === undefined && edit.hidden === undefined) return { ok: false, problem: 'give "role", "tags", "modes", "hidden" or some of them' };
   return { ok: true, edit };
 }
 
@@ -56,5 +62,5 @@ export function editedProfile(profile: AgentProfile, edit: ProfileEdit): AgentPr
     const on = edit.modes?.[id];
     if (on !== undefined) modes[id] = { ...modes[id], enabled: on };
   }
-  return { ...rest, ...(role === undefined ? {} : { role }), tags: edit.tags ?? profile.tags, modes };
+  return { ...rest, ...(role === undefined ? {} : { role }), tags: edit.tags ?? profile.tags, hidden: edit.hidden ?? profile.hidden, modes };
 }

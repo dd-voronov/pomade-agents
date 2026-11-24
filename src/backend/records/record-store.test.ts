@@ -1,4 +1,4 @@
-import { chmod, mkdir, mkdtemp, readFile, readdir, realpath, rm, unlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, readdir, realpath, rm, stat, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -212,6 +212,35 @@ describe("the record store", () => {
       await writeFile(profileFile("c"), "id: c\nprovider: claude\nkind: folder\nconfigDir: Agents/c\ncommand: c\nmodes: {}\n");
       await expect.poll(() => s.profiles.get("c")?.value?.command, { timeout: 5000, interval: 50 }).toBe("c");
       expect(seen).toContain("a");
+    });
+
+    it("removes a profile and its folder, keeps a folder that holds more, and takes a file already gone", async () => {
+      const s = await open();
+      const seen: string[] = [];
+      s.profiles.onChange((id) => seen.push(id));
+      await s.profiles.create(profile("a"));
+      await s.profiles.create(profile("b"));
+      await writeFile(join(dataDir, AGENTS_FOLDER, "b", "notes.md"), "kept\n");
+      const removed = await s.profiles.remove("a");
+      expect(removed).toContain("id: a\n");
+      expect(s.profiles.get("a")).toBeUndefined();
+      expect(seen).toContain("a");
+      await expect(stat(join(dataDir, AGENTS_FOLDER, "a"))).rejects.toMatchObject({ code: "ENOENT" });
+      await s.profiles.remove("b");
+      expect(s.profiles.ids()).toEqual([]);
+      expect(await readFile(join(dataDir, AGENTS_FOLDER, "b", "notes.md"), "utf8")).toBe("kept\n");
+      await expect(s.profiles.remove("ghost")).resolves.toBeNull();
+
+      // Restored as it was: written new, over other text, never from a text that is not the id's profile.
+      await s.profiles.restore("a", removed ?? "");
+      expect(await readFile(profileFile("a"), "utf8")).toBe(removed);
+      expect(s.profiles.get("a")?.value).toEqual(profile("a"));
+      expect(s.profiles.text("a")).toBe(removed);
+      await writeFile(profileFile("a"), "# edited\nid: a\nprovider: codex\nkind: folder\nconfigDir: Agents/a\ncommand: a\nmodes: {}\n");
+      await s.profiles.restore("a", removed ?? "");
+      expect(await readFile(profileFile("a"), "utf8")).toBe(removed);
+      await expect(s.profiles.restore("a", "id: b\nprovider: claude\n")).rejects.toMatchObject({ kind: "unreadable" });
+      expect(await readFile(profileFile("a"), "utf8")).toBe(removed);
     });
   });
 });

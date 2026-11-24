@@ -1,0 +1,10 @@
+/* The Workspace's glyph in Start session's menu: a small square in the accent, as Pomade's
+   Workspace row marks it. */
+.workspace {
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--accent);
+}

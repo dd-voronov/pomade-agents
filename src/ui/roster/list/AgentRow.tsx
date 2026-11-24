@@ -1,12 +1,11 @@
 // One agent as a row of the list (DESIGN §3.3): name with its state chips over the role line,
-// provider and model, Connected to, Last active, This week, and Start session ▾ with the ⋯ menu.
+// provider and model, Connected to, Last active, This week, and Start session ▾ with the ⋯ menu —
+// the card's own buttons and menus; an orphan's Re-link ▾ and Remove, which asks in place first.
 // Narrow lists drop the provider column and This week first, then Last active.
 
-import type { ReactElement } from "react";
+import { useState, type ReactElement } from "react";
 
-import { CaretIcon, ResumeIcon } from "../../core/icons.tsx";
-import type { RosterActions } from "./actions.ts";
-import { ModelLine, MoreButton, OrphanActions, StateChips } from "./AgentCard.tsx";
+import { type RosterTools, ModelLine, MoreButton, OrphanButtons, StartButton, StateChips } from "./AgentCard.tsx";
 import { ConnectedTo } from "./ConnectedTo.tsx";
 import { ROW_NAMES } from "./connected-model.ts";
 import { lastActiveText, weekText, type AgentView } from "./roster-model.ts";
@@ -15,19 +14,21 @@ import styles from "./AgentList.module.css";
 
 export interface AgentRowProps {
   agent: AgentView;
-  actions: RosterActions;
-  projects: number;
+  tools: RosterTools;
   now: Date;
 }
 
-function SecondLine({ agent }: { agent: AgentView }): ReactElement {
+function SecondLine({ agent, removing }: { agent: AgentView; removing: boolean }): ReactElement {
+  if (agent.orphan && removing) return <>Remove its profile? No agent folder is touched.</>;
   if (agent.orphan) return <>Config folder <code>{agent.configDir}</code> is gone</>;
   if (agent.problem !== null) return <>agent.yaml can’t be used: {agent.problem}</>;
   return agent.role === null ? <span className={styles.faint}>No role line</span> : <>{agent.role}</>;
 }
 
-export function AgentRow({ agent, actions, projects, now }: AgentRowProps): ReactElement {
+export function AgentRow({ agent, tools, now }: AgentRowProps): ReactElement {
   const { orphan } = agent;
+  const { actions, scope } = tools;
+  const [removing, setRemoving] = useState(false);
   return (
     <div className={styles.row} data-testid={`agent-card-${agent.id}`} data-orphan={orphan ? "" : undefined} data-hidden={agent.hidden ? "" : undefined}>
       <div className={styles.agent}>
@@ -40,7 +41,7 @@ export function AgentRow({ agent, actions, projects, now }: AgentRowProps): Reac
           </span>
         </div>
         <div className={styles.line2} data-testid={`agent-role-${agent.id}`} title={agent.role ?? undefined}>
-          <SecondLine agent={agent} />
+          <SecondLine agent={agent} removing={removing} />
         </div>
       </div>
       <div className={styles.model}>
@@ -48,7 +49,7 @@ export function AgentRow({ agent, actions, projects, now }: AgentRowProps): Reac
         <div className={`${styles.cell} ${styles.faint}`}>{orphan ? null : <ModelLine agent={agent} />}</div>
       </div>
       <div className={styles.connected}>
-        {orphan ? null : <ConnectedTo agent={agent.id} agentName={agent.name} ranked={agent.connected} projects={projects} max={ROW_NAMES} onOpen={() => actions.openProjects(agent.id)} />}
+        {orphan ? null : <ConnectedTo agent={agent.id} agentName={agent.name} ranked={agent.connected} projects={scope.projects.size} max={ROW_NAMES} onOpen={() => actions.openProjects(agent.id)} />}
       </div>
       <div className={styles.last} data-testid={`agent-last-${agent.id}`}>
         {orphan ? null : lastActiveText(agent.lastActiveAt, now)}
@@ -58,17 +59,11 @@ export function AgentRow({ agent, actions, projects, now }: AgentRowProps): Reac
       </div>
       <div className={styles.actions}>
         {orphan ? (
-          <OrphanActions agent={agent} small />
+          <OrphanButtons agent={agent} tools={tools} small removing={removing} onRemoving={setRemoving} />
         ) : (
           <>
-            <button type="button" className={`${controls.primary} ${controls.small}`} data-testid={`agent-start-${agent.id}`}>
-              <ResumeIcon size={12} />
-              Start session
-              <span className={controls.caret}>
-                <CaretIcon />
-              </span>
-            </button>
-            <MoreButton agent={agent} actions={actions} className={`${controls.iconBtn} ${styles.more}`} />
+            <StartButton agent={agent} tools={tools} small />
+            <MoreButton agent={agent} tools={tools} className={`${controls.iconBtn} ${styles.more}`} />
           </>
         )}
       </div>

@@ -75,6 +75,23 @@ function api(entries: string[] = [], profilesOff: string | null = null) {
         ? Promise.reject(new HostError("not-found", `No agent ${id}`))
         : Promise.resolve({ provider: "claude", file: "/s.json", exists: true, problem: null, model: change.model ?? null, effort: change.effort ?? null, writable: true });
     },
+    unclaimedFolders: () => Promise.resolve([{ name: "w2", configDir: "Agents/w2" }]),
+    relink: (id, folder) => {
+      calls.push(["relink", id, folder]);
+      const agent = AGENTS[id];
+      return agent === undefined
+        ? Promise.reject(new HostError("not-found", `No agent ${id}`))
+        : Promise.resolve({ profile: { ...agent.profile, configDir: `Agents/${folder}` }, undo: { agent: id, agentText: "id: x\n", folder, profileText: null } });
+    },
+    undoRelink: (undo) => {
+      calls.push(["undoRelink", undo]);
+      const agent = AGENTS[undo.agent];
+      return agent === undefined ? Promise.reject(new HostError("not-found", `No agent ${undo.agent}`)) : Promise.resolve(agent.profile);
+    },
+    removeOrphan: (id) => {
+      calls.push(["removeOrphan", id]);
+      return AGENTS[id] === undefined ? Promise.reject(new HostError("not-found", `No agent ${id}`)) : Promise.resolve();
+    },
   };
   const projects: ApiSources["projects"] = {
     projects: () => Promise.resolve(Object.keys(VISIBLE)),
@@ -319,6 +336,32 @@ describe("the roster API", () => {
     ["no mode", { agent: "claude", modes: {} }],
   ])("refuses a modes edit with %s as invalid-params", async (_, params) => {
     await expect(Promise.resolve().then(() => api().handlers["roster.updateProfile"]?.(params as never, ctx))).rejects.toMatchObject({ code: "invalid-params" });
+  });
+
+  it("takes the hidden mark to the roster with the profile edit, and refuses one that is not true or false", async () => {
+    const { handlers, calls } = api();
+    await handlers["roster.updateProfile"]?.({ agent: "claude", hidden: true }, ctx);
+    expect(calls.at(-1)).toEqual(["updateProfile", "claude", { hidden: true }]);
+    await expect(Promise.resolve().then(() => handlers["roster.updateProfile"]?.({ agent: "claude", hidden: "yes" } as never, ctx))).rejects.toMatchObject({ code: "invalid-params" });
+  });
+
+  it("answers the unclaimed folders, re-links an orphan to one and removes an orphan, each naming the agent", async () => {
+    const { handlers, calls } = api();
+    expect(await handlers["roster.unclaimedFolders"]?.({} as never, ctx)).toEqual({ folders: [{ name: "w2", configDir: "Agents/w2" }] });
+    expect(await handlers["roster.relink"]?.({ agent: "claude", folder: "w2" } as never, ctx)).toMatchObject({ profile: { id: "claude", configDir: "Agents/w2" }, undo: { agent: "claude", folder: "w2" } });
+    expect(calls.at(-1)).toEqual(["relink", "claude", "w2"]);
+    const undo = { agent: "claude", agentText: "id: claude\n", folder: "w2", profileText: "id: w2\n" };
+    expect(await handlers["roster.undoRelink"]?.(undo as never, ctx)).toMatchObject({ profile: { id: "claude" } });
+    expect(calls.at(-1)).toEqual(["undoRelink", undo]);
+    for (const params of [{ ...undo, profileText: 3 }, { ...undo, profileText: "x".repeat(65_537) }, { ...undo, folder: "" }, { ...undo, agentText: "" }]) {
+      await expect(Promise.resolve().then(() => handlers["roster.undoRelink"]?.(params as never, ctx))).rejects.toMatchObject({ code: "invalid-params" });
+    }
+    expect(await handlers["roster.removeOrphan"]?.({ agent: "claude" } as never, ctx)).toEqual({ agent: "claude" });
+    expect(calls.at(-1)).toEqual(["removeOrphan", "claude"]);
+    for (const params of [{ folder: "w2" }, { agent: "claude" }, { agent: "claude", folder: "" }]) {
+      await expect(Promise.resolve().then(() => handlers["roster.relink"]?.(params as never, ctx))).rejects.toMatchObject({ code: "invalid-params" });
+    }
+    await expect(Promise.resolve().then(() => handlers["roster.removeOrphan"]?.({} as never, ctx))).rejects.toMatchObject({ code: "invalid-params" });
   });
 
   it("takes a model and effort change to the roster; null removes a key", async () => {

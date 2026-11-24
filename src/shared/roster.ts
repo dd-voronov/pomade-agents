@@ -354,7 +354,7 @@ export function isAliasCheck(value: unknown): value is AliasCheck {
 
 // ── The agent's page: editing the profile, reading its config ────────────────
 
-/** Changes an agent's role line and tags in its `agent.yaml`; answers `RosterUpdateProfileResult`. */
+/** Changes an agent's role line, tags, modes and hidden mark in its `agent.yaml`; answers `RosterUpdateProfileResult`. */
 export const ROSTER_UPDATE_PROFILE_METHOD = "roster.updateProfile";
 
 /** What an agent's provider config grants — permissions, MCP servers, plugins; answers `AgentPermissions`. */
@@ -375,6 +375,8 @@ export type RosterUpdateProfileParams = {
   tags?: string[];
   /** A mode switched on or off; `normal` is always on, so it takes only `true`. */
   modes?: Partial<Record<ModeId, boolean>>;
+  /** Left out of Pomade's "+" menu (`true`) or offered there again (`false`). */
+  hidden?: boolean;
 };
 
 export type RosterUpdateProfileResult = { profile: AgentProfile };
@@ -526,4 +528,69 @@ export function isRosterConnectionsAnswer(value: unknown): value is RosterConnec
     Array.isArray(value.connections) &&
     value.connections.every((c) => isObject(c) && typeof c.agent === "string" && Array.isArray(c.projects) && c.projects.every((p) => typeof p === "string"))
   );
+}
+
+// ── Orphans: Re-link and Remove ──────────────────────────────────────────────
+
+/** The agent folders an orphan can be re-linked to; answers `UnclaimedFoldersAnswer`. */
+export const ROSTER_UNCLAIMED_FOLDERS_METHOD = "roster.unclaimedFolders";
+
+/** Points an orphan's profile at an unclaimed agent folder; answers `RosterRelinkResult`. */
+export const ROSTER_RELINK_METHOD = "roster.relink";
+
+/** Removes an orphan's profile — never an agent folder; answers `RemoveOrphanResult`. */
+export const ROSTER_REMOVE_ORPHAN_METHOD = "roster.removeOrphan";
+
+/** An agent folder no profile has made its own: none names it but the first-sight profile written
+ *  when the folder appeared, still as it was written. */
+export type UnclaimedFolder = {
+  /** The folder's name, `Agents/<name>`. */
+  name: string;
+  /** Workspace-relative, as a profile's `configDir` names it: `Agents/<name>`. */
+  configDir: string;
+};
+
+export type UnclaimedFoldersAnswer = { folders: UnclaimedFolder[] };
+
+export type RosterRelinkParams = { agent: string; folder: string };
+
+/** What takes a re-link back (`roster.undoRelink`): the agent's profile before it and the folder's
+ *  profile the re-link removed, each as its file held it (`profileText: null`: the folder had none). */
+export type RelinkUndo = { agent: string; agentText: string; folder: string; profileText: string | null };
+
+export type RosterRelinkResult = { profile: AgentProfile; undo: RelinkUndo };
+
+export type RemoveOrphanParams = { agent: string };
+
+export type RemoveOrphanResult = { agent: string };
+
+/** True for a well-formed `roster.unclaimedFolders` answer. */
+export function isUnclaimedFoldersAnswer(value: unknown): value is UnclaimedFoldersAnswer {
+  return isObject(value) && Array.isArray(value.folders) && value.folders.every((f) => isObject(f) && typeof f.name === "string" && typeof f.configDir === "string");
+}
+
+/** True for a well-formed `roster.removeOrphan` answer. */
+export function isRemoveOrphanResult(value: unknown): value is RemoveOrphanResult {
+  return isObject(value) && typeof value.agent === "string";
+}
+
+/** Takes a re-link back: both profiles' files as they were; answers `RosterUpdateProfileResult`. */
+export const ROSTER_UNDO_RELINK_METHOD = "roster.undoRelink";
+
+/** The longest profile text `roster.undoRelink` restores, each. */
+export const PROFILE_TEXT_MAX = 65_536;
+
+export function isRelinkUndo(value: unknown): value is RelinkUndo {
+  return (
+    isObject(value) &&
+    typeof value.agent === "string" &&
+    typeof value.agentText === "string" &&
+    typeof value.folder === "string" &&
+    (value.profileText === null || typeof value.profileText === "string")
+  );
+}
+
+/** True for a well-formed `roster.relink` answer. */
+export function isRosterRelinkResult(value: unknown): value is RosterRelinkResult {
+  return isObject(value) && isAgentProfile(value.profile) && isRelinkUndo(value.undo);
 }

@@ -7,6 +7,9 @@
 //   when it has no file, and never over one: a file that is there, usable or not, is left as it is.
 //   A folder some profile already names as its `configDir` is that profile's agent, not a new one.
 // - **Orphans**: a folder agent's profile whose `configDir` is gone. A built-in is never an orphan.
+//   An orphan is re-linked to an unclaimed agent folder — one no profile has made its own: none
+//   names it but the first-sight profile written when the folder appeared, still as written (a
+//   folder renamed outside the app gets that profile within a tick) — or its profile is removed.
 // - **What answers**: an agent's profile when it is usable; else, for an agent the scan finds
 //   (or with no workspace open, so no profiles), its first-sight values.
 // - **Changes**: a profile changed on disk is seen at once (the record store's watch); folders,
@@ -20,7 +23,19 @@ import { isAbsolute, join } from "node:path";
 import { providerModes, type RosterAgent } from "pomade-kit/protocol";
 import { HostError } from "pomade-kit/sdk";
 
-import { MODE_IDS, type AgentMemory, type AgentModelConfig, type AgentPermissions, type AgentProfile, type ModeId, type RosterAgentsAnswer, type RosterChanged, type RosterEntry } from "../../shared/roster.ts";
+import {
+  MODE_IDS,
+  type AgentMemory,
+  type AgentModelConfig,
+  type AgentPermissions,
+  type AgentProfile,
+  type ModeId,
+  type RosterAgentsAnswer,
+  type RosterChanged,
+  type RelinkUndo,
+  type RosterEntry,
+  type UnclaimedFolder,
+} from "../../shared/roster.ts";
 import { RecordError, type FileSet } from "../records/record-store.ts";
 import { isRecordId } from "../sessions/rules.ts";
 import { AGENTS_FOLDER, folderAgentNames } from "../stores/roots.ts";
@@ -76,6 +91,22 @@ export interface Roster {
    *  `permissions`, `invalid-params` (a Codex
    *  agent), `io-error` (the file cannot be used or written). */
   setModel(id: string, change: ModelChange): Promise<AgentModelConfig>;
+  /** The agent folders an orphan can be re-linked to, by name; none when no profiles are kept. */
+  unclaimedFolders(): Promise<UnclaimedFolder[]>;
+  /** Point the orphan `id`'s profile at the unclaimed agent folder `folder` (its name under `Agents/`) and remove
+   *  that folder's first-sight profile; answers the profile as written and what takes it back, the roster read again. Rejects with
+   *  `HostError`: `not-ready` (no profiles are kept), `not-found` (no such agent), `invalid-params` (not an orphan,
+   *  or the folder is not unclaimed), `io-error` (a file cannot be written or removed). */
+  relink(id: string, folder: string): Promise<{ profile: AgentProfile; undo: RelinkUndo }>;
+  /** Take a re-link back: the agent's profile, then the folder's removed one, written back as their files held them;
+   *  the roster read again, as before the re-link. Rejects with `HostError`: `not-ready`, `not-found` (no
+   *  such agent), `invalid-params` (the agent no longer names the folder, or the text is not the folder's profile),
+   *  `io-error`. */
+  undoRelink(undo: RelinkUndo): Promise<AgentProfile>;
+  /** Remove the orphan `id`'s profile (its `agent.yaml`, and its folder when nothing else is in it) — never an
+   *  agent folder; the roster read again. Rejects with `HostError`: `not-ready`, `not-found`, `invalid-params`
+   *  (not an orphan), `io-error`. */
+  removeOrphan(id: string): Promise<void>;
   /** Read everything again now; resolves when the answer is current. */
   refresh(): Promise<void>;
   onChange(listener: (changed: RosterChanged) => void): () => void;
@@ -99,6 +130,10 @@ export function resolveConfigDir(configDir: string, home: string | null, workspa
   if (isAbsolute(configDir)) return configDir;
   return workspace === null ? null : join(workspace, configDir);
 }
+
+/** A profile as first sight would write it again: the keys that tell an untouched profile from an edited one. */
+const sightKey = (p: AgentProfile): string =>
+  JSON.stringify([p.id, p.provider, p.kind, p.configDir, p.command, p.role ?? null, p.tags, p.hidden, MODE_IDS.map((id) => p.modes[id]?.enabled === true)]);
 
 /** The modes a profile enables, in the roster's order. */
 export const enabledModes = (profile: AgentProfile): ModeId[] => MODE_IDS.filter((id) => profile.modes[id]?.enabled === true);
@@ -191,6 +226,40 @@ export function startRoster(options: RosterOptions): Roster {
     return { entries, facts };
   };
 
+  /** The agent `id`'s facts as the roster reads them now, when it is an orphan whose profile can be written. */
+  const orphanAgent = async (id: string): Promise<RosterAgentFacts> => {
+    if (profiles === null) throw new HostError("not-ready", noProfiles);
+    await refresh();
+    const facts = built.facts.get(id);
+    if (facts === undefined) throw new HostError("not-found", `No agent ${JSON.stringify(id)} in the roster`);
+    if (!facts.orphan) throw new HostError("invalid-params", `${id} is not an orphan: its config folder is there`);
+    return facts;
+  };
+
+  const writeFailed = (err: unknown): HostError =>
+    err instanceof RecordError ? new HostError(err.kind === "missing" ? "not-found" : "io-error", err.message) : new HostError("io-error", message(err));
+
+  const unclaimedFolders = async (): Promise<UnclaimedFolder[]> => {
+    if (profiles === null || workspace === null) return [];
+    const overrides = await readPomadeOverrides(workspace, log);
+    const folders = (await folderAgentNames(workspace)).filter((name) => !BUILTIN_IDS.includes(name) && isRecordId(name));
+    const named = new Map<string, string[]>();
+    for (const id of profiles.ids()) {
+      const profile = profiles.get(id)?.value ?? null;
+      const dir = profile === null ? null : resolve(profile.configDir);
+      if (dir !== null) named.set(dir, [...(named.get(dir) ?? []), id]);
+    }
+    const unclaimed: UnclaimedFolder[] = [];
+    for (const name of folders) {
+      if ((named.get(join(workspace, AGENTS_FOLDER, name)) ?? []).some((id) => id !== name)) continue;
+      const own = profiles.get(name);
+      // A profile of its own that is unusable, or no longer its first-sight one, makes the folder its agent's.
+      if (own !== undefined && (own.value === null || sightKey(own.value) !== sightKey(await folderProfile(workspace, name, overrides)))) continue;
+      unclaimed.push({ name, configDir: `${AGENTS_FOLDER}/${name}` });
+    }
+    return unclaimed;
+  };
+
   /** The agent `id`'s facts; `not-found` for an agent the roster does not hold and for an orphan. */
   const livingAgent = (id: string): RosterAgentFacts => {
     const facts = built.facts.get(id);
@@ -278,9 +347,65 @@ export function startRoster(options: RosterOptions): Roster {
         await refresh();
         return written;
       } catch (err) {
-        if (err instanceof RecordError) throw new HostError(err.kind === "missing" ? "not-found" : "io-error", err.message);
-        throw new HostError("io-error", message(err));
+        throw writeFailed(err);
       }
+    },
+
+    unclaimedFolders,
+
+    async relink(id, folder) {
+      await orphanAgent(id);
+      if (!(await unclaimedFolders()).some((f) => f.name === folder)) {
+        throw new HostError("invalid-params", `${AGENTS_FOLDER}/${folder} is not an unclaimed agent folder`);
+      }
+      // `profiles` is kept: `orphanAgent` refused otherwise.
+      const kept = profiles as FileSet<AgentProfile>;
+      try {
+        const agentText = kept.text(id);
+        if (agentText === null) throw new HostError("io-error", `The profile of ${id} could not be read`);
+        const written = await kept.update(id, (current) => ({ ...current, configDir: `${AGENTS_FOLDER}/${folder}` }));
+        // The folder is this agent's now: the profile first sight gave it goes.
+        const profileText = kept.get(folder) === undefined ? null : await kept.remove(folder);
+        await refresh();
+        return { profile: written, undo: { agent: id, agentText, folder, profileText } };
+      } catch (err) {
+        throw writeFailed(err);
+      }
+    },
+
+    async undoRelink({ agent, agentText, folder, profileText }) {
+      if (profiles === null) throw new HostError("not-ready", noProfiles);
+      const linked = `${AGENTS_FOLDER}/${folder}`;
+      const before = profiles.text(agent);
+      if (profiles.get(agent)?.value?.configDir !== linked || before === null) throw new HostError("invalid-params", `${agent} no longer names ${linked}: nothing to take back`);
+      try {
+        await profiles.restore(agent, agentText);
+      } catch (err) {
+        throw err instanceof RecordError && err.kind === "unreadable" ? new HostError("invalid-params", err.message) : writeFailed(err);
+      }
+      try {
+        // The folder is unclaimed again: its own profile comes back as its file held it.
+        if (profileText !== null) await profiles.restore(folder, profileText);
+      } catch (err) {
+        // Nothing half-done: the agent keeps the folder.
+        await profiles.restore(agent, before).catch(() => undefined);
+        await refresh();
+        throw err instanceof RecordError && err.kind === "unreadable" ? new HostError("invalid-params", err.message) : writeFailed(err);
+      }
+      await refresh();
+      const restored = profiles.get(agent)?.value;
+      if (restored === undefined || restored === null) throw new HostError("io-error", `The profile of ${agent} could not be read back`);
+      return restored;
+    },
+
+    async removeOrphan(id) {
+      await orphanAgent(id);
+      try {
+        await (profiles as FileSet<AgentProfile>).remove(id);
+      } catch (err) {
+        throw writeFailed(err);
+      }
+      await refresh();
     },
 
     async permissions(id) {

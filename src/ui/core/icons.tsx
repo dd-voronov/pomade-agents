@@ -296,3 +296,14 @@ export function TerminalIcon({ size = 16 }: IconProps): ReactElement {
     </Glyph>
   );
 }
+
+/** An eye struck through — an agent left out of Pomade's "+" menu. */
+export function EyeOffIcon({ size = 16 }: IconProps): ReactElement {
+  return (
+    <Glyph size={size}>
+      <path d="M2.5 8s2-3.75 5.5-3.75S13.5 8 13.5 8 11.5 11.75 8 11.75 2.5 8 2.5 8z" />
+      <circle cx="8" cy="8" r="1.6" />
+      <path d="M3 13L13 3" />
+    </Glyph>
+  );
+}

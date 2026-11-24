@@ -90,41 +90,10 @@
   color: var(--text-faint);
 }
 
-/* Two lines, always: the room the role line has when it is edited in place. */
+/* Two lines, always: the role line's room, the same however long it is and while it is edited. */
 .role {
-  display: -webkit-box;
   flex: none;
   height: calc(var(--fs-base) * var(--lh) * 2);
-  margin: 0;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-/* One row, always: the tags that do not fit are cut at the edge, the full list is the tooltip. */
-.tags {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 4px;
-  height: 20px;
-  overflow: hidden;
-  mask-image: linear-gradient(to right, black calc(100% - 20px), transparent);
-}
-
-.tag {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  height: 20px;
-  padding: 0 7px;
-  border-radius: 10px;
-  background: var(--active-bg);
-  color: var(--text-muted);
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-medium);
-  line-height: 20px;
-  white-space: nowrap;
 }
 
 .notice {
@@ -152,6 +121,10 @@
 
 .notice code {
   background: var(--hover-bg);
+}
+
+.notice[data-tone="danger"] {
+  background: var(--danger-soft);
 }
 
 .link {

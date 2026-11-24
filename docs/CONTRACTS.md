@@ -56,6 +56,32 @@ One UI bundle; `welcome.surface` and the frame's route pick the view (`src/ui/co
 - **The Roster list's navigation** (`RosterActions`, `src/ui/roster/list/actions.ts`): the name and
   **Open ›** of a card or row navigate the tab to `agentRoute(agent, "overview")`, **Connected to** to
   `agentRoute(agent, "projects")`, **New agent** to `NEW_AGENT_ROUTE`.
+- **An agent's actions** — one implementation (`src/ui/roster/commands/`: `useAgentCommands`,
+  `AgentMenus.tsx`) for a card, a list row and the agent page's header; a toast says what was done,
+  or what was not and why (by the error's code, `refusedText`), the backend's words on hover:
+  - **Start session ▾** — a segment of the enabled modes (`launchModes`: the profile's, Normal always;
+    both when no usable profile answers; none shown when only Normal is), then the projects the
+    agent is connected to (`roster.connections`), the others, each in the Projects panel's order,
+    then the Workspace (`launchTargets`). A pick is `agentTabs.launch({ agentId, projectId, mode })`
+    — Pomade builds the line from `roster.launchSpec`; nothing is said when it works (Pomade switches
+    to the tab). Off, with the reason as its tooltip (`cannotStart`), without a workspace, for an
+    orphan, and for a hidden agent: Pomade launches only what `roster.list` holds.
+  - **Sessions** (a card's button, the ⋯ menu's entry on the Roster) — Open in Sessions with the
+    agent only (below).
+  - **The ⋯ menu** (`agentMenuEntries`): on the Roster **Open agent page** and **Sessions**, then on
+    both **Clone…** (a Claude Code folder agent), **Hide from the “+” menu** / **Show in the “+” menu**
+    (off without a usable profile), **Open CLAUDE.md** (Claude Code agents), **Open agent.yaml**. Hide
+    and Show are `roster.updateProfile({ agent, hidden })`; the frame takes the profile from the
+    answer, and the toast's Undo sets the mark back.
+  - **An orphan's Re-link ▾** asks `roster.unclaimedFolders` each time it opens and lists them
+    (`Agents/<name>`), or says there are none; a pick is `roster.relink`, its toast's Undo
+  `roster.undoRelink` with the answer's `undo`. **Remove** asks in place
+    first (the card's notice, the row's second line, **Remove** and **Cancel**), then
+    `roster.removeOrphan`.
+  - **The role line and tags on a card** are the agent page's `RoleLine` (cut to two lines; its field
+    grows over what follows while edited) and `TagList` (one row, `add="hover"`) with
+    `useProfileEdit`, in a room of fixed height: hovering or editing moves nothing. A list row shows
+    the role line only.
 - `sessions` is the route Pomade's History icon opens (HOST-API §4 `apps`, "Platform reads of app
   APIs").
 - **The selection is the route.** `<id>` is the session id, URI-encoded (`sessionsRoute`,
@@ -203,7 +229,7 @@ it the same way. Method names and shapes are in `src/shared/api.ts`, `src/shared
 | `roster.checkName` | `{ name }` | `NameVerdict` `{ name, problem, detail }` (the app's own frames) |
 | `roster.create` | `CreateAgentParams` `{ name, role, tags, projects, createId, clone? }` | `CreateAgentResult` (the app's own frames) |
 | `roster.checkAlias` | `AliasCheckParams` `{ agent }` | `AliasCheck` `{ ok, aliasLine, rcFile, detail }` (the app's own frames) |
-| `roster.updateProfile` | `RosterUpdateProfileParams` `{ agent, role?: string \| null, tags?: string[], modes?: { [mode]: boolean } }` | `RosterUpdateProfileResult` `{ profile: AgentProfile }` (the app's own frames) |
+| `roster.updateProfile` | `RosterUpdateProfileParams` `{ agent, role?: string \| null, tags?: string[], modes?: { [mode]: boolean }, hidden?: boolean }` | `RosterUpdateProfileResult` `{ profile: AgentProfile }` (the app's own frames) |
 | `roster.permissions` | `{ agent }` | `AgentPermissions` (the app's own frames) |
 | `roster.memory` | `{ agent }` | `AgentMemory` (the app's own frames) |
 | `roster.modelConfig` | `{ agent }` | `AgentModelConfig` (the app's own frames) |
@@ -211,6 +237,10 @@ it the same way. Method names and shapes are in `src/shared/api.ts`, `src/shared
 | `skills.link` | `SkillLinkParams` `{ agent, name, target }` | `SkillLinkResult` (the app's own frames) |
 | `skills.unlink` | `SkillUnlinkParams` `{ agent, name }` | `SkillLinkResult` (the app's own frames) |
 | `roster.connections` | — | `RosterConnectionsAnswer` `{ connections: { agent, projects }[] }` (the app's own frames) |
+| `roster.unclaimedFolders` | — | `UnclaimedFoldersAnswer` `{ folders: { name, configDir }[] }` (the app's own frames) |
+| `roster.relink` | `RosterRelinkParams` `{ agent, folder }` | `RosterRelinkResult` `{ profile: AgentProfile, undo: RelinkUndo }` (the app's own frames) |
+| `roster.removeOrphan` | `RemoveOrphanParams` `{ agent }` | `RemoveOrphanResult` `{ agent }` (the app's own frames) |
+| `roster.undoRelink` | `RelinkUndo` `{ agent, agentText, folder, profileText }` | `RosterUpdateProfileResult` `{ profile: AgentProfile }` (the app's own frames) |
 
 ```ts
 interface AppInfo {
@@ -788,16 +818,18 @@ the `roster.creating` notice; the shapes in `src/shared/roster.ts`, the name rul
   fresh zsh defines `agent` as the alias of its config folder; never writes. `not-found` for an id
   that is not a folder agent the roster holds (or is an orphan). The page's **Check again**.
 
-**`roster.updateProfile`** — the page's edit of an agent's role line, tags and modes in its `agent.yaml`:
+**`roster.updateProfile`** — the edit of an agent's role line, tags, modes and hidden mark in its `agent.yaml`:
 
 ```ts
-type RosterUpdateProfileParams = { agent: string; role?: string | null; tags?: string[]; modes?: Partial<Record<ModeId, boolean>> };
+type RosterUpdateProfileParams = { agent: string; role?: string | null; tags?: string[]; modes?: Partial<Record<ModeId, boolean>>; hidden?: boolean };
 type RosterUpdateProfileResult = { profile: AgentProfile };   // as written
 ```
 
 - Each key present is set; `role: null` removes the role line; a key absent is left alone, and so is
   every other key of the file (comments and extra keys included) — the rewrite rules of "Backend"
-  below. At least one of `role`, `tags` and `modes` is required.
+  below. At least one of `role`, `tags`, `modes` and `hidden` is required.
+- `hidden`: `true` leaves the agent out of `roster.list` (so out of Pomade's "+" menu and launches),
+  `false` offers it again; anything but a boolean is `invalid-params`.
 - `modes`: one or more of `normal`, `full-autonomy` mapped to `true` / `false`; each sets
   `modes.<id>.enabled`, the other modes are left alone. Normal is always on: `normal: false` is
   `invalid-params`. A mode switched off leaves `roster.list` and `roster.launchSpec` refuses it
@@ -810,6 +842,43 @@ type RosterUpdateProfileResult = { profile: AgentProfile };   // as written
   orphan); `io-error` (the file cannot be used — it is never written over — or cannot be written).
 - The change is in the file when the call answers; `roster.changed` follows from the data folder's
   watch.
+
+**Orphans: `roster.unclaimedFolders`, `roster.relink`, `roster.removeOrphan`** (DESIGN §3.2) —
+`src/backend/roster/roster.ts`:
+
+```ts
+type UnclaimedFolder = { name: string; configDir: string };   // configDir: "Agents/<name>"
+type UnclaimedFoldersAnswer = { folders: UnclaimedFolder[] };
+type RosterRelinkParams = { agent: string; folder: string };  // folder: an unclaimed folder's name
+type RelinkUndo = { agent: string; agentText: string; folder: string; profileText: string | null };
+type RosterRelinkResult = { profile: AgentProfile; undo: RelinkUndo };
+type RemoveOrphanParams = { agent: string };
+type RemoveOrphanResult = { agent: string };
+```
+
+- **An unclaimed agent folder** is a folder agent (`Agents/<name>` with a `CLAUDE.md`, not a
+  built-in, a name that can name a profile) that no profile has made its own: no profile but its
+  own names it as `configDir`, and its own profile is absent or still exactly what first sight
+  writes for it (id, provider, kind, `configDir`, command, role, tags, hidden, the modes switched
+  on). A folder renamed outside the app gets that first-sight profile within a tick, so it is
+  unclaimed until someone edits it. `roster.unclaimedFolders` answers them in name order, read on
+  each call; none without a workspace.
+- **`roster.relink`** points the orphan's profile at the folder (`configDir: Agents/<folder>`,
+  every other key kept), then removes the folder's own first-sight profile, and reads the roster
+  again before it answers: the agent is in `roster.list` again under its id. `undo` holds the
+  agent's profile and the removed one as their files held them (`profileText: null`: none). Errors: `not-ready`
+  (no workspace); `not-found` (no such agent); `invalid-params` (the agent is not an orphan, or the
+  folder is not unclaimed); `io-error` (a file cannot be written or removed).
+- **`roster.undoRelink`** takes a re-link back from its `undo`: the agent's profile, then the
+  folder's, written back byte for byte (new, or over a file of other text), the roster read again —
+  both files and `roster.agents` as before the re-link. Errors:
+  `not-ready`; `not-found` (no agent with a usable profile); `invalid-params` (the agent no longer
+  names the folder — taken back already, or changed since; a text over `PROFILE_TEXT_MAX` (65 536)
+  or not a usable profile of its id, in which case the re-link stands); `io-error`.
+- **`roster.removeOrphan`** deletes the orphan's `agents/<id>/agent.yaml` and that folder when
+  nothing else is left in it — never an agent folder — and reads the roster again before it
+  answers. Errors as `roster.relink`; a profile already gone is no error, an agent no longer an
+  orphan is `invalid-params`.
 
 **`roster.permissions`** — what an agent's provider config grants, for its page's Permissions tab:
 
@@ -1250,7 +1319,10 @@ type AgentRunFinished = AgentRunStarted & {
   - `agents/<id>/agent.yaml` — one profile per agent ("Roster" above), written at first sight and on
     every change, under the same rules as a record: keys changed one by one, linked into place, never
     over an unusable file. A profile deleted by hand is written again with its first-sight values
-    while its agent exists.
+    while its agent exists. A profile is removed (`FileSet.remove`, which answers the text it held)
+    only by `roster.relink` (the folder's first-sight one) and `roster.removeOrphan`: the file, then
+    its `agents/<id>/` folder when nothing else is in it. `FileSet.restore` puts a removed text back
+    (`roster.undoRelink`), never one that is not a usable file of the id.
   - `settings.yaml` — `skillFolders`: the skill folders ("Skills" above), written through the
     same document model, so the file's other keys, comments and order stay; a settings write
     is one at a time with the first run's, starts from the file on disk, and is never made over

@@ -3,7 +3,8 @@
 // Pomade's broker and asked again whenever the roster changes (`roster.changed`) or a project's
 // place, name, agents or presence does (`project.updated`, `project.created`, `project.renamed`,
 // `project.removed`). While the backend does not answer, the UI asks again every second. A profile
-// the frame saved itself is taken from the save's answer at once (`patchProfile`).
+// the frame saved itself is taken from the save's answer at once (`patchProfile`); a read that was
+// on its way when the save answered may predate the write, so it is dropped and asked again.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { HostClient } from "pomade-kit/sdk";
@@ -35,6 +36,8 @@ export function useRoster(host: HostClient): RosterRead {
   const [answer, setAnswer] = useState<RosterAgentsAnswer | null>(null);
   const [connections, setConnections] = useState<ReadonlyMap<string, readonly string[]> | null>(null);
   const held = useRef<RosterAgentsAnswer | null>(null);
+  /** Counts the profiles taken from a save's answer: a read that started under another count is stale. */
+  const patches = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,11 +52,16 @@ export function useRoster(host: HostClient): RosterRead {
       }
       asking = true;
       clearTimeout(retry);
+      const patchesAtStart = patches.current;
       try {
         const call = (method: string): Promise<unknown> => host.apps.call(host.welcome.appId, method, {}, { timeoutMs: ANSWER_TIMEOUT_MS });
         const [agents, connected] = await Promise.all([call(ROSTER_AGENTS_METHOD), call(ROSTER_CONNECTIONS_METHOD)]);
         if (cancelled) return;
         if (!isRosterAgentsAnswer(agents) || !isRosterConnectionsAnswer(connected)) throw new Error("malformed answer");
+        if (patches.current !== patchesAtStart) {
+          again = true;
+          return;
+        }
         held.current = agents;
         setAnswer(agents);
         setConnections(new Map(connected.connections.map((c) => [c.agent, c.projects])));
@@ -82,9 +90,10 @@ export function useRoster(host: HostClient): RosterRead {
   }, [host]);
 
   const patchProfile = useCallback((profile: AgentProfile) => {
+    patches.current += 1;
     const current = held.current;
     if (current === null) return;
-    const next = { ...current, agents: current.agents.map((entry) => (entry.id === profile.id ? { ...entry, profile, problem: null } : entry)) };
+    const next = { ...current, agents: current.agents.map((entry) => (entry.id === profile.id ? { ...entry, profile, problem: null, hidden: profile.hidden } : entry)) };
     held.current = next;
     setAnswer(next);
   }, []);

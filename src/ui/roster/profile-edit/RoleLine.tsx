@@ -1,10 +1,11 @@
 // An agent's role line, edited where it is shown (DESIGN §3.3, §3.4): a click, or Enter on the focused
 // line, turns it into a field; Enter or leaving the field saves, Esc drops the change. Hovering and
 // editing only paint — the line keeps its box (the field lies over the text, which stays in the
-// layout and takes the typed text), so nothing around it moves. Used by the agent page and the
-// Roster's cards and rows.
+// layout and takes the typed text), so nothing around it moves. A line cut to `lines` (a card's) is
+// edited in a field that grows over what lies below it, so the whole text shows while it is typed.
+// Used by the agent page and the Roster's cards.
 
-import { useEffect, useRef, useState, type CSSProperties, type ReactElement } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactElement } from "react";
 
 import { ROLE_MAX } from "../../../shared/roster.ts";
 import { PencilIcon } from "../../core/icons.tsx";
@@ -33,6 +34,15 @@ export function RoleLine({ role, editable, onSave, lines, testId }: RoleLineProp
   useEffect(() => {
     if (editing) field.current?.focus();
   }, [editing]);
+
+  // The field is at least the line's box, and as tall as its text.
+  useLayoutEffect(() => {
+    const el = field.current;
+    const box = el?.parentElement;
+    if (!el || !box) return;
+    el.style.height = "0px";
+    el.style.height = `${Math.max(box.getBoundingClientRect().height, el.scrollHeight)}px`;
+  }, [draft]);
 
   const shown = editing ? oneLine(draft) : sent === undefined ? role : (sent ?? undefined);
 

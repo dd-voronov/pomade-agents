@@ -314,25 +314,49 @@ test("Open CLAUDE.md, agent.yaml, settings.json and a memory file open in Pomade
   expect(opened()).toHaveLength(6);
 });
 
-test("Start session and Hide show in their places, disabled, Clone… is there for a folder agent only; the page has no Start session for an orphan", async ({ page, openShell, pomade }) => {
-  await openPage(page, openShell, pomade, LIBRA, "overview");
-  const frame = frameOf(page);
-  await expect(frame.getByTestId("agent-start-session")).toBeDisabled();
-  await frame.getByTestId("agent-more").click();
-  await expect(frame.getByTestId("menu-item-clone")).toBeEnabled();
-  await expect(frame.getByTestId("menu-item-hide")).toHaveText("Hide from the “+” menu");
-  await expect(frame.getByTestId("menu-item-hide")).toBeDisabled();
-  await expect(frame.getByTestId("menu-item-open-claude-md")).toBeEnabled();
-  await expect(frame.getByTestId("menu-item-open-agent-yaml")).toBeEnabled();
-  await page.keyboard.press("Escape");
+test.describe("the header's actions — the Roster card's own", () => {
+  test.use({ pomadeSeed: { roster: [{ id: LIBRA, name: LIBRA, command: LIBRA, provider: "claude" }] } });
 
-  // The built-ins cannot be cloned.
-  await frame.getByTestId("agent-back").click();
-  pomade.fake.openAppTab({ projectId: "alpha", route: agentRoute("claude", "overview") });
-  await expect(frame.getByTestId("agent-name")).toHaveText("claude");
-  await expect(frame.getByTestId("agent-chip-builtin")).toHaveText("built-in");
-  await frame.getByTestId("agent-more").click();
-  await expect(frame.getByTestId("menu-item-clone")).toHaveCount(0);
+  test("Start session ▾ launches the agent in the project and mode picked; ⋯ hides it from the “+” menu, with Undo; Clone… is there for a folder agent only", async ({ page, openShell, pomade, sandbox }) => {
+    // Pomade launches in the project's folder: it must be there.
+    pomade.fake.writeFile("Projects/beta/README.md", "beta\n");
+    await openPage(page, openShell, pomade, LIBRA, "overview");
+    const frame = frameOf(page);
+    const file = profileOf(sandbox, LIBRA);
+
+    await frame.getByTestId("agent-start-session").click();
+    const menu = frame.getByTestId("start-menu");
+    await expect(menu.getByTestId("menu-segment-mode-normal")).toHaveAttribute("aria-pressed", "true");
+    await menu.getByTestId("menu-segment-mode-full-autonomy").click();
+    await expect(menu.getByTestId("menu-segment-mode-full-autonomy")).toHaveAttribute("aria-pressed", "true");
+    await expect(menu.locator('[data-testid^="menu-item-launch-"]')).toHaveText(["Alpha", "Beta", "Workspace"]);
+    await menu.getByTestId("menu-item-launch-beta").click();
+    await expect.poll(() => pomade.fake.openedAgentTabs.at(-1)).toMatchObject({ agentId: LIBRA, projectId: "beta", mode: "full-autonomy" });
+    await expect(menu).toHaveCount(0);
+
+    await frame.getByTestId("agent-more").click();
+    await expect(frame.getByTestId("menu-item-clone")).toBeEnabled();
+    await expect(frame.getByTestId("menu-item-open-claude-md")).toBeEnabled();
+    await expect(frame.getByTestId("menu-item-open-agent-yaml")).toBeEnabled();
+    await expect(frame.getByTestId("menu-item-open-agent")).toHaveCount(0);
+    await frame.getByTestId("menu-item-hide").click();
+    await expect(frame.getByTestId("toast-text")).toHaveText("claude-libra is hidden from Pomade’s “+” menu.");
+    await expect(frame.getByTestId("agent-chip-hidden")).toBeVisible();
+    await expect.poll(() => readFile(file, "utf8")).toContain("hidden: true");
+    await expect(frame.getByTestId("agent-start-session")).toBeDisabled();
+    await frame.getByTestId("toast-undo").click();
+    await expect.poll(() => readFile(file, "utf8")).toContain("hidden: false");
+    await expect(frame.getByTestId("agent-chip-hidden")).toHaveCount(0);
+    await expect(frame.getByTestId("agent-start-session")).toBeEnabled();
+
+    // The built-ins cannot be cloned.
+    await frame.getByTestId("agent-back").click();
+    pomade.fake.openAppTab({ projectId: "alpha", route: agentRoute("claude", "overview") });
+    await expect(frame.getByTestId("agent-name")).toHaveText("claude");
+    await expect(frame.getByTestId("agent-chip-builtin")).toHaveText("built-in");
+    await frame.getByTestId("agent-more").click();
+    await expect(frame.getByTestId("menu-item-clone")).toHaveCount(0);
+  });
 });
 
 test("the built-ins: Claude's permissions come from its settings.json and the home .claude.json, Codex's from config.toml, and Codex has no CLAUDE.md or memory", async ({ page, openShell, pomade }) => {

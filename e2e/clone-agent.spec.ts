@@ -171,7 +171,7 @@ test.describe("on the Roster", () => {
     await expect(tab.getByTestId(`chip-needs-login-${SOURCE}`)).toHaveCount(0);
     // The built-ins are never cloned.
     await tab.getByTestId("agent-more-claude").click();
-    await expect(tab.getByTestId("agent-menu-claude").getByRole("menuitem")).toHaveText(["Open agent page"]);
+    await expect(tab.getByTestId("agent-menu-claude").getByRole("menuitem")).toHaveText(["Open agent page", "Sessions", "Hide from the “+” menu", "Open CLAUDE.md", "Open agent.yaml"]);
     await page.keyboard.press("Escape");
 
     // The list row shows the chip too.
