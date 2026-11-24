@@ -27,7 +27,7 @@ import {
   type LaunchSpec,
   type RosterAgentsAnswer,
 } from "../src/shared/roster.ts";
-import type { FakePomade } from "../harness/fake-pomade/server.ts";
+import type { FakePomade } from "../harness/fake-pomade.ts";
 import { expect, test } from "./fixtures.ts";
 
 /** Pomade's limit for its roster read. */

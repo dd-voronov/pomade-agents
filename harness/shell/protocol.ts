@@ -1,6 +1,7 @@
-// What the fake Pomade (a Node process) and its shell page (a browser window) say to each other
-// over their WebSocket. The fake host lives in Node, where the app's backend can reach it over a
-// unix socket; the shell page only hosts the app's frames and relays their postMessage traffic.
+// What the fake Pomade's frame relay (`relay.ts`, in Node) and its shell page (a browser window)
+// say to each other over their WebSocket. The fake host lives in Node, where the app's backend
+// reaches it over the kit's socket; the shell page only hosts the app's frames and relays their
+// postMessage traffic.
 
 /** A frame's id, chosen by the shell: unique within the page. */
 export type FrameId = string;

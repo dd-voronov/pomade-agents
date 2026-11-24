@@ -5,7 +5,7 @@ import { INDEX_FILE } from "../src/backend/stores/index-file.ts";
 import { APP_INFO_METHOD } from "../src/shared/api.ts";
 import { BUILT_BACKEND, FIXTURE_AGENTS } from "../harness/app.ts";
 import { spawnBackend } from "../harness/backend-process.ts";
-import { startFakePomade } from "../harness/fake-pomade/server.ts";
+import { startFakePomade } from "../harness/fake-pomade.ts";
 import { SEEDED_TRANSCRIPTS, fixtureSnapshots } from "../harness/sandbox.ts";
 import { expect, test } from "./fixtures.ts";
 

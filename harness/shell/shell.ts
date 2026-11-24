@@ -4,7 +4,7 @@
 
 import "pomade-kit/tokens.css";
 import "./shell.css";
-import type { FrameId, HostToShell, ShellToHost } from "../fake-pomade/shell-protocol.ts";
+import type { FrameId, HostToShell, ShellToHost } from "./protocol.ts";
 
 function param(name: string): string {
   const value = new URLSearchParams(location.search).get(name);

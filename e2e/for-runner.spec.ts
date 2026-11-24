@@ -12,7 +12,7 @@ import type { AgentTabExitedPayload, JsonValue } from "pomade-kit/protocol";
 
 import { BUILT_BACKEND, FIXTURE_PROJECTS } from "../harness/app.ts";
 import { spawnBackend } from "../harness/backend-process.ts";
-import { startFakePomade, type FakePomade } from "../harness/fake-pomade/server.ts";
+import { startFakePomade, type FakePomade } from "../harness/fake-pomade.ts";
 import type { Sandbox } from "../harness/sandbox.ts";
 import { SESSION_CLOSED_EVENT, SESSION_STATUS_CHANGED_EVENT, STATUS_WINDOW_MS, isSessionClosedEvent, isStatusChangedEvent } from "../src/shared/session-events.ts";
 import {

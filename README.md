@@ -42,7 +42,7 @@ The gate: `npm run lint && npm run typecheck && npm run build && npm run test:un
 | `src/backend/records/` | the app's data files: session records and `settings.yaml` — read, written, watched |
 | `src/backend/sessions/` | sessions joined: summaries + records + projects; first-run adoption, record rules, project attribution |
 | `src/backend/interfaces/` | the API the backend serves through Pomade's broker, and what it follows of Pomade (projects, agent tabs) |
-| `harness/` | development and test tooling: the sandbox, the fake Pomade and its shell page, fixtures (synthetic transcripts in `fixtures/transcripts/`) |
+| `harness/` | development and test tooling: the sandbox, the fake Pomade (pomade-kit's fake host and its socket side) and its shell page, fixtures (synthetic transcripts in `fixtures/transcripts/`) |
 | `e2e/` | Playwright specs against the fake Pomade; `e2e/pomade/` — the smoke spec in a real Pomade |
 | `scripts/` | `dev`, `dev:fake` and the `pomade` command runner |
 

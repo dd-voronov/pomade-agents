@@ -14,7 +14,7 @@ import type { JsonValue } from "pomade-kit/protocol";
 
 import { BUILT_BACKEND } from "../harness/app.ts";
 import { spawnBackend } from "../harness/backend-process.ts";
-import type { FakePomade } from "../harness/fake-pomade/server.ts";
+import type { FakePomade } from "../harness/fake-pomade.ts";
 import type { Sandbox } from "../harness/sandbox.ts";
 import { SESSIONS_LIST_METHOD, SESSIONS_SET_STATUS_METHOD, isSessionsAnswer, type Session } from "../src/shared/sessions.ts";
 import { formatMoney } from "../src/ui/sessions/table-model.ts";

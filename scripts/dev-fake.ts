@@ -9,7 +9,7 @@ import { createServer } from "vite";
 
 import { FIXTURE_PROJECTS, SOURCE_BACKEND, readManifest } from "../harness/app.ts";
 import { spawnBackend } from "../harness/backend-process.ts";
-import { startFakePomade } from "../harness/fake-pomade/server.ts";
+import { startFakePomade } from "../harness/fake-pomade.ts";
 import { createSandbox } from "../harness/sandbox.ts";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
@@ -24,7 +24,7 @@ const pomade = await startFakePomade({
   appKey: sandbox.appKey,
   host: { projects: FIXTURE_PROJECTS, activeProject: "alpha", workspaceRoot: sandbox.workspace, pomadeVersion: "0.0.0-fake" },
 });
-const backend = spawnBackend(sandbox, { entry: SOURCE_BACKEND, nodeArgs: ["--watch"], echo: true });
+const backend = spawnBackend(sandbox, { entry: SOURCE_BACKEND, nodeArgs: ["--watch"], echo: true, pomade });
 const app = await createServer({ root: ROOT, server: { port: APP_PORT, strictPort: true } });
 const shell = await createServer({ configFile: `${ROOT}harness/shell/vite.config.ts`, server: { port: SHELL_PORT, strictPort: true } });
 await app.listen();

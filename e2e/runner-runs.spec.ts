@@ -13,7 +13,7 @@ import { SESSIONS_LIVE_IN_METHOD, checkLiveIn, type AgentTabExitedPayload, type 
 
 import { BUILT_BACKEND, FIXTURE_PROJECTS } from "../harness/app.ts";
 import { spawnBackend } from "../harness/backend-process.ts";
-import { startFakePomade, type FakePomade } from "../harness/fake-pomade/server.ts";
+import { startFakePomade, type FakePomade } from "../harness/fake-pomade.ts";
 import type { Sandbox } from "../harness/sandbox.ts";
 import { RUN_FINISHED_EVENT, RUN_STARTED_EVENT, type AgentRunFinished, type AgentRunStarted } from "../src/shared/runner-events.ts";
 import { SESSION_CLOSED_EVENT, isSessionClosedEvent } from "../src/shared/session-events.ts";

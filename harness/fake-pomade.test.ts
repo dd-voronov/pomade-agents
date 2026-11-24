@@ -4,15 +4,15 @@
 import { connectSocket } from "pomade-kit/node";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { readRunRecord } from "../../src/backend/core/run-record.ts";
-import { INDEX_FILE } from "../../src/backend/stores/index-file.ts";
-import { APP_INFO_METHOD } from "../../src/shared/api.ts";
-import { ROSTER_AGENTS_METHOD, isRosterAgentsAnswer } from "../../src/shared/roster.ts";
-import { SESSIONS_LIST_METHOD, isSessionsAnswer } from "../../src/shared/sessions.ts";
-import { FIXTURE_AGENTS, FIXTURE_PROJECTS, SOURCE_BACKEND, readManifest } from "../app.ts";
-import { spawnBackend, type BackendProcess } from "../backend-process.ts";
-import { SEEDED_TRANSCRIPTS, createSandbox, fixtureSnapshots, type Sandbox } from "../sandbox.ts";
-import { startFakePomade, type FakePomade } from "./server.ts";
+import { readRunRecord } from "../src/backend/core/run-record.ts";
+import { INDEX_FILE } from "../src/backend/stores/index-file.ts";
+import { APP_INFO_METHOD } from "../src/shared/api.ts";
+import { ROSTER_AGENTS_METHOD, isRosterAgentsAnswer } from "../src/shared/roster.ts";
+import { SESSIONS_LIST_METHOD, isSessionsAnswer } from "../src/shared/sessions.ts";
+import { FIXTURE_AGENTS, FIXTURE_PROJECTS, SOURCE_BACKEND, readManifest } from "./app.ts";
+import { spawnBackend, type BackendProcess } from "./backend-process.ts";
+import { SEEDED_TRANSCRIPTS, createSandbox, fixtureSnapshots, type Sandbox } from "./sandbox.ts";
+import { startFakePomade, type FakePomade } from "./fake-pomade.ts";
 
 const manifest = readManifest();
 
@@ -47,7 +47,7 @@ describe("the backend against the fake Pomade", { timeout: 20_000 }, () => {
   });
 
   it("connects, serves app.info with locations inside the sandbox, and records its run", async () => {
-    backend = spawnBackend(sandbox, { entry: SOURCE_BACKEND });
+    backend = spawnBackend(sandbox, { entry: SOURCE_BACKEND, pomade });
     await until(() => pomade.backendCount() === 1, "the backend to connect");
     await until(async () => (await pomade.fake.callApi(APP_INFO_METHOD).catch(() => null)) !== null, "the API to be served");
 
@@ -65,7 +65,7 @@ describe("the backend against the fake Pomade", { timeout: 20_000 }, () => {
   });
 
   it("stops on SIGTERM with status 0, removes its run record, keeps its parse index, leaves home untouched and adds only its settings, session records and agent profiles to the workspace", async () => {
-    backend = spawnBackend(sandbox, { entry: SOURCE_BACKEND });
+    backend = spawnBackend(sandbox, { entry: SOURCE_BACKEND, pomade });
     await until(() => pomade.backendCount() === 1, "the backend to connect");
     // The first run adopts every seeded session, writing into Apps/; stopping before or during it
     // would leave a different set of files each time.
@@ -93,12 +93,17 @@ describe("the backend against the fake Pomade", { timeout: 20_000 }, () => {
   });
 
   it("refuses a client with the wrong key", async () => {
-    const env = sandbox.backendEnv();
+    const env = { ...sandbox.backendEnv(), ...pomade.env() };
     const wrong = await connectSocket({ env, key: "not-the-key", timeoutMs: 2000 });
     expect(wrong).toMatchObject({ status: "rejected", reason: "unauthorized" });
     const right = await connectSocket({ env, timeoutMs: 2000 });
     if (right.status !== "connected") throw new Error(right.status);
     expect(right.host.welcome).toMatchObject({ appId: manifest.id, surface: "backend" });
     right.host.close();
+  });
+
+  it("gives a backend the Pomade environment the sandbox gives it, so a backend started without the host connects too", () => {
+    const sandboxEnv = sandbox.backendEnv();
+    for (const [name, value] of Object.entries(pomade.env())) expect(sandboxEnv[name], name).toBe(value);
   });
 });

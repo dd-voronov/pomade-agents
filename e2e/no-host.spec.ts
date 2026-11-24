@@ -1,4 +1,4 @@
-import { startFakePomade } from "../harness/fake-pomade/server.ts";
+import { startFakePomade } from "../harness/fake-pomade.ts";
 import { expect, shellOf, shellUrl, test } from "./fixtures.ts";
 import { APP_URL } from "./ports.ts";
 

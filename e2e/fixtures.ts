@@ -6,7 +6,7 @@ import { test as base, expect, type FrameLocator, type Page } from "@playwright/
 
 import { BUILT_BACKEND, FIXTURE_PROJECTS, readManifest, type AppManifest } from "../harness/app.ts";
 import { spawnBackend, type BackendProcess } from "../harness/backend-process.ts";
-import { startFakePomade, type FakePomade } from "../harness/fake-pomade/server.ts";
+import { startFakePomade, type FakePomade } from "../harness/fake-pomade.ts";
 import { createSandbox, type Sandbox } from "../harness/sandbox.ts";
 import { APP_URL, SHELL_URL } from "./ports.ts";
 
@@ -69,7 +69,7 @@ export const test = base.extend<Fixtures>({
   },
   backend: async ({ seed, sandbox, pomade }, use) => {
     if (seed !== null) await seed.into(sandbox);
-    const backend = spawnBackend(sandbox, { entry: BUILT_BACKEND });
+    const backend = spawnBackend(sandbox, { entry: BUILT_BACKEND, pomade });
     await expect.poll(() => pomade.backendCount(), { message: `the backend connects\n${backend.output()}` }).toBe(1);
     await use(backend);
     await backend.stop();

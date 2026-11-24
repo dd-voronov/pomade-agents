@@ -636,15 +636,19 @@ type AgentRunFinished = AgentRunStarted & {
   synthetic transcripts in `harness/fixtures/transcripts/` (`SEEDED_TRANSCRIPTS`), which the unit
   tests read too. `workspaceReal` is where the workspace's files are; `workspace` is what Pomade
   and the backend are given — the same folder, or with `workspaceLink` a symlink to it.
-- `startFakePomade({ manifest, socketPath, appKey, host })` (`harness/fake-pomade/server.ts`) —
-  `{ fake, shellSocketUrl, backendCount(), close() }`: pomade-kit's fake host, reached by the
-  backend over the unix socket and by frames through the shell page (`harness/shell/`). The app's
-  tabs are the fake host's own (`fake.appTabs`, `fake.onAppTab`): `tabs.openApp` opens, focuses or
-  navigates them, `tabs.setRoute` records a tab's route; the shell shows each open tab with a frame
-  attached to it (`{ tabId }`), so a frame reload opens at the tab's recorded route.
-- `spawnBackend(sandbox, { entry, env? })` (`harness/backend-process.ts`) — `{ pid, output(), running(),
-  stop() }`; the backend gets `sandbox.backendEnv()` — Pomade's backend environment, with
-  `POMADE_APP_STATE` at `<userData>/app-state/<appId>` — changed by `env` (`undefined` unsets).
+- `startFakePomade({ manifest, socketPath, appKey, host })` (`harness/fake-pomade.ts`) —
+  `{ fake, shellSocketUrl, env(role?), backendCount(), close() }`: pomade-kit's fake host, reached
+  by the backend over the kit's socket side (`serveFakeHost` from `pomade-kit/fake-host/node`, at
+  the sandbox's `socketPath` with its `appKey`) and by frames through the shell page
+  (`harness/shell/`) and its WebSocket relay (`harness/shell/relay.ts`). `env()` is the
+  environment the kit gives a backend. The app's tabs are the fake host's own (`fake.appTabs`,
+  `fake.onAppTab`): `tabs.openApp` opens, focuses or navigates them, `tabs.setRoute` records a
+  tab's route; the shell shows each open tab with a frame attached to it (`{ tabId }`), so a frame
+  reload opens at the tab's recorded route.
+- `spawnBackend(sandbox, { entry, nodeArgs?, echo?, pomade?, env? })` (`harness/backend-process.ts`) —
+  `{ pid, output(), running(), stop() }`. It runs with `sandbox.backendEnv()` — Pomade's backend
+  environment, with `POMADE_APP_STATE` at `<userData>/app-state/<appId>` — then `pomade.env()` over
+  it when given, then `env` (`undefined` unsets a variable).
 - Playwright fixtures (`e2e/fixtures.ts`): `manifest`, `sandbox`, `pomade`, `backend`, `openShell`, and
   the options `seed` — `test.use({ seed: { into(sandbox) } })` writes into the sandbox before the
   backend starts (`null` by default) — and `workspaceLink` (`false` by default).

@@ -20,7 +20,7 @@ import {
 
 import { BUILT_BACKEND, FIXTURE_PROJECTS } from "../harness/app.ts";
 import { spawnBackend } from "../harness/backend-process.ts";
-import { startFakePomade, type FakePomade } from "../harness/fake-pomade/server.ts";
+import { startFakePomade, type FakePomade } from "../harness/fake-pomade.ts";
 import { SESSIONS_LIST_METHOD, isSessionsAnswer, type Session } from "../src/shared/sessions.ts";
 import { expect, test } from "./fixtures.ts";
 import { claudeSession, projectFolder, prompt } from "./transcripts.ts";
