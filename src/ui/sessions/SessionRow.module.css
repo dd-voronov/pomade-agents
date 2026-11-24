@@ -101,6 +101,15 @@
   transition: opacity var(--dur-fast) var(--ease);
 }
 
+/* The live mark sits in the name's indent too, under the group header's status mark. */
+.live {
+  position: absolute;
+  top: 50%;
+  left: 22px;
+  display: flex;
+  transform: translateY(-50%);
+}
+
 .row:hover .check,
 .row:focus-within .check,
 .check[aria-checked="true"],

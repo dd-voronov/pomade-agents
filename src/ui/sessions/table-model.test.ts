@@ -22,9 +22,11 @@ import {
   groupByStatus,
   inScope,
   isLong,
+  liveTitle,
   projectLabel,
   rowName,
   shownRows,
+  sinceStamp,
   statusOf,
   totalCost,
   unknownReason,
@@ -212,6 +214,21 @@ describe("relative time", () => {
     expect(formatStamp(at(2026, 10, 3, 9, 5), now)).toBe("Nov 3, 09:05");
     expect(formatStamp(at(2025, 10, 3, 9, 5), now)).toBe("Nov 3, 2025, 09:05");
     expect(formatStamp(null, now)).toBe("No time recorded");
+  });
+
+  it("says since when, today's date left out", () => {
+    expect(sinceStamp(at(2026, 10, 17, 9, 5), now)).toBe("09:05");
+    expect(sinceStamp(at(2026, 10, 16, 18, 40), now)).toBe("yesterday, 18:40");
+    expect(sinceStamp(at(2026, 10, 3, 9, 5), now)).toBe("Nov 3, 09:05");
+  });
+
+  it("gives the live mark's tooltip, and none for Closed", () => {
+    const since = at(2026, 10, 17, 9, 5);
+    expect(liveTitle(testSession({ live: "working", liveSince: since }), now)).toBe("Working since 09:05");
+    expect(liveTitle(testSession({ live: "needs-you", liveSince: since }), now)).toBe("Needs you since 09:05");
+    expect(liveTitle(testSession({ live: "idle", liveSince: since }), now)).toBe("Idle since 09:05");
+    expect(liveTitle(testSession({ live: "idle", liveSince: null }), now)).toBe("Idle");
+    expect(liveTitle(testSession({ live: "closed", liveSince: since }), now)).toBeNull();
   });
 });
 

@@ -47,6 +47,16 @@
   opacity: 1;
 }
 
+/* Its slot stays while Closed shows no mark, so every row's name starts at one line. */
+.live {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 19px;
+}
+
 .text {
   flex: 1;
   min-width: 0;

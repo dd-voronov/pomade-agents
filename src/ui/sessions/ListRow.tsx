@@ -1,4 +1,4 @@
-// One session in the list beside the detail panel: its checkbox, then two lines — the name with
+// One session in the list beside the detail panel: its checkbox, its live mark, then two lines — the name with
 // its marks and chips, and last active; then project (Workspace scope) · agent · model · effort,
 // with context % and ~$ est. on the right. Its note sits under them. The checkbox shows on hover
 // and while any row is checked; the row drags onto a status tab.
@@ -6,12 +6,13 @@
 import type { ReactElement } from "react";
 
 import { NoteIcon } from "../core/icons.tsx";
+import { LiveMark } from "../core/LiveMark.tsx";
 import type { Session } from "../../shared/sessions.ts";
 import { Checkbox } from "./Checkbox.tsx";
 import { rowMeta } from "./detail-model.ts";
 import type { RowEvents, RowMarks } from "./row-events.ts";
 import { SessionName } from "./SessionName.tsx";
-import { formatAgo, formatMoney, formatStamp, statusOf } from "./table-model.ts";
+import { formatAgo, formatMoney, formatStamp, liveTitle, statusOf } from "./table-model.ts";
 import { ContextMeter, Unknown } from "./Values.tsx";
 import styles from "./ListRow.module.css";
 
@@ -33,6 +34,7 @@ export interface ListRowProps {
 export function ListRow({ session, workspace, names, fork, now, selected, marks, events, note }: ListRowProps): ReactElement {
   const { summary } = session;
   const meta = rowMeta(session, workspace, names);
+  const live = liveTitle(session, now);
   return (
     <div
       className={styles.row}
@@ -57,6 +59,7 @@ export function ListRow({ session, workspace, names, fork, now, selected, marks,
       onDragEnd={events.onDragEnd}
     >
       <Checkbox className={styles.check} checked={marks.checked} label="Check the session" testId="row-check" onToggle={(event) => events.onCheck(session.id, event)} />
+      <span className={styles.live}>{live !== null && <LiveMark state={session.live} title={live} />}</span>
       <div className={styles.text}>
         <div className={styles.first}>
           <SessionName session={session} names={names} fork={fork} />

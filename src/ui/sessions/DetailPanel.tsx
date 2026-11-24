@@ -1,5 +1,5 @@
 // The detail panel (DESIGN §2.7 "List with the detail panel"): one session's name — renamed in
-// place — and when it was last active, Rename and Move to project, its marker notes, its status as four buttons with the one-line note under them, the
+// place — its live state and since when (Closed: when it was last active), Rename and Move to project, its marker notes, its status as four buttons with the one-line note under them, the
 // facts, and its first message, last message and last agent answer. A refused change says so
 // under the note.
 
@@ -7,13 +7,14 @@ import { useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactElemen
 import { SESSION_STATUSES, type SessionStatus } from "pomade-kit/protocol";
 
 import { CaretIcon, CloseIcon, FolderIcon, ForkIcon, InfoIcon, MoveIcon, PencilIcon, TimerIcon, WarningIcon } from "../core/icons.tsx";
+import { LiveMark } from "../core/LiveMark.tsx";
 import { SESSION_NAME_MAX, SESSION_NOTE_MAX, type Session } from "../../shared/sessions.ts";
 import { ClampedText } from "./ClampedText.tsx";
 import {
   CLAMP_LINES,
   PROVIDER_LABELS,
   detailName,
-  lastActiveLine,
+  liveLine,
   markerNotes,
   noteToSave,
   sameMessage,
@@ -21,7 +22,7 @@ import {
   type MarkerNote,
 } from "./detail-model.ts";
 import { StatusMark } from "./StatusGroup.tsx";
-import { STATUS_LABELS, STATUS_SHORT_LABELS, formatMoney, formatStamp, projectLabel, statusOf } from "./table-model.ts";
+import { STATUS_LABELS, STATUS_SHORT_LABELS, formatMoney, formatStamp, liveTitle, projectLabel, statusOf } from "./table-model.ts";
 import type { Failure } from "./useStatusChange.ts";
 import { ContextMeter, Unknown } from "./Values.tsx";
 import styles from "./DetailPanel.module.css";
@@ -59,6 +60,20 @@ export interface DetailPanelProps {
   askMove: boolean;
   /** Open Move to project under `anchor`, the button's box. */
   onOpenMove: (anchor: DOMRect) => void;
+}
+
+function LiveLine({ session, now }: { session: Session; now: Date }): ReactElement {
+  const line = liveLine(session, now);
+  const title = liveTitle(session, now);
+  return (
+    <p className={styles.sub} data-testid="detail-live" data-state={session.live}>
+      {title !== null && <LiveMark state={session.live} title={title} />}
+      <span className={styles.liveWord} data-state={session.live}>
+        {line.state}
+      </span>
+      {line.when !== "" && <span>· {line.when}</span>}
+    </p>
+  );
 }
 
 function Note({ icon, children, kind }: { icon: ReactElement; children: ReactNode; kind: MarkerNote["kind"] }): ReactElement {
@@ -370,9 +385,7 @@ export function DetailPanel(props: DetailPanelProps): ReactElement {
             <CloseIcon />
           </button>
         </div>
-        <p className={styles.sub} data-testid="detail-last-active">
-          {lastActiveLine(session.summary.lastActiveAt, now)}
-        </p>
+        <LiveLine session={session} now={now} />
         <Actions moveOpen={props.moveOpen} askMove={props.askMove} onStartRename={props.onStartRename} onOpenMove={props.onOpenMove} />
         <MarkerNotes notes={notes} onSelect={onSelect} />
         <section className={styles.section}>

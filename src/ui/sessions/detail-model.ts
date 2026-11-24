@@ -1,5 +1,5 @@
 // What the detail panel and the list's two-line rows show, as pure functions of a session (DESIGN
-// §2.7 "List with the detail panel"): the panel's name and last-active line, its marker notes, the
+// §2.7 "List with the detail panel"): the panel's name and live line, its marker notes, the
 // start folder relative to the project, the message blocks, the note's save rule and how a failed
 // change reads. Values read as in the table (`table-model.ts`).
 
@@ -7,7 +7,8 @@ import type { ErrorCode } from "pomade-kit/protocol";
 import { HostError } from "pomade-kit/sdk";
 
 import type { Session, SessionProvider, TimedText } from "../../shared/sessions.ts";
-import { formatStamp, projectLabel, rowName } from "./table-model.ts";
+import { LIVE_LABELS } from "../core/live.ts";
+import { formatStamp, projectLabel, rowName, sinceStamp } from "./table-model.ts";
 
 export const PROVIDER_LABELS: Record<SessionProvider, string> = {
   "claude-code": "Claude Code",
@@ -20,10 +21,12 @@ export function detailName(session: Session): { text: string; unnamed: boolean }
   return name === undefined ? { text: "Unnamed session", unnamed: true } : { text: name, unnamed: false };
 }
 
-/** "Last active today, 09:05"; "No activity recorded" without a time. */
-export function lastActiveLine(iso: string | null, now: Date): string {
-  if (iso === null) return "No activity recorded";
-  return `Last active ${formatStamp(iso, now).replace(/^(Today|Yesterday)\b/, (day) => day.toLowerCase())}`;
+/** The panel's live line: the live state in words, then since when — "Working", "since 09:05" — or,
+ *  Closed, when it was last active: "last active today, 09:05". */
+export function liveLine(session: Session, now: Date): { state: string; when: string } {
+  if (session.live !== "closed") return { state: LIVE_LABELS[session.live], when: session.liveSince === null ? "" : `since ${sinceStamp(session.liveSince, now)}` };
+  const at = session.summary.lastActiveAt;
+  return { state: LIVE_LABELS.closed, when: at === null ? "no activity recorded" : `last active ${formatStamp(at, now).replace(/^(Today|Yesterday)\b/, (day) => day.toLowerCase())}` };
 }
 
 // ── Marker notes ────────────────────────────────────────────────────────────

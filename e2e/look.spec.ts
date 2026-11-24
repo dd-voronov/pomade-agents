@@ -72,8 +72,15 @@ test("the panel and each tab view are light, even on a dark system appearance", 
   await page.screenshot({ path: `${ARTIFACTS}/roster.png` });
 });
 
+/** Agent tabs bound to three of Alpha's Active sessions: Working, Needs you, Idle. */
+const LIVE_TABS = [
+  { tabId: "tab-working", projectId: "alpha", agentId: "claude", sessionId: ALPHA[0] ?? "", state: "working" as const },
+  { tabId: "tab-needs-you", projectId: "alpha", agentId: "claude", sessionId: ALPHA[1] ?? "", state: "needs-you" as const },
+  { tabId: "tab-idle", projectId: "alpha", agentId: "claude", sessionId: ALPHA[3] ?? "", state: "idle" as const },
+];
+
 test.describe("the Sessions table", () => {
-  test.use({ seed: { into: seedLook } });
+  test.use({ seed: { into: seedLook }, pomadeSeed: { agentTabs: LIVE_TABS } });
 
   test("a project, a narrow tab, a long Done group and the Workspace", async ({ page, openShell, pomade, backend }) => {
     const set = (list: string[], status: string, note?: string) => pomade.fake.callApi(SESSIONS_SET_STATUS_METHOD, note === undefined ? { ids: list, status } : { ids: list, status, note });
@@ -157,7 +164,7 @@ async function seedDetailLook(sandbox: Sandbox): Promise<void> {
 }
 
 test.describe("the list with the detail panel", () => {
-  test.use({ seed: { into: seedDetailLook } });
+  test.use({ seed: { into: seedDetailLook }, pomadeSeed: { agentTabs: [...LIVE_TABS, { tabId: "tab-detail", projectId: "alpha", agentId: "claude", sessionId: DETAIL, state: "working" }] } });
 
   test("a project, a long answer, a refused change, a narrow tab, the Workspace and the table after Esc", async ({ page, openShell, pomade, sandbox, manifest, backend }) => {
     const set = (list: string[], status: string, note?: string) => pomade.fake.callApi(SESSIONS_SET_STATUS_METHOD, note === undefined ? { ids: list, status } : { ids: list, status, note });

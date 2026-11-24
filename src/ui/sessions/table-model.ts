@@ -5,6 +5,7 @@
 import { SESSION_STATUSES, WORKSPACE_PROJECT_ID, type SessionStatus } from "pomade-kit/protocol";
 
 import { contextPercent, type Session } from "../../shared/sessions.ts";
+import { LIVE_LABELS } from "../core/live.ts";
 
 export const STATUS_LABELS: Record<SessionStatus, string> = {
   active: "Active",
@@ -224,6 +225,18 @@ export function formatStamp(iso: string | null, now: Date): string {
   if (days === 1) return `Yesterday, ${time}`;
   const year = at.getFullYear() === now.getFullYear() ? "" : `, ${at.getFullYear()}`;
   return `${MONTHS[at.getMonth()]} ${at.getDate()}${year}, ${time}`;
+}
+
+/** A time after "since": "09:05" today, "yesterday, 18:40", "Nov 3, 09:05". */
+export function sinceStamp(iso: string | null, now: Date): string {
+  return formatStamp(iso, now).replace(/^Today, /, "").replace(/^Yesterday\b/, "yesterday");
+}
+
+/** The live mark's tooltip, "Working since 09:05"; `null` for a Closed session, which shows no mark. */
+export function liveTitle(session: Session, now: Date): string | null {
+  if (session.live === "closed") return null;
+  const label = LIVE_LABELS[session.live];
+  return session.liveSince === null ? label : `${label} since ${sinceStamp(session.liveSince, now)}`;
 }
 
 // ── A row's texts ───────────────────────────────────────────────────────────

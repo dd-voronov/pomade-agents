@@ -8,7 +8,7 @@ import {
   detailName,
   draftNote,
   failureText,
-  lastActiveLine,
+  liveLine,
   markerNotes,
   noteToSave,
   oneLine,
@@ -37,11 +37,18 @@ describe("the panel's head", () => {
     expect(detailName(testSession({ record: null }))).toEqual({ text: "Unnamed session", unnamed: true });
   });
 
-  it("says when it was last active", () => {
-    expect(lastActiveLine(local(17, 9, 5), NOW)).toBe("Last active today, 09:05");
-    expect(lastActiveLine(local(16, 18, 40), NOW)).toBe("Last active yesterday, 18:40");
-    expect(lastActiveLine(local(3, 9, 5), NOW)).toBe("Last active Nov 3, 09:05");
-    expect(lastActiveLine(null, NOW)).toBe("No activity recorded");
+  it("says the live state and since when", () => {
+    expect(liveLine(testSession({ live: "working", liveSince: local(17, 9, 5) }), NOW)).toEqual({ state: "Working", when: "since 09:05" });
+    expect(liveLine(testSession({ live: "needs-you", liveSince: local(16, 18, 40) }), NOW)).toEqual({ state: "Needs you", when: "since yesterday, 18:40" });
+    expect(liveLine(testSession({ live: "idle", liveSince: null }), NOW)).toEqual({ state: "Idle", when: "" });
+  });
+
+  it("says when a Closed session was last active", () => {
+    const closed = (lastActiveAt: string | null): Session => testSession({ summary: testSummary({ lastActiveAt }), live: "closed", liveSince: local(17, 14, 0) });
+    expect(liveLine(closed(local(17, 9, 5)), NOW)).toEqual({ state: "Closed", when: "last active today, 09:05" });
+    expect(liveLine(closed(local(16, 18, 40)), NOW)).toEqual({ state: "Closed", when: "last active yesterday, 18:40" });
+    expect(liveLine(closed(local(3, 9, 5)), NOW)).toEqual({ state: "Closed", when: "last active Nov 3, 09:05" });
+    expect(liveLine(closed(null), NOW)).toEqual({ state: "Closed", when: "no activity recorded" });
   });
 });
 

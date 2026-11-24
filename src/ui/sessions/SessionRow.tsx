@@ -1,17 +1,19 @@
 // One session in the Sessions table: a 28 px line of columns, and its note under it. Clicking it
 // selects the session; the row selected before the detail panel closed is marked, as where ↑ ↓
-// go on from. Its checkbox sits before the name, under the group header's chevron; ⋯ at the end
+// go on from. Its checkbox sits before the name, under the group header's chevron, and its live
+// mark between them, under the status mark; ⋯ at the end
 // opens its menu. Both show on hover; the checkbox also while any row is checked. The row drags
 // onto a group header.
 
 import type { ReactElement } from "react";
 
 import { MoreIcon, NoteIcon } from "../core/icons.tsx";
+import { LiveMark } from "../core/LiveMark.tsx";
 import type { Session } from "../../shared/sessions.ts";
 import { Checkbox } from "./Checkbox.tsx";
 import type { RowEvents, RowMarks } from "./row-events.ts";
 import { SessionName } from "./SessionName.tsx";
-import { formatAgo, formatMoney, formatStamp, projectLabel, statusOf, type Columns } from "./table-model.ts";
+import { formatAgo, formatMoney, formatStamp, liveTitle, projectLabel, statusOf, type Columns } from "./table-model.ts";
 import { ContextMeter, Unknown } from "./Values.tsx";
 import styles from "./SessionRow.module.css";
 
@@ -34,6 +36,7 @@ export function SessionRow({ session, columns, names, fork, now, lastSelected, m
   const note = session.record?.note;
   const project = columns.project ? projectLabel(session, names) : "";
   const model = summary.model;
+  const live = liveTitle(session, now);
   return (
     <div
       className={styles.row}
@@ -59,6 +62,7 @@ export function SessionRow({ session, columns, names, fork, now, lastSelected, m
       <div className={styles.line}>
         <div className={`${styles.cell} ${styles.name}`} data-testid="cell-name">
           <Checkbox className={styles.check} checked={marks.checked} label="Check the session" testId="row-check" onToggle={(event) => events.onCheck(session.id, event)} />
+          {live !== null && <span className={styles.live}><LiveMark state={session.live} title={live} /></span>}
           <SessionName session={session} names={names} fork={fork} />
         </div>
         {columns.project && (

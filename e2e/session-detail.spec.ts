@@ -116,7 +116,7 @@ test.describe("the session detail", () => {
 
     const docs = await sessionOf(pomade, DOCS);
     await expect(panel.getByTestId("detail-name")).toHaveText("Unnamed session");
-    await expect(panel.getByTestId("detail-last-active")).toContainText("Last active");
+    await expect(panel.getByTestId("detail-live")).toHaveText(/^Closed· last active /);
     await expect(panel.getByTestId("fact-project")).toHaveText("Alpha");
     await expect(panel.getByTestId("fact-started-in")).toHaveText("docs/on feature/docs");
     await expect(panel.getByTestId("fact-started-in").locator("code")).toHaveText("docs/");
