@@ -28,9 +28,10 @@ is off.
    - it contains `template`, or is `new`.
    A green tick and `Free: folder Agents/<name>, alias <name>.` mean it is free.
 3. **Provider** — Claude Code. (Codex agents come later.)
-4. **Role line** — required: one line on what the agent is for (up to 140 characters). The card and the setup
+4. **Role line** — required: one line on what the agent is for (up to 200 characters). The card and the setup
    prompt use it.
-5. **Tags** — Enter or a comma adds a tag; Backspace in the empty field removes the last.
+5. **Tags** — Enter or a comma adds a tag; Backspace in the empty field removes the last. Up
+   to 20 tags of 24 characters.
 6. **Connect to projects** — tick the projects whose “+” menu should offer the agent. A project that already
    offers every agent isn't listed. With none ticked, the agent is still available in the Workspace.
 

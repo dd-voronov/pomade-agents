@@ -13,8 +13,8 @@ back. The page remembers its tab: a reload, or restarting Pomade, opens the same
 
 ## The header
 
-The agent's name — for the built-ins, `claude` and `codex` — with its chips (`Needs login`, `built-in`,
-`orphan`, `hidden`, `agent.yaml can’t be read`), **Start session ▾** and ⋯. Under the name: the provider, the
+The agent's name — `Claude` and `Codex` for the built-ins — with its chips (`Needs login`, `built-in`,
+`orphan`, `hidden`, `agent.yaml can’t be read`), **Start session ▾** and ⋯. Under the name: the id when it differs from the name (`id claude`), the provider, the
 default model and effort (`provider default` when none), and `launches with <command>` — the shell alias
 Pomade types to start it.
 

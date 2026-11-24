@@ -74,14 +74,15 @@ only; Sessions and Open are entries of its ⋯ menu.
 - **This week:** `11 sessions · ~$9.85`, `1 session` (cost left out when none known). A row shows the
   count over the cost, or `—` for none.
 - **State chips**, in order (`chipsOf`): `Needs login` (below), `built-in`, `orphan`, `agent.yaml can't be
-  read` (the problem on hover), `hidden`.
+  read` (the problem on hover), `hidden` — one list for the
+  card, the row and the agent's page (`state-chips.ts`).
 - **Notices.** A card shows one at a time, the first that applies (`Notice`): an orphan — its config
   folder is gone, with the folder's name; an unusable `agent.yaml` — why, that the agent runs on its
   first-sight values and the file is never written over, with **Open agent.yaml**; Needs login — **Log in
   with `/login` in its tab, then paste the setup prompt.** with **Copy setup prompt**. A row has no
   notice: its second line says `Config folder … is gone` for an orphan, `agent.yaml can’t be used: …` for
-  an unusable file, else the role; Needs login is the chip alone (the prompt is on the card and the agent's
-  page). An orphan's model, Connected to and numbers are empty.
+  an unusable file, Needs login — the instruction with **Copy setup prompt** (below 640 px the link alone,
+  the instruction in its tooltip), else the role; the chip stays at every width. An orphan's model, Connected to and numbers are empty.
 - **Needs login** (`needs-login.ts`): a Claude Code folder agent with a usable profile that is not an
   orphan and has no session of any status in its store (`AgentCountsAnswer.withSessions`). It clears by
   itself when the agent's first session appears. While the stores' first walk runs (`indexing`) no agent is

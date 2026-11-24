@@ -32,11 +32,11 @@ the tabs read and write: [agent-config](agent-config.md); the profile and the ro
 
 `AgentHeader.tsx`, over the tab bar:
 
-- **← Roster** (to `roster`); the name — the roster **id**, so the built-in shows as `claude`, where its
-  card says `Claude`; the state chips; **Start session ▾** (not for an orphan) and the **⋯** menu.
+- **← Roster** (to `roster`); the agent's name, as on its card (`Claude` for the built-in; a folder agent's
+  name is its id); the state chips; **Start session ▾** (not for an orphan) and the **⋯** menu.
 - **Chips**, in order: `Needs login`, `built-in`, `orphan`, `agent.yaml can’t be read` (cause on hover),
-  `hidden` (from the profile's `hidden`; an unusable file shows none).
-- **Under the name:** the provider, the default model + effort (`provider default` when none; the effort is
+  `hidden` — the card's own list (`state-chips.ts`), read from the roster entry.
+- **Under the name:** `id <id>` when the id differs from the name (the built-ins), the provider, the default model + effort (`provider default` when none; the effort is
   shown only with a model), and `launches with <command>` when the profile is usable.
 - **Notices** (`entry.orphan`, `entry.problem`, Needs login): the config folder is gone, with its path;
   `agent.yaml <problem>. The agent runs on its first-sight values; the file is never written over.`; and
@@ -131,7 +131,7 @@ agent), in two bands.
   open.`), an orphan, an unusable profile; and a `settings.json` that cannot be used is reported with
   **Open settings.json** and never written over.
 - Codex: model, effort and the file they come from, read-only, with `Read-only here: editing Codex’s model
-  comes with Codex-based agents (P-003).`
+  comes with Codex-based agents.`
 - The tab shows the latest read, or a write's own answer until the next read lands.
 
 **Modes** — one row per mode (`Normal`, `Full autonomy`) with what it does per provider (`the agent’s own

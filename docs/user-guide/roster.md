@@ -108,8 +108,8 @@ over the file. Fix the file; the card updates by itself.
 
 ## Needs login
 
-A new agent, until it has had a session, has `Needs login`: its config folder is logged out. The card says
-`Log in with /login in its tab, then paste the setup prompt.` — **Copy setup prompt** copies the sentence
+A new agent, until it has had a session, has `Needs login`: its config folder is logged out. The card, and the
+list row's second line, say `Log in with /login in its tab, then paste the setup prompt.` — **Copy setup prompt** copies the sentence
 that has the `creating-claude-agent` skill write the agent's identity. Start a session, run `/login`, paste.
 The chip and notice go as soon as the agent's first session appears.
 

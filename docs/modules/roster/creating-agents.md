@@ -32,12 +32,13 @@ new route (another agent to clone) starts the page afresh. The page title is `Ne
   holds history and credentials. A clone takes its source's role line, tags and projects once both the
   roster and Pomade's projects have answered (`clonePrefill`; the projects are those whose visible agents
   list the source); the name starts empty; the user changes them freely. Picking another source prefills
-  again, over what was typed. Create stays refused until a source is picked (`Pick the agent to clone.`).
+  only the fields the user has not changed (`takePrefill`). Create stays refused until a source is picked (`Pick the agent to clone.`).
 - **Name** — focused on open. Checked as typed (below).
 - **Provider** — Claude Code; Codex is disabled (`Codex-based agents come later`).
-- **Role line** — required, one line, at most 140 characters on this page.
+- **Role line** — required, one line, at most 200 characters (`ROLE_MAX`).
 - **Tags** — a field in a box: Enter or comma adds a tag, Backspace in an empty field removes the last,
-  leaving the field adds what is typed; lower-cased, each once, at most 24 characters in the field.
+  leaving the field adds what is typed; lower-cased, each once, at most 24 characters each and 20 tags — at 20 the
+  field is off, with a hint. The limits are the roster's own (`src/shared/roster.ts`).
 - **Connect to projects** — the workspace's projects in sidebar order under their groups, each a checkbox
   with its root. A project that offers every agent already is not listed; a hint names them (`<names> offer
   every agent already.`). With none to choose: `The workspace has no projects.`
@@ -161,7 +162,6 @@ refused names, an rc file that cannot be written and Check again, a slow shell),
 `e2e/clone-agent.spec.ts` (Clone…, what a clone copies, the tab and the prompt, Needs login until the first
 session).
 
-Known limits: Claude Code only; the page's role limit (140) and tag limit (24, no count limit) are
-tighter than the backend's (200; 40 each, at most 20).
+Known limits: Claude Code only.
 
-Tickets: T-025, T-026.
+Tickets: T-025, T-026, T-037.
