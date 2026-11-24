@@ -117,7 +117,7 @@ describe("Runner's runs", () => {
   });
 
   it("places a run without a session id by its folder and start once its session appears, skipping one a tab or another run holds", async () => {
-    live.put("tab", "t1", { sessionId: "user-own", agent: "codex", cwd: "/ws/Projects/alpha", state: "idle", job: null });
+    live.put("tab", "t1", { sessionId: "user-own", agent: "codex", cwd: "/ws/Projects/alpha", projectId: "alpha", state: "idle", job: null });
     putSessions(codexSession("too-early", later(-10_000)), codexSession("user-own", later(1000)));
     runs.started(codexRun());
     await settle();

@@ -21,9 +21,9 @@ and the backend's handlers in step with it.
 |---|---|
 | `id` · `name` | `pomade-agents` · Agents |
 | `hostApi` | `0` |
-| `capabilities` | `project.read` (projects, their stable ids, names and folders, their visible agents) · `agentTabs.read` (each agent tab's session, folder and live state) — the backend's project attribution, live state and the project ↔ agent connection; the Sessions tab's project names |
+| `capabilities` | `project.read` (projects, their stable ids, names and folders, their visible agents) · `agentTabs.read` (each agent tab's session, folder and live state) — the backend's project attribution, live state and the project ↔ agent connection; the Sessions tab's and Live now's project names · `tabs.open` — Live now focuses agent tabs (`agentTabs.focus`) |
 | `strip` | one icon, `agents` — action `panel` |
-| `events` | publishes `sessions.changed` and `roster.changed` (for its own UI frames) and `session.turnFinished` (declared, never published), `session.closed`, `session.statusChanged` ("Published events" below); subscribes to `pomade-agents:sessions.changed` and `pomade-agents:roster.changed` (its own, for its UI frames), `project.created`, `project.renamed` and `project.removed` (the backend, and the UI frames for project names) and, for the backend, `pomade.ready`, `agentTab.changed`, `agentTab.exited` and Runner's `pomade-runner:run.started`, `pomade-runner:run.finished` ("Subscribed events" below) |
+| `events` | publishes `sessions.changed`, `roster.changed` and `liveNow.changed` (for its own UI frames) and `session.turnFinished` (declared, never published), `session.closed`, `session.statusChanged` ("Published events" below); subscribes to `pomade-agents:sessions.changed`, `pomade-agents:roster.changed` and `pomade-agents:liveNow.changed` (its own, for its UI frames), `project.created`, `project.renamed` and `project.removed` (the backend, and the UI frames for project names) and, for the backend, `pomade.ready`, `agentTab.changed`, `agentTab.exited` and Runner's `pomade-runner:run.started`, `pomade-runner:run.finished` ("Subscribed events" below) |
 | `backend` | `backend/main.mjs`, mode `with-pomade` |
 | `api` | the methods of "Published API" below — `sessions.forRepo`, `sessions.liveIn` and `roster.list` among them, which Pomade reads (HOST-API §4, "Platform reads of app APIs") |
 | `outsideWorkspace` | `~/.claude/`, `~/.codex/`, `~/.zshrc` — the paths outside the workspace the backend uses; Pomade shows them at install (HOST-API §1) |
@@ -70,6 +70,11 @@ One UI bundle; `welcome.surface` and the frame's route pick the view (`src/ui/co
   one `sessions.setStatus` per earlier status. The toast leaves before the backend's 5 s window
   ("Published events", C) can close, so an Undo lands inside it and `session.statusChanged` is
   never published for the change taken back.
+- **Live now** (the panel) follows the project in front — `welcome.project`, then each
+  `project.changed` — for its group order and "current" tag. A row's click is `agentTabs.focus` of
+  its tab (Pomade switches to the tab's project); a group header's is `agentTabs.focus` of the
+  group's first row, since the Host API has no call that only switches project. Its rows come from
+  `liveNow.list` ("Live now" below).
 - The app has one tab per project — Pomade's icon-less app tab. `tabs.openApp({ route })` opens it
   or navigates it (the panel's Sessions and Roster); the frame follows `route.changed`. The tab's
   Sessions | Roster switch is the tab navigating by itself (`navigate`, `tabs.setRoute`), as the
@@ -93,6 +98,7 @@ it the same way. Method names and shapes are in `src/shared/api.ts`, `src/shared
 | `sessions.get` | `SessionsGetParams` `{ id }` | `SessionsGetResult` `{ session: Session }` |
 | `sessions.lastMessage` | `SessionsLastMessageParams` `{ id }` | `SessionsLastMessageResult` `{ message: { text, at } \| null }` |
 | `sessions.find` | `SessionsFindParams` `{ cwd, startedFrom, startedTo, agent? }` | `SessionsFindResult` `{ sessions: FoundSession[] }` |
+| `liveNow.list` | — | `LiveNowAnswer` (the app's own frames) |
 | `roster.list` | `{}` | `{ agents: RosterAgent[] }` (the kit's) |
 | `roster.launchSpec` | `LaunchSpecParams` `{ agent, mode, resume?, sessionId?, prompt? }` | `LaunchSpec` `{ command, args, line, sessionId, exit }` |
 | `roster.projectsFor` | `RosterProjectsForParams` `{ agent }` | `RosterProjectsForResult` `{ projects: string[] }` |
@@ -229,6 +235,41 @@ at a listing is dated then, a state that stays across listings keeps its date, a
 stops running is `closed` since that moment, and one never seen live this run is `closed` since
 `null`. A live-state change is a session change like any other: a new revision, and
 `sessions.changed`.
+
+### Live now
+
+The Live now panel's rows (DESIGN §2.8), shapes in `src/shared/live-now.ts`, built by
+`src/backend/sessions/live-now.ts` from the live state above.
+
+```ts
+type LiveTabRow = {
+  kind: "tab";
+  tabId: string;              // the agent tab: what a click focuses (agentTabs.focus)
+  project: string;            // the tab's project id; "__workspace__" for the Workspace
+  sessionId: string | null;   // null before the tab's first prompt
+  agent: string;              // roster id
+  agentName: string;          // the roster's name for it (roster.agents); its id when the roster has none
+  state: "working" | "needs-you" | "idle";
+  since: string;              // ISO 8601: when the backend saw the tab enter `state`
+  name: string | null;        // the session record's name; null: unnamed, or no session
+  firstMessage: string | null; // the session's first message, whitespace folded to one line
+};
+type LiveRow = LiveTabRow;
+type LiveNowAnswer = { epoch: string; revision: number; rows: LiveRow[] };  // every row, whole
+```
+
+- **Rows** — one per live agent-tab entry (a tab whose `state` is not `exited`), bound to a
+  session or not. Runner's runs are not rows. The answer is unordered; the panel groups and orders
+  (`src/ui/sessions/live-now-model.ts`).
+- **Change notice — `liveNow.changed`** `{ epoch, revision }`: the rows are built again whenever the
+  live entries, the sessions (`sessions.changed`) or the roster change; an answer that differs is a
+  new revision, published at once. A frame behind it asks `liveNow.list` again; it asks once its
+  subscription stands, and every second while the backend does not answer.
+- **The badge** (`keepBadge`) — the backend sets the `agents` icon's badge (`strip.setBadge`, `urgent:
+  true`) to the number of `needs-you` rows whenever it changes, `0` clearing it. It runs from
+  Pomade's start, so the badge is right before the panel's frame exists. A new connection starts from
+  no badge (Pomade clears an app's badges when the app restarts); on `pomade.ready` a non-zero badge is
+  set again, for a window that came up after the backend first set it.
 
 ### The sessions contract (git)
 
@@ -671,7 +712,9 @@ type AgentRunFinished = AgentRunStarted & {
   it when given, then `env` (`undefined` unsets a variable).
 - Playwright fixtures (`e2e/fixtures.ts`): `manifest`, `sandbox`, `pomade`, `backend`, `openShell`, and
   the options `seed` — `test.use({ seed: { into(sandbox) } })` writes into the sandbox before the
-  backend starts (`null` by default) — and `workspaceLink` (`false` by default).
+  backend starts (`null` by default) — `workspaceLink` (`false` by default) and `pomadeSeed` — what
+  the fake Pomade has at start besides the fixture projects: `test.use({ pomadeSeed: { agentTabs:
+  [...] } })` (nothing by default).
 - Transcript helpers (`e2e/transcripts.ts`): `prompt` and `answer` (Claude Code lines; a prompt
   may record a git branch, an answer carries its model, effort, usage and text), `claudeSession(sandbox, id, lines)`, `projectFolder(sandbox,
   projectId)`, and `seedIntoProject(sandbox, projectId)`, which moves the seeded transcripts' start

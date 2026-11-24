@@ -17,10 +17,12 @@
 // Runs live in memory only: they are gone when the backend stops, and `drop` lets go of every run
 // when the connection to Pomade ends — no run finished is heard while it is down.
 
+import { WORKSPACE_PROJECT_ID } from "pomade-kit/protocol";
+
 import { readRunFinished, readRunStarted, type AgentRunStarted } from "../../shared/runner-events.ts";
 import type { RealPath } from "../core/real-paths.ts";
 import { foundSessions } from "./for-runner.ts";
-import type { LiveEntry, LiveState } from "./live-state.ts";
+import type { LiveFacts, LiveState } from "./live-state.ts";
 import type { SessionData } from "./session-data.ts";
 import type { SessionEvents } from "./session-events.ts";
 
@@ -55,10 +57,11 @@ interface Run {
 
 const runKey = (job: string, run: string): string => `${job}\0${run}`;
 
-const entryOf = ({ started, sessionId }: Run): Omit<LiveEntry, "since" | "source"> => ({
+const entryOf = ({ started, sessionId }: Run): LiveFacts => ({
   sessionId,
   agent: started.agent,
   cwd: started.cwd,
+  projectId: started.project ?? WORKSPACE_PROJECT_ID,
   state: "working",
   job: started.name,
 });

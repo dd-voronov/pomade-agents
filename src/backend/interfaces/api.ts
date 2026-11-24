@@ -15,6 +15,7 @@ import {
 import { HostError, type ApiHandler } from "pomade-kit/sdk";
 
 import { APP_INFO_METHOD, type AppInfo } from "../../shared/api.ts";
+import { LIVE_NOW_LIST_METHOD } from "../../shared/live-now.ts";
 import {
   ROSTER_AGENTS_FOR_METHOD,
   ROSTER_AGENTS_METHOD,
@@ -51,6 +52,7 @@ import { launchSpec } from "../roster/launch-spec.ts";
 import { enabledModes, type Roster } from "../roster/roster.ts";
 import { liveSessions, repoSessions } from "../sessions/for-git.ts";
 import { foundSessions } from "../sessions/for-runner.ts";
+import type { LiveNow } from "../sessions/live-now.ts";
 import type { LiveState } from "../sessions/live-state.ts";
 import type { SessionData } from "../sessions/session-data.ts";
 
@@ -58,6 +60,7 @@ export interface ApiSources {
   info: AppInfo;
   sessions: Pick<SessionData, "answer" | "list" | "get" | "changeStatus" | "rename" | "moveToProject">;
   live: Pick<LiveState, "entries">;
+  liveNow: Pick<LiveNow, "answer">;
   realPath: RealPath;
   roster: Pick<Roster, "answer" | "list" | "agent">;
   /** Pomade's projects, through the connection the API is served on. */
@@ -170,7 +173,7 @@ function launchSpecParams(raw: unknown): LaunchSpecParams {
 /** The kit's contract shapes are interfaces, which TypeScript does not take for JSON values; they hold only JSON. */
 const json = (value: SessionsForRepoResult | SessionsLiveInResult): JsonValue => value as unknown as JsonValue;
 
-export function createApi({ info, sessions, live, realPath, roster, projects }: ApiSources): Record<string, ApiHandler> {
+export function createApi({ info, sessions, live, liveNow, realPath, roster, projects }: ApiSources): Record<string, ApiHandler> {
   const updated = async (changed: Promise<SessionsUpdated["sessions"]>): Promise<SessionsUpdated> => ({ sessions: await changed });
   /** The session `{ id }` names; `not-found` when no transcript of it is known. */
   const sessionOf = (raw: unknown): Session => {
@@ -215,6 +218,7 @@ export function createApi({ info, sessions, live, realPath, roster, projects }: 
     [SESSIONS_GET_METHOD]: (raw): SessionsGetResult => ({ session: sessionOf(raw) }),
     [SESSIONS_LAST_MESSAGE_METHOD]: (raw): SessionsLastMessageResult => ({ message: sessionOf(raw).summary.lastAnswer }),
     [SESSIONS_FIND_METHOD]: async (raw): Promise<SessionsFindResult> => ({ sessions: await foundSessions(sessions.list(), findParams(raw), realPath) }),
+    [LIVE_NOW_LIST_METHOD]: () => liveNow.answer(),
     [ROSTER_LIST_METHOD]: () => ({ agents: roster.list() }) as unknown as JsonValue,
     [ROSTER_LAUNCH_SPEC_METHOD]: (raw): LaunchSpec => {
       const params = launchSpecParams(raw);

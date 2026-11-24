@@ -235,7 +235,8 @@ becomes two panes:
 - **Click a row:**
   - an agent tab → Pomade switches to its project and focuses the tab
   - a Runner run → its attached terminal tab opens
-- **The Agents icon's badge** counts the sessions in **Needs you**.
+- **The Agents icon's badge** counts the sessions in **Needs you**. The backend keeps it, so it is
+  right from Pomade's start, before the panel was ever opened.
 - **Nothing running:** "No agents running".
 - The red unread dots on tabs and the per-project counters are the platform's and stay as they
   are.
@@ -421,6 +422,7 @@ Registered with Pomade's broker (`pomade:E-028`). Callers reach it through the H
 | `roster.launchSpec({ agent, mode, resume?, sessionId?, prompt? })` | `{ command, args, line, sessionId, exit }`: the agent's command, the arguments, both as one shell line; the session's id (`null` when the provider cannot pre-assign it); what ends the agent. A disabled or unknown mode is refused | Pomade "+" menu, Runner |
 | `roster.projectsFor({ agent })` · `roster.agentsFor({ project })` | `{ projects }` stable project ids · `{ agents }` roster ids: the connection, read from each project's visible agents (`["*"]` = every agent; the Workspace offers every agent) | Runner (job form) |
 | `roster.agents()` | every agent with its profile, hidden ones and orphans included, its default model and effort; `roster.changed` says when it changes | the app's own frames |
+| `liveNow.list()` | the Live now panel's rows — one per running agent tab: its project, session, agent, live state and since when, the session's name and first message; `liveNow.changed` says when they change | the app's own frames |
 
 **The sessions contract.** `sessions.forRepo` and `sessions.liveIn` are a contract shared with
 Pomade, fixed in `pomade-kit/protocol` (`agent-sessions.ts`). The app imports its types and

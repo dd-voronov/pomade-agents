@@ -31,6 +31,8 @@ export interface PlatformFacts {
   runStarted(payload: unknown): void;
   /** Runner's run finished, its payload as it crossed the bus. */
   runFinished(payload: unknown): void;
+  /** Pomade finished starting (`pomade.ready`). */
+  ready(): void;
 }
 
 export interface FollowOptions {
@@ -90,6 +92,7 @@ export function followPomade(host: HostClient, facts: PlatformFacts, { workspace
       host.events.subscribe(RUN_STARTED_EVENT, (payload) => facts.runStarted(payload)),
       host.events.subscribe(RUN_FINISHED_EVENT, (payload) => facts.runFinished(payload)),
       host.events.subscribe("pomade.ready", () => {
+        facts.ready();
         run("list the projects", loadProjects);
         run("list the agent tabs", loadTabs);
       }),

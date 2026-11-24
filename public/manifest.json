@@ -6,7 +6,8 @@
   "icon": "agents.svg",
   "capabilities": [
     "project.read",
-    "agentTabs.read"
+    "agentTabs.read",
+    "tabs.open"
   ],
   "strip": [
     {
@@ -19,6 +20,7 @@
     "publish": [
       "sessions.changed",
       "roster.changed",
+      "liveNow.changed",
       "session.turnFinished",
       "session.closed",
       "session.statusChanged"
@@ -26,6 +28,7 @@
     "subscribe": [
       "pomade-agents:sessions.changed",
       "pomade-agents:roster.changed",
+      "pomade-agents:liveNow.changed",
       "pomade.ready",
       "project.created",
       "project.renamed",
@@ -51,6 +54,7 @@
     "sessions.get",
     "sessions.lastMessage",
     "sessions.find",
+    "liveNow.list",
     "roster.list",
     "roster.launchSpec",
     "roster.projectsFor",

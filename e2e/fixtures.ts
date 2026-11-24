@@ -3,6 +3,7 @@
 // built backend running in that sandbox. Nothing here reads or writes outside the sandbox.
 
 import { test as base, expect, type FrameLocator, type Page } from "@playwright/test";
+import type { FakeHostOptions } from "pomade-kit/fake-host";
 
 import { BUILT_BACKEND, FIXTURE_PROJECTS, readManifest, type AppManifest } from "../harness/app.ts";
 import { spawnBackend, type BackendProcess } from "../harness/backend-process.ts";
@@ -26,6 +27,9 @@ interface Fixtures {
   seed: Seed | null;
   /** Pomade names the sandbox's workspace through a symlink (`test.use({ workspaceLink: true })`). */
   workspaceLink: boolean;
+  /** What the fake Pomade has at start besides the fixture projects — its agent tabs
+   *  (`test.use({ pomadeSeed: { agentTabs: [...] } })`); nothing by default. */
+  pomadeSeed: Pick<FakeHostOptions, "agentTabs">;
   manifest: AppManifest;
   sandbox: Sandbox;
   pomade: FakePomade;
@@ -49,6 +53,7 @@ export function shellOf(page: Page): Shell {
 export const test = base.extend<Fixtures>({
   seed: [null, { option: true }],
   workspaceLink: [false, { option: true }],
+  pomadeSeed: [{}, { option: true }],
   manifest: async ({}, use) => {
     await use(readManifest());
   },
@@ -57,12 +62,12 @@ export const test = base.extend<Fixtures>({
     await use(sandbox);
     await sandbox.cleanup();
   },
-  pomade: async ({ manifest, sandbox }, use) => {
+  pomade: async ({ manifest, sandbox, pomadeSeed }, use) => {
     const pomade = await startFakePomade({
       manifest,
       socketPath: sandbox.socketPath,
       appKey: sandbox.appKey,
-      host: { projects: FIXTURE_PROJECTS, activeProject: "alpha", workspaceRoot: sandbox.workspace, pomadeVersion: "0.0.0-e2e" },
+      host: { projects: FIXTURE_PROJECTS, activeProject: "alpha", workspaceRoot: sandbox.workspace, pomadeVersion: "0.0.0-e2e", ...pomadeSeed },
     });
     await use(pomade);
     await pomade.close();

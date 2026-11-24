@@ -67,7 +67,7 @@ function api() {
       return visible === undefined ? Promise.reject(new HostError("not-found", `No project ${id}`)) : Promise.resolve(visible);
     },
   };
-  return { handlers: createApi({ info, sessions, live, realPath: (p) => Promise.resolve(p), roster, projects }), calls };
+  return { handlers: createApi({ info, sessions, live, liveNow: { answer: () => ({ epoch: "l", revision: 0, rows: [] }) }, realPath: (p) => Promise.resolve(p), roster, projects }), calls };
 }
 
 const call = (method: string, params: unknown): unknown => {

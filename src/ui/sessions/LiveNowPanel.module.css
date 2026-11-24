@@ -5,11 +5,36 @@
   min-height: 0;
 }
 
+.header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) var(--space-2) var(--space-4);
+  color: var(--text-faint);
+  font-size: var(--fs-xs);
+}
+
+.title {
+  margin: 0;
+  font-size: inherit;
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.count {
+  font-weight: var(--fw-medium);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .actions {
   display: flex;
   flex: none;
   gap: var(--space-2);
-  padding: var(--space-1) var(--space-3) var(--space-3);
+  padding: 0 var(--space-4) var(--space-3);
 }
 
 .action {
@@ -20,28 +45,196 @@
   gap: 6px;
   min-width: 0;
   height: 28px;
-  padding: 0 var(--space-2);
+  padding: 0 var(--space-3);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   background: var(--panel-raised);
-  color: var(--text-muted);
+  color: var(--text);
   font-size: var(--fs-sm);
   font-weight: var(--fw-medium);
+  white-space: nowrap;
   cursor: pointer;
   transition:
     background var(--dur-fast) var(--ease),
-    color var(--dur-fast) var(--ease);
+    border-color var(--dur-fast) var(--ease);
 }
 
 .action:hover {
-  background: var(--hover-bg);
-  color: var(--text);
+  background: linear-gradient(var(--hover-bg), var(--hover-bg)), var(--panel-raised);
 }
 
 .action:active {
-  background: var(--active-bg);
+  background: linear-gradient(var(--active-bg), var(--active-bg)), var(--panel-raised);
 }
 
 .action svg {
   flex: none;
+  color: var(--text-muted);
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  padding-bottom: var(--space-4);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.group + .group {
+  margin-top: var(--space-2);
+}
+
+.groupHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 26px;
+  padding: 0 var(--space-3) 0 var(--space-4);
+  border: none;
+  background: transparent;
+  font-size: var(--fs-xs);
+  text-align: left;
+  cursor: pointer;
+}
+
+.groupName {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-faint);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.groupHead:hover .groupName {
+  color: var(--text-muted);
+}
+
+.current {
+  flex: none;
+  color: var(--badge-fg);
+  font-size: 10.5px;
+  font-weight: var(--fw-medium);
+}
+
+.groupCount {
+  margin-left: auto;
+  color: var(--text-faint);
+  font-weight: var(--fw-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A row: two lines — the name and since when; the state in words and the agent. */
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  width: calc(100% - 2 * var(--space-2));
+  margin: 0 var(--space-2);
+  padding: 5px var(--space-2);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.row:hover {
+  background: var(--hover-bg);
+}
+
+.row:active {
+  background: var(--active-bg);
+}
+
+.lead {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 19px;
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+}
+
+.line1 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 19px;
+}
+
+.name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: var(--fw-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.name[data-unnamed] {
+  color: var(--text-faint);
+  font-weight: 400;
+}
+
+.when {
+  flex: none;
+  margin-left: auto;
+  padding-left: var(--space-1);
+  color: var(--text-faint);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.line2 {
+  display: flex;
+  gap: 5px;
+  min-width: 0;
+  height: 17px;
+  color: var(--text-faint);
+  font-size: var(--fs-xs);
+  line-height: 17px;
+  white-space: nowrap;
+}
+
+.word {
+  white-space: nowrap;
+}
+
+.word[data-state="needs-you"] {
+  color: var(--danger);
+  font-weight: var(--fw-semibold);
+}
+
+.word[data-state="working"] {
+  color: var(--badge-fg);
+}
+
+.agent {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.empty {
+  padding: var(--space-2) var(--space-4);
+  color: var(--text-faint);
+  font-size: var(--fs-sm);
+}
+
+.empty b {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--text-muted);
+  font-weight: var(--fw-semibold);
 }

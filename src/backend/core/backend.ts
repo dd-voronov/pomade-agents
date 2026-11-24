@@ -13,11 +13,13 @@ import type { AppInfo } from "../../shared/api.ts";
 import { STATUS_WINDOW_MS } from "../../shared/session-events.ts";
 import { ROSTER_CHANGED_EVENT } from "../../shared/roster.ts";
 import { SESSIONS_CHANGED_EVENT } from "../../shared/sessions.ts";
+import { LIVE_NOW_CHANGED_EVENT, LIVE_NOW_ICON } from "../../shared/live-now.ts";
 import { createApi } from "../interfaces/api.ts";
 import { followPomade } from "../interfaces/platform.ts";
 import { openRecordStore, type RecordStore } from "../records/record-store.ts";
 import type { ProjectReads } from "../roster/connections.ts";
 import { startRoster } from "../roster/roster.ts";
+import { keepBadge, startLiveNow } from "../sessions/live-now.ts";
 import { createLiveState, followTabs } from "../sessions/live-state.ts";
 import { startRunnerRuns } from "../sessions/runner-runs.ts";
 import { startSessionData } from "../sessions/session-data.ts";
@@ -86,6 +88,8 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
   const tabs = followTabs(live);
   const realPath = createRealPaths();
   const sessions = startSessionData({ summaries: store, records, noRecords, live, realPath, now: options.now, log });
+  const liveNow = startLiveNow({ live, sessions, roster });
+  const badge = keepBadge(liveNow, log);
 
   // The UI frames subscribe to the app's own `sessions.changed`; the backend publishes it to them
   // through whichever Pomade connection is up.
@@ -95,6 +99,9 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
   });
   roster.onChange((changed) => {
     host?.events.publish(ROSTER_CHANGED_EVENT, changed).catch((err: unknown) => log(`could not publish ${ROSTER_CHANGED_EVENT}: ${message(err)}`));
+  });
+  liveNow.onChange((changed) => {
+    host?.events.publish(LIVE_NOW_CHANGED_EVENT, changed).catch((err: unknown) => log(`could not publish ${LIVE_NOW_CHANGED_EVENT}: ${message(err)}`));
   });
   // Events B and C go to other apps through the connection that is up when they are due.
   const events = startSessionEvents({
@@ -117,10 +124,11 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
       onConnect(connected) {
         host = connected;
         log(`connected to Pomade ${connected.welcome.pomadeVersion}`);
-        connected.api.serve(createApi({ info, sessions, live, realPath, roster, projects: projectReads(connected) })).then(
+        connected.api.serve(createApi({ info, sessions, live, liveNow, realPath, roster, projects: projectReads(connected) })).then(
           ({ methods }) => log(`serving ${methods.join(", ")}`),
           (err: unknown) => log(`could not serve the API: ${message(err)}`),
         );
+        badge.connected((count) => connected.strip.setBadge({ icon: LIVE_NOW_ICON, count, urgent: true }));
         followPomade(
           connected,
           {
@@ -131,12 +139,14 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
             tabExited: (exited) => events.tabExited(exited),
             runStarted: (payload) => runs.started(payload),
             runFinished: (payload) => runs.finished(payload),
+            ready: () => badge.ready(),
           },
           { workspace: locations.workspace, log },
         );
       },
       onDisconnect() {
         host = null;
+        badge.disconnected();
         // Pomade's agents end with it; a Pomade that comes back lists its tabs again. Runner's run
         // finished is not heard while the connection is down, so no run is held across it.
         tabs.list([]);
@@ -152,6 +162,8 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
   return {
     async stop() {
       runs.stop();
+      badge.stop();
+      liveNow.stop();
       await events.stop();
       connection.stop();
       sessions.stop();

@@ -43,15 +43,6 @@ export function RosterIcon({ size = 16 }: IconProps): ReactElement {
   );
 }
 
-/** A pulse line — Live now. */
-export function LiveIcon({ size = 16 }: IconProps): ReactElement {
-  return (
-    <Glyph size={size}>
-      <path d="M1.5 8.5h3l1.7-4.5 3 8 1.8-3.5h3.5" />
-    </Glyph>
-  );
-}
-
 /** An unplugged connector — no host, or a host this build cannot talk to. */
 export function UnpluggedIcon({ size = 16 }: IconProps): ReactElement {
   return (

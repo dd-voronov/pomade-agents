@@ -85,7 +85,7 @@ describe("the live state", () => {
   it("lists an agent tab not prompted yet as live with no session, and leaves out one whose agent exited", () => {
     const { state, tabs, heard } = setup();
     tabs.list([tab({ tabId: "t1" }), tab({ tabId: "t2", state: "exited", sessionId: "old" })]);
-    expect(state.entries()).toEqual([{ source: "tab", sessionId: null, agent: "claude", cwd: "/w/alpha", state: "idle", job: null, since: T0 }]);
+    expect(state.entries()).toEqual([{ source: "tab", key: "t1", sessionId: null, agent: "claude", cwd: "/w/alpha", projectId: "alpha", state: "idle", job: null, since: T0 }]);
     expect(state.ofSession("old")).toEqual({ live: "closed", liveSince: null });
     expect(heard).toEqual([]);
   });
@@ -112,7 +112,7 @@ describe("the live state", () => {
 
   it("takes a session's state from a tab bound to it over a run of it, and from the run once the tab goes", () => {
     const { state, tabs } = setup();
-    state.put("run", "r1", { sessionId: "s", agent: "claude", cwd: "/w", state: "working", job: "Nightly" });
+    state.put("run", "r1", { sessionId: "s", agent: "claude", cwd: "/w", projectId: "alpha", state: "working", job: "Nightly" });
     expect(state.ofSession("s").live).toBe("working");
     tabs.list([tab({ tabId: "t1", sessionId: "s", state: "idle" })]);
     expect(state.ofSession("s").live).toBe("idle");
@@ -122,10 +122,26 @@ describe("the live state", () => {
 
   it("keeps each source's entries apart: replacing the tabs leaves the runs", () => {
     const { state, tabs } = setup();
-    state.put("run", "r1", { sessionId: "s9", agent: "claude", cwd: "/w", state: "working", job: "Nightly" });
+    state.put("run", "r1", { sessionId: "s9", agent: "claude", cwd: "/w", projectId: "alpha", state: "working", job: "Nightly" });
     tabs.list([tab({ tabId: "t1" })]);
     tabs.list([]);
-    expect(state.entries()).toEqual([{ source: "run", sessionId: "s9", agent: "claude", cwd: "/w", state: "working", job: "Nightly", since: T0 }]);
+    expect(state.entries()).toEqual([{ source: "run", key: "r1", sessionId: "s9", agent: "claude", cwd: "/w", projectId: "alpha", state: "working", job: "Nightly", since: T0 }]);
     expect(state.ofSession("s9").live).toBe("working");
+  });
+
+  it("tells its entry listeners of every entry that came, went or changed — one bound to no session too — and of nothing else", () => {
+    const { state, tabs } = setup();
+    let heard = 0;
+    state.onEntries(() => (heard += 1));
+    tabs.list([tab({ tabId: "t1" })]);
+    expect(heard).toBe(1);
+    tabs.list([tab({ tabId: "t1" })]);
+    tabs.changed(tab({ tabId: "t1", title: "Renamed" }), false);
+    expect(heard).toBe(1);
+    tabs.changed(tab({ tabId: "t1", state: "needs-you" }), false);
+    tabs.changed(tab({ tabId: "t1", projectId: "beta", state: "needs-you" }), false);
+    expect(state.entries()).toMatchObject([{ key: "t1", projectId: "beta", sessionId: null, state: "needs-you" }]);
+    tabs.changed(tab({ tabId: "t1" }), true);
+    expect(heard).toBe(4);
   });
 });

@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import { createApi } from "../backend/interfaces/api.ts";
 import { API_METHODS } from "./api.ts";
+import { LIVE_NOW_CHANGED_EVENT } from "./live-now.ts";
 import { ROSTER_CHANGED_EVENT } from "./roster.ts";
 import { RUN_FINISHED_EVENT, RUN_STARTED_EVENT } from "./runner-events.ts";
 import { SESSION_CLOSED_EVENT, SESSION_STATUS_CHANGED_EVENT, SESSION_TURN_FINISHED_EVENT } from "./session-events.ts";
@@ -30,11 +31,11 @@ describe("manifest.json", () => {
     expect(parsed.manifest.outsideWorkspace).toEqual(["~/.claude/", "~/.codex/", "~/.zshrc"]);
     // The UI hears the backend's change notices through the app's own published events; other apps
     // hear the session events; the backend follows Pomade's projects and agent tabs, and Runner's
-    // runs, for project attribution, live state and event B.
-    expect(parsed.manifest.capabilities).toEqual(["project.read", "agentTabs.read"]);
+    // runs, for project attribution, live state and event B; Live now focuses agent tabs.
+    expect(parsed.manifest.capabilities).toEqual(["project.read", "agentTabs.read", "tabs.open"]);
     expect(parsed.manifest.events).toEqual({
-      publish: ["sessions.changed", ROSTER_CHANGED_EVENT, SESSION_TURN_FINISHED_EVENT, SESSION_CLOSED_EVENT, SESSION_STATUS_CHANGED_EVENT],
-      subscribe: ["pomade-agents:sessions.changed", "pomade-agents:roster.changed", "pomade.ready", "project.created", "project.renamed", "project.removed", "agentTab.changed", "agentTab.exited", RUN_STARTED_EVENT, RUN_FINISHED_EVENT],
+      publish: ["sessions.changed", ROSTER_CHANGED_EVENT, LIVE_NOW_CHANGED_EVENT, SESSION_TURN_FINISHED_EVENT, SESSION_CLOSED_EVENT, SESSION_STATUS_CHANGED_EVENT],
+      subscribe: ["pomade-agents:sessions.changed", "pomade-agents:roster.changed", `pomade-agents:${LIVE_NOW_CHANGED_EVENT}`, "pomade.ready", "project.created", "project.renamed", "project.removed", "agentTab.changed", "agentTab.exited", RUN_STARTED_EVENT, RUN_FINISHED_EVENT],
     });
   });
 
@@ -58,6 +59,6 @@ describe("manifest.json", () => {
     const live = { entries: () => [] };
     const roster = { answer: () => ({ epoch: "e", revision: 0, agents: [], profilesOff: null }), list: () => [], agent: () => undefined };
     const projects = { projects: none, visibleAgents: none };
-    expect(Object.keys(createApi({ info, sessions, live, realPath: (p: string) => Promise.resolve(p), roster, projects }))).toEqual(api);
+    expect(Object.keys(createApi({ info, sessions, live, liveNow: { answer: () => ({ epoch: "l", revision: 0, rows: [] }) }, realPath: (p: string) => Promise.resolve(p), roster, projects }))).toEqual(api);
   });
 });

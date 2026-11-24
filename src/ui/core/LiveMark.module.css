@@ -1,0 +1,37 @@
+.mark {
+  display: inline-block;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.mark[data-state="working"] {
+  width: 10px;
+  height: 10px;
+  margin: -1px;
+  border: 2px solid var(--selection);
+  border-top-color: var(--accent-active);
+  animation: spin 0.9s linear infinite;
+}
+
+.mark[data-state="needs-you"] {
+  background: var(--danger);
+  box-shadow: 0 0 0 3px var(--danger-soft);
+}
+
+.mark[data-state="idle"] {
+  background: var(--text-faint);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mark[data-state="working"] {
+    animation: none;
+  }
+}
