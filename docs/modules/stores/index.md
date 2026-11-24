@@ -30,7 +30,8 @@ folder. Keep it so: a change that needs a transcript edited is a change to the p
 
 - A folder agent is a folder under `<workspace>/Agents/` holding a `CLAUDE.md`, not `_shared`, with
   no "template" in its name (`folderAgentNames`). The roster takes its folder agents from the same
-  function, so the two never disagree.
+  function, so the two never disagree. Which agent a store's sessions belong to is the roster's
+  answer, not the folder's name ([session-data](../sessions/session-data.md) "A session's agent").
 - Only regular `.jsonl` files at exactly those depths count. Claude's `memory/`, per-session folders
   and `<sessionId>/subagents/*.jsonl` sit one level deeper and are skipped; a Codex rollout whose
   `session_meta.source` names a `subagent` is excluded too (it is not a session of its own).

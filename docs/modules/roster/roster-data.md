@@ -84,7 +84,8 @@ a tick, so it is unclaimed until someone edits it. Names in order; none without 
 
 - **`roster.relink { agent, folder }`** points the orphan's `configDir` at `Agents/<folder>` (every other key
   kept), removes the folder's own first-sight profile, and reads the roster again before it answers: the
-  agent is in `roster.list` again under its id. The answer's `undo` holds the agent's profile text and the
+  agent is in `roster.list` again under its id, and the folder's sessions are its own
+  ([session-data](../sessions/session-data.md) "A session's agent"). The answer's `undo` holds the agent's profile text and the
   removed profile's text (`null`: none) as the files held them.
 - **`roster.undoRelink(undo)`** requires the agent to still name the folder, writes the agent's text back,
   then the folder's profile (byte for byte), and reads again. If the second write fails the first is put

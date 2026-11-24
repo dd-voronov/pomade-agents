@@ -263,7 +263,8 @@ each is treated is [[P-017]].
 - **Folder agents:** one per `<workspace>/Agents/<name>/` that holds a `CLAUDE.md`. Folders named
   `_shared` or containing `template` are skipped. All folder agents are Claude Code instances run
   with `CLAUDE_CONFIG_DIR=<folder>`.
-- **Names:** the built-ins show as Claude and Codex, a folder agent as its folder's name.
+- **Names:** the built-ins show as Claude and Codex, a folder agent as its id — its folder's name, until a re-link
+  points it at another folder.
 - **Each agent's launch command is its shell alias**, e.g. `claude-libra`. Pomade types it into
   an interactive shell.
 

@@ -66,6 +66,21 @@ change notices go out at most every 150 ms. A session whose transcripts are gone
 record stays on disk and joins again if a transcript returns. Writes of the app's own are one per
 session at a time, reconsidered once done.
 
+## A session's agent
+
+`summary.agent` is the agent whose profile holds the session's store, not the name of the folder
+the transcript is in ([CONTRACTS "Sessions"](../../CONTRACTS.md), "A session's agent"). Each store
+root carries its config folder and the folder's own agent (`StoreRoot.configDir`, `.folderAgent`,
+`stores/roots.ts`); the roster answers `storeAgent(root)` from every agent's answering profile's
+resolved `configDir` (absolute, normalized): the folder's own agent when it is among those naming
+the folder or when none does, else the first in roster order. The session store takes that answer
+as `StoreAgents` and, on a roster change, re-stamps only the summaries whose agent changed — each
+gets a new revision, `sessions.changed` and `liveNow.changed`. So a **Re-link** and its **Undo**
+move an agent's sessions at once: the counts, the Agent filter, the agent page's tabs, Live now
+and `pomade-agents show` all read `summary.agent`. A record's `agent` key is kept current with it
+(`refreshRecord`). `sessions.liveIn` gives the tab's own agent id, as Pomade launched it.
+Spec: `relink-sessions.spec.ts`. Tickets: T-036.
+
 ## Attribution
 
 `attribution.ts`, [glossary](../../GLOSSARY.md) "Project attribution". In order: `projectOverride`
@@ -188,4 +203,4 @@ started in one folder within a time window). All compare real paths. Contracts: 
 contract (git)"](../../CONTRACTS.md#the-sessions-contract-git), ["Reads for Runner"](../../CONTRACTS.md#reads-for-runner).
 Specs: `for-git.spec.ts`, `for-runner.spec.ts`, `records.spec.ts`.
 
-Tickets: T-004, T-005, T-010, T-011, T-013, T-015, T-027, T-030, T-033.
+Tickets: T-004, T-005, T-010, T-011, T-013, T-015, T-027, T-030, T-033, T-036.

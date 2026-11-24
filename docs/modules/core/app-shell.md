@@ -81,9 +81,10 @@ How a frame's route moves (`useRoute.ts`, `TabView.tsx`, `openTab.ts`):
 on `SIGTERM`/`SIGINT`. `startBackend` wires the parts in this order and returns `stop()`:
 
 1. Resolve locations; write the run record; log the start.
-2. Start the session store (indexing the agents' stores), open the record store, start the roster and
-   read it once before connecting — Pomade asks for `roster.list` the moment the backend serves, and
-   the first answer must be whole.
+2. Open the record store, start the roster and read it once — Pomade asks for `roster.list` the
+   moment the backend serves, and the first answer must be whole — then start the session store
+   (indexing the agents' stores), which asks the roster whose each store is
+   ([session-data](../sessions/session-data.md) "A session's agent").
 3. Start the skill-folder settings (`settings/settings.ts`, on the record store's `settings.yaml`)
    and the skills catalog on top of them and the roster; build agent creation (`roster/create-agent.ts`)
    when a workspace and its app data are there — it connects projects and launches the first tab
