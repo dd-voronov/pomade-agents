@@ -132,7 +132,7 @@ describe("the latest-10 rule", () => {
 });
 
 describe("columns by width", () => {
-  const full = ROW_PADDING + COLUMN_WIDTH.agent + COLUMN_WIDTH.model + COLUMN_WIDTH.context + COLUMN_WIDTH.cost + COLUMN_WIDTH.last + NAME_MIN_WIDTH;
+  const full = ROW_PADDING + COLUMN_WIDTH.agent + COLUMN_WIDTH.model + COLUMN_WIDTH.context + COLUMN_WIDTH.cost + COLUMN_WIDTH.last + COLUMN_WIDTH.actions + NAME_MIN_WIDTH;
   const shown = (width: number, workspace = false): string[] =>
     Object.entries(columnsFor(width, workspace))
       .filter(([, on]) => on)
@@ -144,7 +144,7 @@ describe("columns by width", () => {
     expect(shown(full + COLUMN_WIDTH.project, true)).toEqual(["agent", "context", "cost", "effort", "model", "project"]);
   });
 
-  it("drops effort → model → ~$ est. → context → agent as the tab narrows; name and last active stay", () => {
+  it("drops effort → model → ~$ est. → context → agent as the tab narrows; name, last active and the actions stay", () => {
     const noEffort = full - (COLUMN_WIDTH.model - COLUMN_WIDTH.modelOnly);
     expect(shown(full - 1)).toEqual(["agent", "context", "cost", "model"]);
     expect(shown(noEffort)).toEqual(["agent", "context", "cost", "model"]);
@@ -161,9 +161,9 @@ describe("columns by width", () => {
   });
 
   it("builds the row's grid: the name takes the rest", () => {
-    expect(columnTemplate(columnsFor(10_000, true))).toBe("minmax(0, 1fr) 132px 108px 204px 82px 74px 84px");
-    expect(columnTemplate(columnsFor(full - 1, false))).toBe("minmax(0, 1fr) 108px 140px 82px 74px 84px");
-    expect(columnTemplate(columnsFor(0, false))).toBe("minmax(0, 1fr) 84px");
+    expect(columnTemplate(columnsFor(10_000, true))).toBe("minmax(0, 1fr) 132px 108px 204px 82px 74px 84px 32px");
+    expect(columnTemplate(columnsFor(full - 1, false))).toBe("minmax(0, 1fr) 108px 140px 82px 74px 84px 32px");
+    expect(columnTemplate(columnsFor(0, false))).toBe("minmax(0, 1fr) 84px 32px");
   });
 });
 

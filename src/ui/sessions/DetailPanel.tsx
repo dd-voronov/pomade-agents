@@ -18,7 +18,6 @@ import {
   noteToSave,
   sameMessage,
   startedIn,
-  type ChangeKind,
   type MarkerNote,
 } from "./detail-model.ts";
 import { StatusMark } from "./StatusGroup.tsx";
@@ -40,7 +39,10 @@ export interface DetailPanelProps {
   inTab: (id: string) => boolean;
   onSelect: (id: string) => void;
   onClose: () => void;
-  change: (session: string, kind: ChangeKind, status: SessionStatus, note?: string | null) => Promise<boolean>;
+  /** Set the session's status (a toast with Undo follows). */
+  onSetStatus: (session: string, status: SessionStatus) => void;
+  /** Save the session's note — `null` removes it; resolves `false` when it was refused. */
+  saveNote: (session: string, note: string | null) => Promise<boolean>;
   failure: Failure | null;
   /** The note field's text while it is typed in; `null` once it is saved or left. */
   onDraftNote: (session: string, text: string | null) => void;
@@ -100,7 +102,7 @@ function MarkerNotes({ notes, onSelect }: { notes: MarkerNote[]; onSelect: (id: 
   );
 }
 
-function NoteField({ session, change, onDraftNote }: Pick<DetailPanelProps, "session" | "change" | "onDraftNote">): ReactElement {
+function NoteField({ session, saveNote, onDraftNote }: Pick<DetailPanelProps, "session" | "saveNote" | "onDraftNote">): ReactElement {
   const saved = session.record?.note;
   /** What the field holds while it differs from the saved note; `null`: it shows the saved note. */
   const [draft, setDraft] = useState<string | null>(null);
@@ -113,7 +115,7 @@ function NoteField({ session, change, onDraftNote }: Pick<DetailPanelProps, "ses
       onDraftNote(session.id, null);
       return;
     }
-    const ok = await change(session.id, "note", statusOf(session), note);
+    const ok = await saveNote(session.id, note);
     // A refused note stays in the field to try again; the row goes back to the saved note.
     if (ok) setDraft(null);
     onDraftNote(session.id, null);
@@ -157,7 +159,7 @@ function NoteField({ session, change, onDraftNote }: Pick<DetailPanelProps, "ses
   );
 }
 
-function StatusButtons({ session, change }: Pick<DetailPanelProps, "session" | "change">): ReactElement {
+function StatusButtons({ session, onSetStatus }: Pick<DetailPanelProps, "session" | "onSetStatus">): ReactElement {
   const current = statusOf(session);
   return (
     <div className={styles.segmented} role="group" aria-label="Status" data-testid="status-buttons">
@@ -170,7 +172,7 @@ function StatusButtons({ session, change }: Pick<DetailPanelProps, "session" | "
           title={status === current ? `${STATUS_LABELS[status]} — the session's status` : `Set the status to ${STATUS_LABELS[status]}`}
           data-testid={`status-${status}`}
           onClick={() => {
-            if (status !== current) void change(session.id, "status", status);
+            if (status !== current) onSetStatus(session.id, status);
           }}
         >
           <StatusMark status={status} />
@@ -285,9 +287,9 @@ export function DetailPanel(props: DetailPanelProps): ReactElement {
         <MarkerNotes notes={notes} onSelect={onSelect} />
         <section className={styles.section}>
           <h3 className={styles.label}>Status</h3>
-          <StatusButtons session={session} change={props.change} />
-          <NoteField session={session} change={props.change} onDraftNote={props.onDraftNote} />
-          {failure !== null && failure.session === session.id && (
+          <StatusButtons session={session} onSetStatus={props.onSetStatus} />
+          <NoteField session={session} saveNote={props.saveNote} onDraftNote={props.onDraftNote} />
+          {failure !== null && failure.sessions.includes(session.id) && (
             <p className={styles.failure} role="alert" title={failure.reason} data-testid="change-failure">
               <WarningIcon size={14} />
               <span>{failure.text}</span>

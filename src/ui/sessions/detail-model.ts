@@ -136,7 +136,8 @@ export function draftNote(draft: string): string | undefined {
 
 // ── A failed change ─────────────────────────────────────────────────────────
 
-export type ChangeKind = "status" | "note";
+/** What a change sets: a status, a note, or the earlier statuses back (Undo). */
+export type ChangeKind = "status" | "note" | "undo";
 
 /** A failed change as the panel shows it: `text` in plain words, `reason` (the backend's own
  *  words, paths included) on hover. */
@@ -154,9 +155,15 @@ const CAUSES: Partial<Record<ErrorCode, string>> = {
   "app-not-responding": "The app's backend did not answer in time.",
 };
 
+const LEADS: Record<ChangeKind, string> = {
+  status: "The status was not changed.",
+  note: "The note was not saved.",
+  undo: "The earlier status was not set back.",
+};
+
 /** What the panel says when a change fails: what was not done and, in plain words, why. */
 export function failureText(kind: ChangeKind, error: unknown): FailureText {
-  const lead = kind === "status" ? "The status was not changed." : "The note was not saved.";
+  const lead = LEADS[kind];
   const cause = (error instanceof HostError ? CAUSES[error.code] : undefined) ?? "Something went wrong.";
   const reason = (error instanceof Error ? error.message : String(error)).trim();
   return { text: `${lead} ${cause}`, reason: reason === "" ? cause : reason };

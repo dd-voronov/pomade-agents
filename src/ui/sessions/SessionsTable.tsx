@@ -1,17 +1,22 @@
 // The Sessions table (DESIGN §2.7 "Table — nothing selected"): one scrolling list with a sticky
-// column header and the four collapsible status groups. It measures its own width and shows the
-// columns that fit. Which groups are collapsed or expanded is the tab's, so it stays while the
-// sessions change and across the detail panel. Opened again from the panel, it scrolls to the row
-// that was selected.
+// column header — its checkbox checks every row shown — and the four collapsible status groups,
+// whose headers take dropped rows. It measures its own width and shows the columns that fit. Which
+// groups are collapsed or expanded is the tab's, so it stays while the sessions change and across
+// the detail panel. Opened again from the panel, it scrolls to the row that was selected; the
+// marked row stays in view as Shift+↑↓ move it.
 
 import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactElement, type RefObject } from "react";
 import { SESSION_STATUSES, type SessionStatus } from "pomade-kit/protocol";
 
 import type { Session } from "../../shared/sessions.ts";
+import type { Checked } from "./check-model.ts";
+import { Checkbox } from "./Checkbox.tsx";
+import type { RowEvents } from "./row-events.ts";
 import { SessionRow } from "./SessionRow.tsx";
 import { StatusGroup } from "./StatusGroup.tsx";
 import { columnTemplate, columnsFor, forkTooltip, type Columns } from "./table-model.ts";
 import styles from "./SessionsTable.module.css";
+import type { StatusDrop } from "./useStatusDrag.ts";
 
 export interface SessionsTableProps {
   groups: Record<SessionStatus, readonly Session[]>;
@@ -29,7 +34,14 @@ export interface SessionsTableProps {
   onToggleExpanded: (status: SessionStatus) => void;
   /** The row selected before the detail panel closed: marked, and scrolled into view when the table opens. */
   lastSelected: string | null;
-  onSelect: (id: string) => void;
+  checked: Checked;
+  /** The header checkbox: none, every or some of the rows shown checked. */
+  allChecked: boolean | "mixed";
+  onCheckAll: () => void;
+  /** The session whose menu is open. */
+  menuOf: string | null;
+  events: RowEvents;
+  drop: StatusDrop;
 }
 
 function useWidth(): [RefObject<HTMLDivElement>, number | null] {
@@ -46,10 +58,17 @@ function useWidth(): [RefObject<HTMLDivElement>, number | null] {
   return [ref, width];
 }
 
-function ColumnHeader({ columns }: { columns: Columns }): ReactElement {
+function ColumnHeader({ columns, allChecked, onCheckAll }: { columns: Columns; allChecked: boolean | "mixed"; onCheckAll: () => void }): ReactElement {
   return (
     <div className={styles.columns} data-testid="sessions-columns">
       <div className={`${styles.heading} ${styles.name}`}>
+        <Checkbox
+          className={styles.checkAll}
+          checked={allChecked}
+          label={allChecked === true ? "Clear the checks" : "Check every row shown"}
+          testId="check-all"
+          onToggle={onCheckAll}
+        />
         Name
       </div>
       {columns.project && (
@@ -80,6 +99,7 @@ function ColumnHeader({ columns }: { columns: Columns }): ReactElement {
       <div className={`${styles.heading} ${styles.number}`}>
         Last active
       </div>
+      <div />
     </div>
   );
 }
@@ -95,7 +115,12 @@ export function SessionsTable({
   onToggleCollapsed,
   onToggleExpanded,
   lastSelected,
-  onSelect,
+  checked,
+  allChecked,
+  onCheckAll,
+  menuOf,
+  events,
+  drop,
 }: SessionsTableProps): ReactElement {
   const [ref, width] = useWidth();
   const revealed = useRef(lastSelected);
@@ -105,6 +130,11 @@ export function SessionsTable({
     const row = ref.current?.querySelector(`[data-session-id="${CSS.escape(id)}"]`);
     row?.scrollIntoView({ block: "center" });
   }, [ref]);
+  useLayoutEffect(() => {
+    if (lastSelected === null || lastSelected === revealed.current) return;
+    const row = ref.current?.querySelector(`[data-session-id="${CSS.escape(lastSelected)}"]`);
+    row?.scrollIntoView({ block: "nearest" });
+  }, [ref, lastSelected]);
   // Until the first measure (before paint) every column is laid out.
   const columns = columnsFor(width ?? Infinity, workspace);
   const shown = Object.entries(columns)
@@ -115,7 +145,7 @@ export function SessionsTable({
 
   return (
     <div ref={ref} className={styles.table} style={style} data-testid="sessions-table" data-columns={shown}>
-      <ColumnHeader columns={columns} />
+      <ColumnHeader columns={columns} allChecked={allChecked} onCheckAll={onCheckAll} />
       {SESSION_STATUSES.map((status) => (
         <StatusGroup
           key={status}
@@ -125,6 +155,7 @@ export function SessionsTable({
           expanded={expanded.has(status)}
           onToggleCollapsed={onToggleCollapsed}
           onToggleExpanded={onToggleExpanded}
+          drop={drop}
           row={(session) => (
             <SessionRow
               key={session.id}
@@ -134,7 +165,8 @@ export function SessionsTable({
               fork={forkTooltip(session, byId)}
               now={now}
               lastSelected={session.id === lastSelected}
-              onSelect={onSelect}
+              marks={{ checked: checked.has(session.id), menu: session.id === menuOf }}
+              events={events}
             />
           )}
         />

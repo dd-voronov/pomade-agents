@@ -102,7 +102,7 @@ export function shownRows<T>(status: SessionStatus, rows: readonly T[], expanded
 export const DROP_ORDER = ["effort", "model", "cost", "context", "agent"] as const;
 export type DroppableColumn = (typeof DROP_ORDER)[number];
 
-/** Which columns a table shows. The name and last active always show; the project in the Workspace's tab. */
+/** Which columns a table shows. The name, last active and the row's actions always show; the project in the Workspace's tab. */
 export type Columns = { project: boolean } & Record<DroppableColumn, boolean>;
 
 /** Column widths in px, cell padding included. */
@@ -115,6 +115,8 @@ export const COLUMN_WIDTH = {
   context: 82,
   cost: 74,
   last: 84,
+  /** The row's hover actions: ⋯. */
+  actions: 32,
 } as const;
 
 /** The name column never gets narrower than this (its cell padding included). */
@@ -123,7 +125,7 @@ export const NAME_MIN_WIDTH = 240;
 export const ROW_PADDING = 16;
 
 function fixedWidth(columns: Columns): number {
-  let width = ROW_PADDING + COLUMN_WIDTH.last;
+  let width = ROW_PADDING + COLUMN_WIDTH.last + COLUMN_WIDTH.actions;
   if (columns.project) width += COLUMN_WIDTH.project;
   if (columns.agent) width += COLUMN_WIDTH.agent;
   if (columns.model) width += columns.effort ? COLUMN_WIDTH.model : COLUMN_WIDTH.modelOnly;
@@ -152,7 +154,7 @@ export function columnTemplate(columns: Columns): string {
   if (columns.model) tracks.push(px(columns.effort ? COLUMN_WIDTH.model : COLUMN_WIDTH.modelOnly));
   if (columns.context) tracks.push(px(COLUMN_WIDTH.context));
   if (columns.cost) tracks.push(px(COLUMN_WIDTH.cost));
-  tracks.push(px(COLUMN_WIDTH.last));
+  tracks.push(px(COLUMN_WIDTH.last), px(COLUMN_WIDTH.actions));
   return tracks.join(" ");
 }
 

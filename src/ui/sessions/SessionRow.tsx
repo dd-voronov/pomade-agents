@@ -1,11 +1,15 @@
 // One session in the Sessions table: a 28 px line of columns, and its note under it. Clicking it
 // selects the session; the row selected before the detail panel closed is marked, as where ↑ ↓
-// go on from.
+// go on from. Its checkbox sits before the name, under the group header's chevron; ⋯ at the end
+// opens its menu. Both show on hover; the checkbox also while any row is checked. The row drags
+// onto a group header.
 
 import type { ReactElement } from "react";
 
-import { NoteIcon } from "../core/icons.tsx";
+import { MoreIcon, NoteIcon } from "../core/icons.tsx";
 import type { Session } from "../../shared/sessions.ts";
+import { Checkbox } from "./Checkbox.tsx";
+import type { RowEvents, RowMarks } from "./row-events.ts";
 import { SessionName } from "./SessionName.tsx";
 import { formatAgo, formatMoney, formatStamp, projectLabel, statusOf, type Columns } from "./table-model.ts";
 import { ContextMeter, Unknown } from "./Values.tsx";
@@ -21,10 +25,11 @@ export interface SessionRowProps {
   now: Date;
   /** The row selected before the detail panel closed. */
   lastSelected: boolean;
-  onSelect: (id: string) => void;
+  marks: RowMarks;
+  events: RowEvents;
 }
 
-export function SessionRow({ session, columns, names, fork, now, lastSelected, onSelect }: SessionRowProps): ReactElement {
+export function SessionRow({ session, columns, names, fork, now, lastSelected, marks, events }: SessionRowProps): ReactElement {
   const { summary } = session;
   const note = session.record?.note;
   const project = columns.project ? projectLabel(session, names) : "";
@@ -36,10 +41,24 @@ export function SessionRow({ session, columns, names, fork, now, lastSelected, o
       data-session-id={session.id}
       data-status={statusOf(session)}
       data-last-selected={lastSelected ? "" : undefined}
-      onClick={() => onSelect(session.id)}
+      data-checked={marks.checked ? "" : undefined}
+      data-menu={marks.menu ? "" : undefined}
+      draggable
+      onClick={(event) => events.onClick(session.id, event)}
+      // Shift+click checks a range: no text selection along with it.
+      onMouseDown={(event) => {
+        if (event.shiftKey) event.preventDefault();
+      }}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        events.onMenu(session.id, { x: event.clientX, y: event.clientY });
+      }}
+      onDragStart={(event) => events.onDragStart(session.id, event)}
+      onDragEnd={events.onDragEnd}
     >
       <div className={styles.line}>
         <div className={`${styles.cell} ${styles.name}`} data-testid="cell-name">
+          <Checkbox className={styles.check} checked={marks.checked} label="Check the session" testId="row-check" onToggle={(event) => events.onCheck(session.id, event)} />
           <SessionName session={session} names={names} fork={fork} />
         </div>
         {columns.project && (
@@ -70,6 +89,25 @@ export function SessionRow({ session, columns, names, fork, now, lastSelected, o
         )}
         <div className={`${styles.cell} ${styles.number} ${styles.muted}`} title={formatStamp(summary.lastActiveAt, now)} data-testid="cell-last">
           {formatAgo(summary.lastActiveAt, now)}
+        </div>
+        <div className={styles.actions}>
+          <button
+            type="button"
+            className={styles.more}
+            title="More"
+            aria-label="The session's menu"
+            aria-haspopup="menu"
+            aria-expanded={marks.menu}
+            tabIndex={-1}
+            draggable={false}
+            data-testid="row-more"
+            onClick={(event) => {
+              event.stopPropagation();
+              events.onMenu(session.id, event.currentTarget.getBoundingClientRect());
+            }}
+          >
+            <MoreIcon />
+          </button>
         </div>
       </div>
       {note !== undefined && (

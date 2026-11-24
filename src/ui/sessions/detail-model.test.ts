@@ -181,5 +181,6 @@ describe("a failed change", () => {
     expect(failureText("status", new HostError("app-absent", "pomade-agents is not served")).text).toBe("The status was not changed. The app's backend is not running.");
     expect(failureText("status", new Error("the backend's answer was malformed"))).toEqual({ text: "The status was not changed. Something went wrong.", reason: "the backend's answer was malformed" });
     expect(failureText("note", new Error(""))).toEqual({ text: "The note was not saved. Something went wrong.", reason: "Something went wrong." });
+    expect(failureText("undo", new HostError("io-error", "EACCES")).text).toBe("The earlier status was not set back. The record file could not be written.");
   });
 });

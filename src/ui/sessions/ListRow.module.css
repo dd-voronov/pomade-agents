@@ -1,8 +1,11 @@
 /* A two-line row in the list beside the detail panel. */
 
 .row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
   margin: 0 var(--space-2);
-  padding: 4px var(--space-2);
+  padding: 4px var(--space-2) 4px 6px;
   border-radius: var(--radius-sm);
   cursor: default;
   scroll-margin: var(--space-1) 0;
@@ -20,6 +23,33 @@
 .row[aria-selected="true"] {
   background: var(--accent-soft);
   box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.row[data-checked] {
+  background: var(--selection);
+}
+
+.row[aria-selected="true"][data-checked] {
+  background: linear-gradient(var(--selection), var(--selection)), var(--accent-soft);
+}
+
+/* Centered on the name's line. */
+.check {
+  margin-top: 2.5px;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.row:hover .check,
+.row:focus-within .check,
+.check[aria-checked="true"],
+:global([data-checking]) .check {
+  opacity: 1;
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
 }
 
 .first,

@@ -46,6 +46,11 @@
   box-shadow: inset 0 -2px 0 var(--accent);
 }
 
+/* Rows dragged over it drop here. */
+.tab[data-drop] {
+  background: var(--accent-soft);
+}
+
 .tab:focus-visible {
   outline-offset: -2px;
 }

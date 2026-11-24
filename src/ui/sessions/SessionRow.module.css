@@ -41,7 +41,9 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* The checkbox sits in the name's indent, under the group header's chevron. */
 .name {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -80,4 +82,64 @@
 .note svg {
   flex: none;
   color: var(--text-faint);
+}
+
+.row[data-checked] {
+  background: var(--selection);
+}
+
+.row[data-last-selected][data-checked] {
+  background: linear-gradient(var(--selection), var(--selection)), var(--accent-soft);
+}
+
+.check {
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.row:hover .check,
+.row:focus-within .check,
+.check[aria-checked="true"],
+:global([data-checking]) .check {
+  opacity: 1;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-left: var(--space-1);
+}
+
+.more {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  opacity: 0;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease);
+}
+
+.more:hover,
+.more[aria-expanded="true"] {
+  background: var(--active-bg);
+  color: var(--text);
+}
+
+.row:hover .more,
+.row:focus-within .more,
+.row[data-menu] .more {
+  opacity: 1;
 }

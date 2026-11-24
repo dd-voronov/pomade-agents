@@ -39,10 +39,19 @@
   white-space: nowrap;
 }
 
+/* The header checkbox sits in the name's indent, over the rows' checkboxes. */
 .name {
+  position: relative;
   padding-left: var(--name-indent);
 }
 
 .number {
   text-align: right;
+}
+
+.checkAll {
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  transform: translateY(-50%);
 }

@@ -1,0 +1,29 @@
+.box {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--panel-raised);
+  color: transparent;
+  cursor: pointer;
+}
+
+/* A larger hit area than the box. */
+.box::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
+}
+
+.box[aria-checked="true"],
+.box[aria-checked="mixed"] {
+  border-color: var(--accent-active);
+  background: var(--accent-active);
+  color: var(--accent-contrast);
+}

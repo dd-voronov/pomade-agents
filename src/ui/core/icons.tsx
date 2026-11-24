@@ -2,10 +2,10 @@
 
 import type { ReactElement, ReactNode } from "react";
 
-function Glyph({ size, children }: { size: number; children: ReactNode }): ReactElement {
+function Glyph({ size, stroke = 1.2, children }: { size: number; stroke?: number | undefined; children: ReactNode }): ReactElement {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden="true">
-      <g stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+      <g stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round">
         {children}
       </g>
     </svg>
@@ -14,6 +14,11 @@ function Glyph({ size, children }: { size: number; children: ReactNode }): React
 
 export interface IconProps {
   size?: number;
+}
+
+/** A glyph drawn small inside a control, with a heavier stroke so it reads at that size. */
+export interface MarkProps extends IconProps {
+  stroke?: number;
 }
 
 /** Stacked rows — the Sessions list. */
@@ -133,6 +138,35 @@ export function WarningIcon({ size = 16 }: IconProps): ReactElement {
     <Glyph size={size}>
       <path d="M8 2.5l6 10.5H2z" />
       <path d="M8 6.5v3M8 11.25v.01" />
+    </Glyph>
+  );
+}
+
+/** A tick — checked. */
+export function CheckIcon({ size = 16, stroke }: MarkProps): ReactElement {
+  return (
+    <Glyph size={size} stroke={stroke}>
+      <path d="M3.5 8.5l3 3 6-7" />
+    </Glyph>
+  );
+}
+
+/** A dash — some of the rows checked. */
+export function MixedIcon({ size = 16, stroke }: MarkProps): ReactElement {
+  return (
+    <Glyph size={size} stroke={stroke}>
+      <path d="M4 8h8" />
+    </Glyph>
+  );
+}
+
+/** Three dots — a row's menu. */
+export function MoreIcon({ size = 16 }: IconProps): ReactElement {
+  return (
+    <Glyph size={size}>
+      <circle cx="3.5" cy="8" r=".6" fill="currentColor" />
+      <circle cx="8" cy="8" r=".6" fill="currentColor" />
+      <circle cx="12.5" cy="8" r=".6" fill="currentColor" />
     </Glyph>
   );
 }

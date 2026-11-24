@@ -1,6 +1,6 @@
 // One status's group in the Sessions table: a sticky header (collapse toggle, status mark, label,
-// count, ~$ sum), then its rows — the latest 10 of a long Done or Done–skip/Failed group with
-// "Show all N" — or its one-line empty text.
+// count, ~$ sum) that takes rows dropped on it, then its rows — the latest 10 of a long Done or
+// Done–skip/Failed group with "Show all N" — or its one-line empty text.
 
 import type { ReactElement, ReactNode } from "react";
 import type { SessionStatus } from "pomade-kit/protocol";
@@ -9,6 +9,7 @@ import { ChevronIcon } from "../core/icons.tsx";
 import type { Session } from "../../shared/sessions.ts";
 import { EMPTY_GROUP_TEXT, LATEST_SHOWN, STATUS_LABELS, costSum, formatMoney, isLong, shownRows } from "./table-model.ts";
 import styles from "./StatusGroup.module.css";
+import type { StatusDrop } from "./useStatusDrag.ts";
 
 export interface StatusGroupProps {
   status: SessionStatus;
@@ -19,6 +20,7 @@ export interface StatusGroupProps {
   expanded: boolean;
   onToggleCollapsed: (status: SessionStatus) => void;
   onToggleExpanded: (status: SessionStatus) => void;
+  drop: StatusDrop;
   row: (session: Session) => ReactNode;
 }
 
@@ -35,13 +37,20 @@ function sumText(status: SessionStatus, sessions: readonly Session[]): string | 
   return parts.length === 0 ? null : parts.join(" · ");
 }
 
-export function StatusGroup({ status, sessions, collapsed, expanded, onToggleCollapsed, onToggleExpanded, row }: StatusGroupProps): ReactElement {
+export function StatusGroup({ status, sessions, collapsed, expanded, onToggleCollapsed, onToggleExpanded, drop, row }: StatusGroupProps): ReactElement {
   const count = sessions.length;
   const sum = sumText(status, sessions);
   const long = isLong(status, count);
   return (
     <section className={styles.group} data-testid={`group-${status}`} data-count={count} aria-label={STATUS_LABELS[status]}>
-      <div className={styles.head}>
+      <div
+        className={styles.head}
+        data-testid={`group-head-${status}`}
+        data-drop={drop.over === status ? "" : undefined}
+        onDragOver={(event) => drop.onDragOver(status, event)}
+        onDragLeave={(event) => drop.onDragLeave(status, event)}
+        onDrop={(event) => drop.onDrop(status, event)}
+      >
         <button
           type="button"
           className={styles.toggle}

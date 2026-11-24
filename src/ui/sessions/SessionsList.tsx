@@ -1,5 +1,5 @@
 // The list beside the detail panel (DESIGN §2.7 "List with the detail panel"): the four status
-// tabs with their counts, then the open tab's sessions as two-line rows — a long Done or
+// tabs with their counts, which take rows dropped on them, then the open tab's sessions as two-line rows — a long Done or
 // Done–skip/Failed tab cut to its latest rows with "Show all N", unless the selected session is
 // further down — or its one-line empty text. The selected row is kept in view.
 
@@ -7,12 +7,15 @@ import { useLayoutEffect, useRef, type ReactElement } from "react";
 import { SESSION_STATUSES, type SessionStatus } from "pomade-kit/protocol";
 
 import type { Session } from "../../shared/sessions.ts";
+import type { Checked } from "./check-model.ts";
 import { ListRow } from "./ListRow.tsx";
+import type { RowEvents } from "./row-events.ts";
 import type { Groups } from "./selection-model.ts";
 import { listRows } from "./selection-model.ts";
 import { StatusMark } from "./StatusGroup.tsx";
 import { EMPTY_GROUP_TEXT, LATEST_SHOWN, STATUS_LABELS, STATUS_SHORT_LABELS, forkTooltip } from "./table-model.ts";
 import styles from "./SessionsList.module.css";
+import type { StatusDrop } from "./useStatusDrag.ts";
 
 export interface SessionsListProps {
   groups: Groups;
@@ -20,7 +23,11 @@ export interface SessionsListProps {
   tab: SessionStatus;
   onOpenTab: (status: SessionStatus) => void;
   selected: string;
-  onSelect: (id: string) => void;
+  checked: Checked;
+  /** The session whose menu is open. */
+  menuOf: string | null;
+  events: RowEvents;
+  drop: StatusDrop;
   expanded: ReadonlySet<SessionStatus>;
   onToggleExpanded: (status: SessionStatus) => void;
   workspace: boolean;
@@ -31,7 +38,23 @@ export interface SessionsListProps {
   noteOf: (session: Session) => string | undefined;
 }
 
-export function SessionsList({ groups, tab, onOpenTab, selected, onSelect, expanded, onToggleExpanded, workspace, names, byId, now, noteOf }: SessionsListProps): ReactElement {
+export function SessionsList({
+  groups,
+  tab,
+  onOpenTab,
+  selected,
+  checked,
+  menuOf,
+  events,
+  drop,
+  expanded,
+  onToggleExpanded,
+  workspace,
+  names,
+  byId,
+  now,
+  noteOf,
+}: SessionsListProps): ReactElement {
   const list = useRef<HTMLDivElement>(null);
   const sessions = groups[tab];
   const shown = listRows(tab, sessions, expanded.has(tab), selected);
@@ -53,7 +76,11 @@ export function SessionsList({ groups, tab, onOpenTab, selected, onSelect, expan
             aria-selected={status === tab}
             title={STATUS_LABELS[status]}
             data-testid={`status-tab-${status}`}
+            data-drop={drop.over === status ? "" : undefined}
             onClick={() => onOpenTab(status)}
+            onDragOver={(event) => drop.onDragOver(status, event)}
+            onDragLeave={(event) => drop.onDragLeave(status, event)}
+            onDrop={(event) => drop.onDrop(status, event)}
           >
             <StatusMark status={status} />
             <span className={styles.label}>{STATUS_SHORT_LABELS[status]}</span>
@@ -73,8 +100,9 @@ export function SessionsList({ groups, tab, onOpenTab, selected, onSelect, expan
             fork={forkTooltip(session, byId)}
             now={now}
             selected={session.id === selected}
+            marks={{ checked: checked.has(session.id), menu: session.id === menuOf }}
+            events={events}
             note={noteOf(session)}
-            onSelect={onSelect}
           />
         ))}
         {shown.long && (

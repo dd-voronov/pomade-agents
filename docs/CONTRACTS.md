@@ -56,12 +56,20 @@ One UI bundle; `welcome.surface` and the frame's route pick the view (`src/ui/co
   the start folder and in the project's root resolved), else relative to the workspace `app.info`
   names — with symlinks resolved (`workspaceReal`) or as Pomade names it (`workspace`) — else as
   recorded.
-- **Status and note** are set from the detail panel through `sessions.setStatus` ("Sessions"
-  below), one call at a time; the frame takes the changed sessions from its answer, so the row
-  moves at once, and a refused change leaves the rows as they were. The panel says what was not
-  done and why in plain words, by the error's code (`failureText`, `src/ui/sessions/detail-model.ts`:
-  `io-error` "The record file could not be written.", `not-ready`, `not-found`, `app-absent`,
-  `app-not-responding`, else "Something went wrong."); the backend's message is its hover text.
+- **Status and note** are set through `sessions.setStatus` ("Sessions" below) — a status from the
+  detail panel, the bulk bar, the row menu or a drag onto a status, the note from the panel — one
+  call at a time; a status change of several sessions is one call with every id whose status
+  differs, without `note`. The frame takes the changed sessions from its answer, so the rows move
+  at once, and a refused change leaves the rows as they were. The panel, or for a change made
+  elsewhere the toast, says what was not done and why in plain words, by the error's code
+  (`failureText`, `src/ui/sessions/detail-model.ts`: `io-error` "The record file could not be
+  written.", `not-ready`, `not-found`, `app-absent`, `app-not-responding`, else "Something went
+  wrong."); the backend's message is its hover text.
+- **Undo.** Every status change shows a toast for 4 s (`TOAST_MS`,
+  `src/ui/sessions/useStatusMoves.ts`) with Undo, which sets each session's earlier status back —
+  one `sessions.setStatus` per earlier status. The toast leaves before the backend's 5 s window
+  ("Published events", C) can close, so an Undo lands inside it and `session.statusChanged` is
+  never published for the change taken back.
 - The app has one tab per project — Pomade's icon-less app tab. `tabs.openApp({ route })` opens it
   or navigates it (the panel's Sessions and Roster); the frame follows `route.changed`. The tab's
   Sessions | Roster switch is the tab navigating by itself (`navigate`, `tabs.setRoute`), as the
