@@ -18,7 +18,7 @@ Built by the backend (`backend/sessions/live-now.ts`, `startLiveNow`) from the l
 
 - **Tab row** — one per live agent-tab entry (`working`, `needs-you`, `idle`; `exited` is not live), bound to
   a session or not yet prompted. Carries the session's name and first message (one line), the agent's
-  roster name (its id when the roster has none) and `since`.
+  roster id (`agent`) and roster name (`agentName`, its id when the roster has none) and `since`.
 - **Run row** — one per Runner agent run from its run started to its run finished: always Working, titled
   by the job's name, with the run's attached terminal when Runner named it ([session-data](session-data.md)
   "Runner runs"). Runs never need you.
@@ -33,15 +33,17 @@ The answer is unordered; the panel orders it.
 `live-now-model.ts` (pure) and `LiveNowPanel.tsx`.
 
 - **Header** — "Live now" and `N running · M need you` (`headerCount`; "1 needs you"); empty with nothing running.
-- **Buttons** — "Sessions" and "Roster" open or focus the app's one wide tab at that route in the active
-  project (`tabs.openApp`).
+- **Buttons** — "Sessions" and "Roster" open or focus the app's one wide tab at that route
+  (`openTab` → `tabs.openApp({ route })`, no project named, so Pomade picks); a failure is logged to the console.
 - **Groups** — one per project that has rows: the active project first with a "current" tag, then projects in
   Projects panel order, the Workspace last (`groupRows`). Inside a group: Needs you → Working → Idle, then
   the latest `since` first, ties by tab or run key (`byUrgency`).
-- **Row** — live mark, title, time since (`formatAgo`), state word · agent. Title: a run's job name; a tab's
-  session name, else its first message in grey, else the agent's name (`rowTitle`). Run rows carry a ⏱ and
-  "unattended · <agent>". The tooltip is "Working since 09:05 — switches project and focuses the tab" /
-  "— opens the run’s terminal tab" (`rowTooltip`).
+- **Row** — live mark, title, time since (`formatAgo`), state word · agent. The agent shown is the row's
+  `agent`, the roster id; `agentName` is used only as the title's last fallback. Title: a run's job name; a
+  tab's session name, else its first message in grey, else the agent's name (`rowTitle`). Run rows carry a ⏱
+  and "unattended · <agent>". The tooltip is "Working since 09:05 — switches project and focuses the tab" /
+  "— opens the run’s terminal tab" / "— Runner did not say which terminal it runs in" (`rowTooltip`); the
+  mark's own title is the state word.
 - **Clicks** — tab row: `agentTabs.focus` (Pomade switches to the tab's project). Run row:
   `tabs.openAttached({ session: { app: "pomade-runner", session: terminal }, title, projectId })`; a run
   without a known terminal is disabled. Group header: the first tab row's click, else the first run row

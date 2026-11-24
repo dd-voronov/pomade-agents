@@ -1,7 +1,7 @@
 ---
 doc: docs/modules/sessions/sessions-tab.md
 audience: engineers, product
-holds: the Sessions tab — layouts, selection and checks, status changes and Undo, rename and move, search and filters, hidden sessions, Open / Resume, live marks; the model files and the specs that cover them
+holds: the Sessions tab — layouts, selection and checks, work-session counts and sums, status changes and Undo, rename and move, search and filters (and the filters a route presets), hidden sessions, Open / Resume, live marks; the model files and the specs that cover them
 kind: reference
 ---
 
@@ -12,7 +12,9 @@ filters, the checks, the open menu and the toast, and hands them to presentation
 rule lives in a pure `*-model.ts` file beside it; components only draw. The data comes from
 `useSessions` (below); changes go out through `useStatusChange`, `useSessionEdits` and
 `useOpenSession`, each an `apps.call` to the app's own backend ([CONTRACTS "Sessions"](../../CONTRACTS.md#sessions)).
-Backend side: [session-data](session-data.md).
+Backend side: [session-data](session-data.md). The tab's route grammar (`sessions`, `sessions/<id>`,
+`sessions?agent=<id>&project=<id>`) is in [CONTRACTS "Surfaces and routes"](../../CONTRACTS.md#surfaces-and-routes);
+the layout intent is [DESIGN](../../DESIGN.md) §2.7, the counting rule §2.9.
 
 ## Data in the UI
 
@@ -30,8 +32,19 @@ as it was. `copy === null` shows "Reading the session stores…"; an empty scope
   Workspace's tab lists every session and adds a Project column and filter (`table-model.ts` `inScope`).
 - **Groups** — `groupByStatus`: four status groups, newest `lastActiveAt` first, ties by id. A session
   without a record yet counts as Done (`statusOf`).
-- **Header** — scope name, `N sessions · ~$X est.`; the sum leaves out Done–skip/Failed (`totalCost`).
-  Each group header shows its own sum, with "not in totals" on Done–skip/Failed.
+- **Header** — "Sessions", the scope name ("Workspace · all projects" in the Workspace's tab), and
+  `N work sessions · ~$X est.` (`formatHeaderSum`; "1 work session"; the sum is left out when no
+  session has a cost). The count and the sum are over the scope's **work sessions** (`Session.work`,
+  [DESIGN](../../DESIGN.md) §2.9; `workSessions`, `workCost` in `table-model.ts`): every status but
+  Done–skip/Failed, a session without a record yet included, a hidden session never. They ignore the
+  search and the filters; the tooltip says "Work sessions: every session but Done–skip/Failed". The
+  `data-count` of `sessions-count` is the count.
+- **Group sums** — each group header shows the ~$ sum of the work sessions among its rows (`sumText` in
+  `StatusGroup.tsx`; hidden rows too while they are shown),
+  nothing when none of them has a cost, and "not in totals" when the group holds no work session — which is
+  every Done–skip/Failed group, and no other. A group's and a status tab's *row count* is of its rows,
+  every status alike. The detail panel's ~$ est. fact adds "not counted in totals" to a session that is
+  not a work session (`DetailPanel.tsx` `Facts`).
 - **Latest 10** — a Done or Done–skip/Failed group of more than 12 rows (`CUT_ABOVE`) shows its latest
   10 with "Show all N" / "Show the latest 10 only" (`isLong`, `shownRows`). A search shows every match.
 - **Empty groups** show one line each (`EMPTY_GROUP_TEXT`).
@@ -56,6 +69,11 @@ as it was. `copy === null` shows "Reading the session stores…"; an empty scope
   expanded if the row was past the latest 10; the row stays marked (`data-last-selected`) and scrolled
   into view, and ↑ ↓ continue from it. The marked row is the keys' start in the table (`keyRow`).
 - **Collapsed and expanded groups** are the tab's state: they survive data changes and the panel.
+- **The agent page's Sessions tab** is not this table: it lists one agent's sessions across every
+  project from the same `useSessions` copy and the same row formatters (`table-model.ts`), and its
+  Project filter is the route `roster/<agent>/sessions?project=<id>` ([CONTRACTS "Surfaces and
+  routes"](../../CONTRACTS.md#surfaces-and-routes)). Its **Open in Sessions** button opens this tab in
+  the Workspace with the filters preset (below). The page itself is the roster module's.
 
 ## Checks
 
@@ -120,6 +138,14 @@ One path: `useStatusMoves.move(ids, status, from)` → `useStatusChange.change` 
   a count computed over the search and the other filters (`filterMenu`). Folder keys: `p:<rel>` relative
   to the project, `w:<rel>` to the workspace, `a:<abs>`, `none` (`folderOf`; project-relative uses
   `Session.folderInProject`, workspace-relative the workspace root as named and symlink-resolved).
+- **Preset by the route** — a route `sessions?agent=<id>&project=<id>` (`sessionsFilterRoute`,
+  `sessionsPresetOf` in `src/ui/core/routes.ts`) starts the Agent and Project filters on those values
+  (the Folder filter reset, the search untouched): in the tab's first state, and again whenever its
+  `route` becomes such a route. A route that presets nothing — `sessions`, `sessions/<id>` — leaves the
+  filters as the user has them, so selecting a session keeps them. The filters are state, not route:
+  after a reload the tab shows the preset only while the route still is one, and a filter the user
+  picked is lost. A preset Project filter applies in a project's own tab too, although that tab shows
+  no Project button. Tests: `agent-page.spec.ts`.
 - **While filtering** the table shows every match per group; the list drops its status tabs' selection
   (`aria-selected` false) and shows the matches in collapsible groups; opening a status tab clears the
   search and filters. Nothing matching shows "No sessions match" with "Clear search and filters".
@@ -130,9 +156,9 @@ One path: `useStatusMoves.move(ids, status, from)` → `useStatusChange.change` 
 ## Hidden sessions
 
 `Session.hidden` (`"empty"`, from the backend, [session-data](session-data.md) "Hidden rule") leaves a
-session out of the rows, counts, sums, search and filters. The header says "N hidden"; the toggle
-(`showHidden`) lists them dimmed in their groups with a "hidden — no messages" chip, excluded from the
-header's count and sum. Hiding them again while one is selected deselects it. A hidden session cannot be
+session out of the rows, counts, sums, search and filters. The header says "N hidden" (every hidden
+session of the scope); the toggle (`showHidden`) lists them dimmed in their groups with a "hidden — no
+messages" chip, still excluded from the header's count and sum. Hiding them again while one is selected deselects it. A hidden session cannot be
 resumed: the panel hint and the toast say why (`openHint`, backend refusal); its bound tab, if any, is
 still focused. Its first message or answer makes it a normal row.
 
@@ -160,7 +186,7 @@ the tab lists it), shared folder, outside Pomade; the same facts show as chips a
 
 | File | Rules |
 |---|---|
-| `table-model.ts` | scope, groups, order, sums, latest-10, columns, time formats (`formatAgo`, `formatStamp`), chips, labels |
+| `table-model.ts` | scope, groups, order, work sessions and their sums (`workSessions`, `workCost`), latest-10, columns, time formats (`formatAgo`, `formatStamp`), chips, labels |
 | `selection-model.ts` | ↑ ↓ order and step, open status tab, list rows, reveal in table |
 | `check-model.ts` | checks, ranges, header state, targets, toast texts, Undo calls |
 | `edit-model.ts` | name to save, move targets, move back, rename and move toasts |
@@ -174,19 +200,21 @@ Keyboard shortcuts: [keyboard-shortcuts](../../user-guide/keyboard-shortcuts.md)
 
 ## Tests
 
-Unit specs sit beside each model (`*-model.test.ts`, `sessions-copy.test.ts`). End-to-end specs in `e2e/`:
+Unit specs sit beside each model (`*-model.test.ts`, `sessions-copy.test.ts`); `src/shared/work-sessions.test.ts` holds the work-session rule and the counts; `src/ui/core/routes.test.ts` the route functions. End-to-end specs in `e2e/`:
 
 | Spec | Covers |
 |---|---|
 | `sessions.spec.ts`, `sessions-table.spec.ts` | counts, sums, status groups, columns, latest 10, collapse, live data, empty state |
+| `work-sessions.spec.ts` | a session set to Done–skip/Failed leaves the header count and every group sum and returns with its status; `sessions.agentCounts` follows Move to project |
 | `session-detail.spec.ts` | panel facts and messages, clamping, status + note persistence, refused change, ↑ ↓ and Esc, route |
 | `bulk-status.spec.ts` | checks, ranges, Cmd+A, bulk bar, row menu, drag, Undo, refused bulk change |
 | `rename-move.spec.ts`, `move-shared-folder.spec.ts` | rename in place, Move to project and Undo, shared folder |
 | `search-filters.spec.ts` | search, snippets, filters, grouped list, checks with a filter |
+| `agent-page.spec.ts`, `agent-projects.spec.ts` | Open in Sessions presets the Agent and Project filters; the agent page's Project filter is the route |
 | `hidden-sessions.spec.ts` | the "N hidden" toggle and the rule |
 | `open-resume.spec.ts`, `pomade/open-resume.spec.ts` | Open tab / Resume / run terminal, Enter, double-click, refusals (fake host; real Pomade) |
 | `live-marks.spec.ts` | live marks and the panel's live line |
 | `look.spec.ts` | screenshots of every state |
 | `tab-titles.spec.ts`, `pomade/tab-titles.spec.ts` | names = tab names |
 
-Tickets: T-004, T-005, T-006, T-007, T-008, T-009, T-010, T-011, T-012, T-013, T-029, T-030.
+Tickets: T-004, T-005, T-006, T-007, T-008, T-009, T-010, T-011, T-012, T-013, T-022, T-029, T-030, T-033, T-034.

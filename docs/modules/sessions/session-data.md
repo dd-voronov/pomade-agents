@@ -1,7 +1,7 @@
 ---
 doc: docs/modules/sessions/session-data.md
 audience: engineers, product
-holds: the backend side of sessions — record files, first run, attribution and symlinks, live state, bound tabs, tab titles, the hidden rule, sessions.open, events B and C, Runner runs, reads for other apps
+holds: the backend side of sessions — record files, first run, how a session is joined (work flag included), attribution and symlinks, live state, bound tabs, tab titles, the hidden rule, the work-session rule, sessions.open, events B and C, Runner runs, reads for other apps
 kind: reference
 ---
 
@@ -16,8 +16,8 @@ UI side: [sessions-tab](sessions-tab.md), [live-now](live-now.md).
 ## Records on disk
 
 `<workspace>/Apps/pomade-agents/sessions/<id>.yaml`, plus `agents/<id>/agent.yaml` (profiles, the
-`roster` module) and `settings.yaml` (`adoptedAt`); one machinery (`record-store.ts`) serves both
-kinds. The file is the truth (PLATFORM rule 8); the backend writes it itself, not through the Host
+`roster` module) and `settings.yaml` (`adoptedAt`, and keys other modules keep there, written through
+`rewriteSettings`); one machinery (`record-store.ts`) serves sessions and profiles. The file is the truth (PLATFORM rule 8); the backend writes it itself, not through the Host
 API, so records are kept whether or not Pomade's socket is up.
 
 - **Atomic and ordered** — written to a temp file and renamed; a new record is hard-linked into place so
@@ -29,9 +29,9 @@ API, so records are kept whether or not Pomade's socket is up.
 - **Unreadable stays untouched** — a file that is not valid YAML or not a record is held as a problem
   (`Session.recordProblem`, session shown without a record) and refused for writes until fixed or
   deleted; changes to it answer `io-error`.
-- **Re-read on change** — one recursive watch on the data folder (40 ms settle), plus one more read of
-  each changed file 500 ms later (FSEvents may swallow a second change); the watch is set up again 2 s
-  after it fails. A `git pull` of the data folder reaches the UI like any edit.
+- **Re-read on change** — one recursive watch on the data folder (40 ms settle), plus a read of each
+  changed file 500 ms later, repeated while a read still finds it changed (FSEvents may swallow a
+  second change); the watch is set up again 2 s after it fails. A `git pull` of the data folder reaches the UI like any edit.
 - **`recordsOff`** — no workspace or an unopenable data folder: sessions show without records and changes
   answer `not-ready`. An unreadable `settings.yaml`: existing records work, new sessions get none. The
   reason shows under the Sessions tab's header.
@@ -58,7 +58,8 @@ shows with the problem "its session id cannot name a file".
 ## Joining and revisions
 
 `session-data.ts` keeps an entry per session id: the latest transcript's summary (`latestSummary`: last
-active, then path), the record, attribution, `folderInProject`, live state, bound tab, hidden reason. Work
+active, then path), the record, attribution, `folderInProject`, live state, bound tab, hidden reason and
+the work flag (`Session.work`, below). Work
 is marked dirty and reconciled in one pass; an entry whose JSON did not change keeps its revision.
 `answer(since)` gives the changes after the caller's revision (or all, `full`, for another epoch);
 change notices go out at most every 150 ms. A session whose transcripts are gone leaves the answer; its
@@ -104,8 +105,10 @@ session stay.
 `bound-tabs.ts` holds every tab Pomade lists, exited ones too (a restored tab revives when focused), and
 answers `Session.tab` — a live tab before an exited one, then the first listed. `Session.tab` is what
 Open / Resume, the rename retitle and the Live now click use. The other direction, `ofTab(tabId)`, answers
-the session an agent tab names (`null` for a tab Pomade does not list as an agent's); `sessions.ofTab` and
-the `pomade-agents` command's default target use it ([interfaces](../interfaces/index.md#session-of-a-tab)).
+`{ sessionId }` for an agent tab Pomade lists (`sessionId` `null` before its first prompt) and `null` for any
+other id; `sessions.ofTab` turns that into `{ agentTab, session }` and the `pomade-agents` command's default
+target uses it ([CONTRACTS "Session of a tab"](../../CONTRACTS.md#session-of-a-tab),
+[interfaces](../interfaces/index.md#session-of-a-tab)).
 
 ## Names are tab names
 
@@ -118,6 +121,23 @@ and name the session with it (`adopt`): a tab the user named before its first se
 with the user's title bound to an unnamed session. A tab waits for its session's record before either
 way is applied, and one that already shows what it should is left alone. Specs: `tab-titles.spec.ts`,
 `pomade/tab-titles.spec.ts`. Tickets: T-013.
+
+## Work-session rule
+
+`isWorkSession` (`src/shared/work-sessions.ts`), the only place ([DESIGN](../../DESIGN.md) §2.9,
+[CONTRACTS "Sessions"](../../CONTRACTS.md#sessions) "Work session"): a session is a work session unless
+its record's status is `done-skip`; one without a record counts. `session-data.ts` sets `Session.work`
+whenever it joins a session, so a status change changes it like any field and the revision moves.
+Every count and sum reads the field: the Sessions tab's header and group sums
+([sessions-tab](sessions-tab.md) "Scope, groups, counts"), the command's `work session` line
+(`src/command/session-text.ts`), and `sessions.agentCounts` ([CONTRACTS "Agent counts"](../../CONTRACTS.md#agent-counts)).
+`agentCounts` (same file) tallies per agent, from the whole session list: last activity, work sessions
+and known ~$ within the caller's week, and per project (`attribution.projects`, `[]` → the Workspace
+bucket; a shared-folder session counts in each) the sessions within the caller's window and the last
+activity ever; `agentsWithSessions` lists every agent with a session of any status, which is how the
+Roster knows an agent never ran. The windows are the caller's, never the rule's. A hidden session is a
+work session here: only the Sessions tab leaves it out of its own count. Specs: `work-sessions.spec.ts`,
+`work-sessions.test.ts`. Tickets: T-033.
 
 ## Hidden rule
 
@@ -168,4 +188,4 @@ started in one folder within a time window). All compare real paths. Contracts: 
 contract (git)"](../../CONTRACTS.md#the-sessions-contract-git), ["Reads for Runner"](../../CONTRACTS.md#reads-for-runner).
 Specs: `for-git.spec.ts`, `for-runner.spec.ts`, `records.spec.ts`.
 
-Tickets: T-004, T-005, T-010, T-011, T-013, T-015, T-027, T-030.
+Tickets: T-004, T-005, T-010, T-011, T-013, T-015, T-027, T-030, T-033.

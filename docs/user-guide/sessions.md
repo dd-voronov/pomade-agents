@@ -10,16 +10,21 @@ kind: reference
 The Sessions tab lists every agent session of a project, by status. Open it from the Agents icon's panel
 (**Sessions** button), from the **Sessions | Roster** switch at the top of the Agents tab, or from Pomade's
 History icon. Each project has its own tab; the Workspace's tab lists the sessions of every project.
+An agent's page in the Roster has a **Sessions** tab of its own and an **Open in Sessions** button, which opens the
+Workspace's Sessions tab already filtered to that agent (and to the project chosen there).
 Shortcuts: [keyboard-shortcuts](keyboard-shortcuts.md).
 
 ## What you see
 
-The header names the scope and says `3 sessions · ~$4.20 est.` — the count and the estimated cost,
-without Done–skip/Failed. `Indexing…` shows while the agents' stores are still being read for the first time.
+The header names the scope (**Workspace · all projects** in the Workspace's tab) and says
+`3 work sessions · ~$4.20 est.` — the count and the estimated cost of the **work sessions**: every session
+except those in **Done–skip/Failed**. Hidden sessions are never counted, and neither a search nor a filter
+changes the header. `Indexing…` shows while the agents' stores are still being read for the first time.
 
 Below the header, a search field and filters (**Project** — in the Workspace's tab —, **Agent**, **Folder**), then
-four groups, each with its status, its count and its cost: **Active**, **On hold**, **Done**,
-**Done–skip/Failed**. A group's chevron hides and shows its rows. A long Done or Done–skip/Failed group
+four groups, each with its status, its count and the cost of its work sessions: **Active**, **On hold**,
+**Done**, **Done–skip/Failed**. The count of a group is of its rows; the Done–skip/Failed group shows
+`not in totals` instead of a cost. A group's chevron hides and shows its rows. A long Done or Done–skip/Failed group
 shows its latest 10 with **Show all N**; **Show the latest 10 only** goes back.
 
 Columns, left to right: **Name**, **Project** (Workspace's tab), **Agent**, **Model · effort**, **Context**,
@@ -33,7 +38,8 @@ Name and Last active always stay.
   grey dot when it is Idle, nothing when it is Closed. Hover for "Working since 09:05".
 - **Context** — how full the model's context window was at its last turn; amber from 75 %, red from 90 %.
 - **~$ est.** — the cost estimated from tokens. `—` means unknown; hover for why (no answer yet, or the
-  model is not in the price table).
+  model is not in the price table). A Done–skip/Failed session's cost is not counted in the header or in
+  any group's cost; its panel says `not counted in totals`.
 - **Last active** — `now`, `5m`, `3h`, `yesterday`, `4d`, `Nov 3`, `Nov 2025`; hover for the exact time.
 - A note you attached shows under its row.
 
@@ -104,7 +110,9 @@ out of the tab's project leaves the list. **Undo** in the toast puts it back. A 
   words are one phrase. Matches are marked; a hit hidden in the row appears as a line under it
   (`Agent: …`). The toolbar shows `N matches` and **Clear**.
 - **Project**, **Agent**, **Folder** open menus of the values the tab holds, each with a count of what it
-  would leave; **All projects** / **All agents** / **All folders** remove the filter. Folders read `project root`,
+  would leave; **All projects** / **All agents** / **All folders** remove the filter. Coming from **Open in
+  Sessions** on an agent's page, the tab opens with the **Agent** (and **Project**) filter already set; **Clear**
+  removes them. Folders read `project root`,
   `docs/api`, `workspace root`, `no folder recorded`.
 - While a search or filter is on, every match shows, grouped by status. Opening a status tab clears the
   search and filters. **No sessions match** has **Clear search and filters**.

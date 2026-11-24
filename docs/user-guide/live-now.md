@@ -21,8 +21,8 @@ Projects panel's order, the Workspace last. A group header shows the project's n
 a group the rows are ordered: **Needs you**, then **Working**, then **Idle**, the most recent first.
 
 A row has the agent's state mark (a spinner for Working, a red dot for Needs you, a grey dot for Idle), a title, how
-long ago it entered that state (`now`, `5m`, `3h`), then the state word and the agent's name. Hover for
-"Working since 09:05".
+long ago it entered that state (`now`, `5m`, `3h`), then the state word and the agent (`claude`, `codex`, or a folder agent's id).
+Hover the row for "Working since 09:05 — switches project and focuses the tab".
 
 - **Agent tabs** — the title is the session's name; an unnamed session shows its first message in grey; a
   tab that has not been prompted yet shows the agent's name.
@@ -33,7 +33,7 @@ long ago it entered that state (`now`, `5m`, `3h`), then the state word and the 
 
 - Click an agent-tab row: Pomade switches to that tab's project and focuses the tab.
 - Click an unattended run: its terminal opens as a tab in its project. A run whose terminal Runner did not
-  report cannot be clicked.
+  report cannot be clicked; its tooltip says so.
 - Click a group header (`Switch to <project>`): the same as clicking its first agent-tab row, else its
   first run with a terminal.
 
