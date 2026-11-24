@@ -490,20 +490,47 @@ updated: 2026-11-09T14:32:00Z
 
 ## 5. Published API
 
-Registered with Pomade's broker (`pomade:E-028`). Callers reach it through the Host API.
+Registered with Pomade's broker (`pomade:E-028`). Callers reach it through the Host API. Every
+method is in the manifest's `api`; the handlers do not tell callers apart, so "Callers" names who
+reads a method, not who may. Params, answers and errors: `docs/CONTRACTS.md` "Published API".
 
 | Call | Returns | Callers |
 |---|---|---|
-| `sessions.get({ id })` | `{ session }`: record fields + §2.3 fields + live state | Runner, git |
+| `app.info()` | the app's version, start time, workspace (as Pomade names it and resolved), data folder and state folder | the app's frames |
+| `sessions.list({ since? })` | every session, or the changes since `{ epoch, revision }`; `sessions.changed` says when | the Sessions tab |
+| `sessions.setStatus({ ids, status, note? })` | sets one status (and the note) on every id; the changed sessions | the Sessions tab, other apps |
+| `sessions.rename({ id, name })` | names or unnames a session and retitles its agent tabs; the changed session | the Sessions tab, other apps |
+| `sessions.moveToProject({ id, project })` | sets the project override, or clears it with `null`; the changed session | the Sessions tab, other apps |
+| `sessions.open({ id })` | focuses the session's agent tab, opens its Runner run's terminal, or resumes it in a new tab: `{ opened, tabId, session }` | the Sessions tab |
+| `sessions.get({ id })` | `{ session }`: record fields + §2.3 fields + live state + `work` (§2.9) | the command, Runner, git |
 | `sessions.lastMessage({ id })` | `{ message: { text, at } \| null }`: the last agent answer as the agent wrote it (Markdown), capped at 4000 characters; `null` while it has not answered | Runner (result cards) |
 | `sessions.find({ cwd, startedFrom, startedTo, agent? })` | `{ sessions: { id, provider, agent, cwd, startedAt, lastActiveAt }[] }`: sessions started exactly in that folder (symlinks resolved) within that time window, both ends included; earliest start first | Runner (runs without a pre-set id, e.g. Codex) |
 | `sessions.forRepo({ folder, branch? })` | `{ sessions: RepoSession[] }`: sessions whose start folder is `folder` or inside it (a repo or worktree) and, with `branch`, whose recorded branch is that one; newest activity first | git (branch ↔ session link) |
 | `sessions.liveIn({ folder })` | `{ live, sessions: LiveSession[] }`: agent tabs and Runner agent runs (`kind: agent`; never script, git or service runs) running at or below `folder` now, including an agent tab not yet prompted; `live` is true exactly when `sessions` is non-empty | git (merge block, In progress rows), `pomade-git` (skip scheduled commit) |
-| `roster.list()` | `{ agents: RosterAgent[] }` (the shape in Pomade's `docs/HOST-API.md` §4 "`apps` — the broker", "Platform reads of app APIs"): id, name, command, provider, config dir, enabled modes with their arguments. Hidden agents are left out | Pomade "+" menu and agent launches, Runner |
-| `roster.launchSpec({ agent, mode, resume?, sessionId?, prompt? })` | `{ command, args, line, sessionId, exit }`: the agent's command, the arguments, both as one shell line; the session's id (`null` when the provider cannot pre-assign it); what ends the agent. A disabled or unknown mode is refused | Pomade "+" menu, Runner |
+| `sessions.ofTab({ tabId })` | `{ agentTab, session }`: the session bound to the agent tab with that id; `session` is `null` before the tab's first prompt | the command (its default target) |
+| `sessions.agentCounts({ weekFrom, projectsFrom })` | per agent with a work session: its last activity, work sessions and ~$ within the week, and per project its work sessions within the window and its last session's time; plus every agent with any session (§2.9) | the Roster's frames |
+| `liveNow.list()` | the Live now panel's rows — one per running agent tab: its project, session, agent, live state and since when, the session's name and first message; `liveNow.changed` says when they change | the app's own frames |
+| `roster.list()` | `{ agents: RosterAgent[] }` (the shape in Pomade's `docs/HOST-API.md` §4 "`apps` — the broker", "Platform reads of app APIs"): id, name, command, provider, config dir, enabled modes with their arguments. Hidden agents and orphans are left out | Pomade "+" menu and agent launches, Runner |
+| `roster.launchSpec({ agent, mode, resume?, sessionId?, prompt? })` | `{ command, args, line, sessionId, exit }`: the agent's command, the arguments, both as one shell line; the session's id (`null` when the provider cannot pre-assign it); what ends the agent. A disabled or unknown mode is refused | Pomade "+" menu, Runner, the agent page |
 | `roster.projectsFor({ agent })` · `roster.agentsFor({ project })` | `{ projects }` stable project ids · `{ agents }` roster ids: the connection, read from each project's visible agents (`["*"]` = every agent; the Workspace offers every agent) | Runner (job form) |
 | `roster.agents()` | every agent with its profile, hidden ones and orphans included, its default model and effort; `roster.changed` says when it changes | the app's own frames |
-| `liveNow.list()` | the Live now panel's rows — one per running agent tab: its project, session, agent, live state and since when, the session's name and first message; `liveNow.changed` says when they change | the app's own frames |
+| `roster.connections()` | every agent's connected projects in one read | the Roster's frames |
+| `roster.checkName({ name })` | whether a name can be had for a new agent: the first problem found, or none | the New agent page |
+| `roster.create({ name, role, tags, projects, createId, clone? })` | creates a folder agent from the template or a clone, step by step (`roster.creating` ticks), and answers when every step has run | the New agent page |
+| `roster.checkAlias({ agent })` | whether a fresh zsh resolves the agent's alias to its config folder; never writes | the New agent page |
+| `roster.updateProfile({ agent, role?, tags?, modes?, hidden? })` | edits the profile's role line, tags, modes and hidden mark in `agent.yaml`; `{ profile }` | the agent page, the Roster's menus |
+| `roster.permissions({ agent })` | what the agent's provider config grants: permissions, MCP servers, plugins | the agent page |
+| `roster.memory({ agent })` | the project memory files a Claude Code agent keeps, by project folder | the agent page |
+| `roster.modelConfig({ agent })` | the agent's default model and effort from its provider config | the agent page |
+| `roster.setModel({ agent, model?, effort? })` | sets or removes `model` / `effortLevel` in a Claude Code `settings.json`; the config as written | the agent page |
+| `roster.unclaimedFolders()` | the agent folders no profile has made its own: what an orphan can be re-linked to | the Roster's menus |
+| `roster.relink({ agent, folder })` | points an orphan's profile at an unclaimed folder; `{ profile, undo }` | the Roster's menus |
+| `roster.undoRelink(undo)` | takes a re-link back, both profile files as they were; `{ profile }` | the Roster's menus |
+| `roster.removeOrphan({ agent })` | removes an orphan's profile, never an agent folder | the Roster's menus |
+| `skills.catalog()` | the listed skill folders, their skills and every Claude Code agent's `skills/` entries (§3.8); `skills.changed` says when they change | the Settings page, the agent page's Skills tab |
+| `settings.setSkillFolders({ folders })` | replaces the list of skill folders; the catalog, or the folder refused and why | the Settings page |
+| `skills.link({ agent, name, target })` | makes a symlink in an agent's `skills/`; the catalog after the write | the agent page's Skills tab |
+| `skills.unlink({ agent, name })` | takes a symlink away from an agent's `skills/`; the catalog after the write | the agent page's Skills tab |
 
 **The sessions contract.** `sessions.forRepo` and `sessions.liveIn` are a contract shared with
 Pomade, fixed in `pomade-kit/protocol` (`agent-sessions.ts`). The app imports its types and
@@ -543,6 +570,12 @@ constants (`SESSIONS_APP_ID`, `SESSIONS_FOR_REPO_METHOD`, `SESSIONS_LIVE_IN_METH
 | **B** `session.closed` | the session's process ended: `/exit`, tab closed, crash, a Runner run finished | yes |
 | **C** `session.statusChanged` | the user changed a status (bulk = one event per session), 5 s after the change | yes |
 
+The app's own frames hear five more, published unqualified by the backend: change notices
+`sessions.changed`, `roster.changed`, `liveNow.changed` and `skills.changed`, each
+`{ epoch, revision }`, which say that a read (`sessions.list`, `roster.agents`, `liveNow.list`,
+`skills.catalog`) answers differently; and `roster.creating` `{ createId, steps }`, the steps of a
+Create (§3.6) as they start and end.
+
 **Payload, every event:**
 - `sessionId`, `provider`, `agent` (roster id), `project` (`{ id, root }`, root
   workspace-relative; `null` for the Workspace bucket)
@@ -569,6 +602,11 @@ Session Analyzer script on that transcript.
 
 **Subscribed:**
 - the platform's agent tab exited and binding changes (`pomade:E-031`, `pomade:E-033`)
+- the platform's `pomade.ready` and project events: `project.created`, `project.renamed` and
+  `project.removed` (the backend, which reads the project list again, and the frames, for project
+  names) and `project.updated` (the frames only: a project's offered agents, group or name)
+- its own notices `pomade-agents:sessions.changed`, `roster.changed`, `liveNow.changed`,
+  `skills.changed` and `roster.creating`, by the frames
 - Runner's run started / run finished of agent runs (`pomade-runner:run.started`,
   `pomade-runner:run.finished`: session id, job name, agent, folder, start), for ⏱ rows,
   `liveIn` and B. A run without a session id is matched to its session by folder and start time.

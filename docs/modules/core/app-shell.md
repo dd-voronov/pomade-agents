@@ -1,7 +1,7 @@
 ---
 doc: docs/modules/core/app-shell.md
 audience: engineers, product
-holds: how the app is put together as a Pomade app — manifest, surfaces and routing, the backend process, locations, look, and the shared UI pieces
+holds: how the app is put together as a Pomade app — manifest, surfaces and routing, the backend process, locations, look, the shared UI pieces, and the app's Settings
 kind: reference
 ---
 
@@ -25,6 +25,9 @@ Rules easy to break:
   lists (`capabilities`, `events.publish`, `events.subscribe`, `api` in handler order).
 - **The backend is `with-pomade`** (`backend.entry: backend/main.mjs`): Pomade starts it with the app
   and stops it with the app.
+- Capabilities: `project.read`, `agentTabs.read`, `agentTabs.write`, `tabs.open`, `files.read`
+  (opening an agent's files in Pomade's editor) and `project.write` (connecting an agent to a
+  project: the project's own agents setting).
 - `outsideWorkspace` lists `~/.claude/`, `~/.codex/`, `~/.zshrc`, the paths outside the workspace the
   backend reads; Pomade shows them at install. A new path outside the workspace goes here.
 - One strip icon, `agents`, action `panel`. There is no tab icon: the tab is opened by the app.
@@ -40,11 +43,23 @@ Rules easy to break:
 | `rejected` (`needs-newer-pomade`, `app-too-old`, `unauthorized`) | `Rejected` — one title and sentence per reason (`Unavailable.tsx`) |
 | `connected` | `Hosted`: the view `viewFor(welcome.surface, route)` names |
 
-`viewFor` (`routes.ts`) is the whole routing table: the **panel** is always Live now, whatever the
-route; a **tab** shows Roster for `roster` and `roster/…`, else Sessions (including `""` and unknown
-routes). `sessions/<id>` carries the selected session (`sessionsRoute`, `selectedSessionOf`; the id
-is URI-encoded; anything not exactly `sessions/<one segment>` selects nothing). Table of surfaces,
-routes and views: [CONTRACTS "Surfaces and routes"](../../CONTRACTS.md#surfaces-and-routes).
+`viewFor` (`routes.ts`) picks the view from the route's first segment: the **panel** is always Live
+now, whatever the route; a **tab** shows Settings for `settings`, Roster for `roster` and `roster/…`,
+else Sessions (including `""` and unknown routes). `routes.ts` also builds and reads every route
+below a view, so no feature parses a route itself:
+
+| Route | Shows | Built / read by |
+|---|---|---|
+| `sessions` | the Sessions tab | `SESSIONS_ROUTE` |
+| `sessions/<id>` | the Sessions tab with that session selected; the id is URI-encoded, and anything not exactly one segment selects nothing | `sessionsRoute`, `selectedSessionOf` |
+| `sessions?agent=<id>&project=<id>` | the Sessions tab with its Agent and Project filters preset; either key may be absent | `sessionsFilterRoute`, `sessionsPresetOf` |
+| `roster` | the Roster | `ROSTER_ROUTE` |
+| `roster/new`, `roster/new?clone=<id>` | the New agent page, empty or as a clone; `new` never names an agent | `newAgentRoute`, `isNewAgentRoute`, `cloneSourceOf` |
+| `roster/<agent>/<tab>` | an agent's page on one of `AGENT_TABS` (`overview`, `skills`, `projects`, `model`, `permissions`, `memory`, `sessions`); no tab or an unknown one opens Overview | `agentRoute`, `agentPageOf` |
+| `roster/<agent>/sessions?project=<id>` | the agent's Sessions tab filtered to one project | `agentSessionsRoute`, `agentProjectOf` |
+| `settings` | the app's Settings page | `SETTINGS_ROUTE` |
+
+Table of surfaces, routes and views: [CONTRACTS "Surfaces and routes"](../../CONTRACTS.md#surfaces-and-routes).
 
 How a frame's route moves (`useRoute.ts`, `TabView.tsx`, `openTab.ts`):
 
@@ -52,8 +67,8 @@ How a frame's route moves (`useRoute.ts`, `TabView.tsx`, `openTab.ts`):
   navigates the frame to (the panel's Sessions and Roster buttons, a restored tab).
 - `navigate(route)` is the tab **navigating itself**: it sets the view at once and records the route
   with `tabs.setRoute`, so a reload or a Pomade restart reopens the tab there. Pomade sends no
-  `route.changed` back; do not wait for one. The Sessions | Roster switch (`TabView`) and the
-  session selection (`sessions/useSelection.ts`) both use it.
+  `route.changed` back; do not wait for one. The Sessions | Roster switch and the gear (`TabView`),
+  the session selection (`sessions/useSelection.ts`) and every link inside the Roster use it.
 - `openTab(host, route)` is the panel opening or focusing **the project's one app tab** at a route
   (`tabs.openApp`). Pomade keeps one such tab per project, so both views live in it and the frame
   stays loaded while the route changes.
@@ -69,11 +84,16 @@ on `SIGTERM`/`SIGINT`. `startBackend` wires the parts in this order and returns 
 2. Start the session store (indexing the agents' stores), open the record store, start the roster and
    read it once before connecting — Pomade asks for `roster.list` the moment the backend serves, and
    the first answer must be whole.
-3. Build the live state, bound tabs, session data, Live now, badge, session events, Runner runs and
-   tab titles. Their `onChange` hooks publish `sessions.changed`, `roster.changed`, `liveNow.changed`
-   through whichever Pomade connection is up; with none, the notice is dropped (a UI frame lives only inside
-   a running Pomade and reads everything when it loads).
-4. `stayConnected` (`pomade-kit/node`): on every connection it serves the API
+3. Start the skill-folder settings (`settings/settings.ts`, on the record store's `settings.yaml`)
+   and the skills catalog on top of them and the roster; build agent creation (`roster/create-agent.ts`)
+   when a workspace and its app data are there — it connects projects and launches the first tab
+   through whichever Pomade connection is up.
+4. Build the live state, bound tabs, session data, Live now, badge, session events, Runner runs and
+   tab titles. The `onChange` hooks publish `sessions.changed`, `roster.changed`, `liveNow.changed`,
+   `skills.changed` and `roster.creating` through whichever Pomade connection is up; with none, the
+   notice is dropped (a UI frame lives only inside a running Pomade and reads everything when it
+   loads).
+5. `stayConnected` (`pomade-kit/node`): on every connection it serves the API
    (`createApi`, `interfaces`), sets the tab-title writer, the badge and `followPomade` (projects,
    agent tabs, Runner's runs). On disconnect it forgets the tabs and runs (Pomade's agents end with
    it) and waits; a returning Pomade lists its tabs again. A refused connection is logged.
@@ -125,11 +145,17 @@ the frame is light. The frame stays blank until the handshake answers (or 1.5 s 
 
 Used by `sessions` and `roster`; change one here and every surface changes.
 
-- **`Menu`** — the context menu: entries (`item`, `head`, `separator`) in a raised box over a
-  transparent scrim, opened at a point (right-click) or under an element (⋯), kept inside the window.
-  First item takes focus; ↑ ↓ Home End move, Enter or click runs and closes, Esc, Tab, a scrim click,
-  window blur or resize closes. Items are `menu-item-<id>` in tests; a checked item is a
-  `menuitemradio`.
+- **`Menu`** — the context menu: entries in a raised box over a transparent scrim, opened at a
+  point (right-click) or under an element (⋯, a ▾ button), kept inside the window. Entry kinds:
+  `item` (with an optional glyph, tick, trailing key or count, second `detail` line, and `disabled`
+  with its reason as the tooltip), `head`, `separator`, `note` (a faint line, such as why a list is
+  empty), `search` (a field at the top; the caller filters the entries by its value) and `segment`
+  (a row of options of which one is on, picked without closing the menu — a launch's mode).
+  The first item takes focus, or the search field when there is one; ↑ ↓ Home End move over enabled
+  items, Enter or click runs and closes, Esc, Tab, a scrim click, window blur or resize closes.
+  Items are `menu-item-<id>` in tests; a checked item is a `menuitemradio`.
+- **`Switch`** — an on/off switch (`role="switch"`); locked, it shows its state, takes no clicks
+  and its tooltip says why.
 - **`LiveMark`** — the live-state mark (spinner Working, red dot Needs you, grey dot Idle, nothing for
   Closed), always round so it never reads as a status's square. Words come from `live.ts`
   (`LIVE_LABELS`).
@@ -137,13 +163,42 @@ Used by `sessions` and `roster`; change one here and every surface changes.
   sentences, at most one button; `tone` (`neutral`, `warning`) and `size` (`regular`, `compact` for the
   panel). `NoHost` and `Rejected` are `StatePage`s.
 - **`BackendStatus`** — the panel's "Background: running / connecting… / not answering" line.
-- **`TabView`** — the tab's bar (Sessions | Roster switch) and its view area.
+- **`TabView`** — the tab's bar (the Sessions | Roster switch, and the gear that opens Settings)
+  and its view area.
+- **`copyText`** (`clipboard.ts`) — copies a text from a frame: `navigator.clipboard`, else the
+  browser's copy of a selected field.
 - **`icons.tsx`** — the app's inline SVG icons; a new glyph goes here, not in a feature folder.
-- **Hooks** — `useRoute`, `useBackendInfo`, `useProjects` (project names and roots from `project.list`,
-  refreshed on `project.created|renamed|removed`), `useActiveProject`, `useNow` (renews relative times
+- **Hooks** — `useRoute`, `useBackendInfo`, `useProjects` (each project's name, root and sidebar group
+  from `project.list`, refreshed on `project.created|renamed|removed|updated`), `useActiveProject`, `useNow` (renews relative times
   such as "5m").
 
-Tests that touch these: `routes.test.ts` (unit); the e2e specs `no-host`, `panel`, `tabs`, `look`,
-`backend` ([Testing](testing.md)).
+## Settings
 
-Tickets: T-002, T-029, T-031, T-032.
+The app's own settings are one page (`src/ui/settings/SettingsPage.tsx`, route `settings`) and one
+file, `<workspace>/Apps/pomade-agents/settings.yaml`. The page lists the **skill folders** — the
+workspace folders the skills catalog reads, subfolders included — each with its skill count and
+the links that point into it ("5 links from 3 agents"). **Add folder…** goes through Pomade's
+folder picker; **Remove** first warns, naming the agents, when links depend on the folder, and
+keeps the links; every change offers Undo.
+
+- **Backend:** `src/backend/settings/skill-folders.ts` reads and writes the `skillFolders` key
+  through the `yaml` document model, so the file's other keys, comments and order stay. An absent
+  key is `DEFAULT_SKILL_FOLDERS`; an empty list is a list. `settings.ts` serves the list from the
+  record store's copy of the file, follows a hand edit, and writes one change at a time.
+- **A folder** is workspace-relative, a folder now, inside the workspace also by its real path,
+  never the workspace itself, never `.pomade`, and never inside or around another listed folder —
+  each skill belongs to one folder. A listed folder that is gone shows as missing.
+- **An unusable `settings.yaml`** is never written over: the catalog reads the default folders and
+  `foldersOff` says why the list cannot be changed. The same with no workspace or no app data.
+- **UI:** `useSkillsCatalog` asks `skills.catalog`, again on `skills.changed` and whenever the tab
+  comes back into view, and every second while the backend does not answer; a change made in the
+  frame takes the catalog its answer carries. The agent page's Skills tab uses the same hook
+  ([roster](../roster/index.md)).
+
+Interfaces: [CONTRACTS "Skills"](../../CONTRACTS.md#skills). Design: [DESIGN](../../DESIGN.md) §3.8.
+
+Tests that touch this page's parts: `routes.test.ts`, `skill-folders.test.ts`,
+`settings-copy.test.ts` (unit); the e2e specs `no-host`, `panel`, `tabs`, `look`, `backend`,
+`settings` ([Testing](testing.md)).
+
+Tickets: T-002, T-029, T-031, T-032, T-035.

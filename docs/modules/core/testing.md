@@ -31,7 +31,7 @@ checkout and runs one Electron app at a time.
   Node and DOM APIs.
 - **Build** is part of the gate because the e2e runs the **built** app, backend and command
   (`dist/`), not the source. It ends with `scripts/check-build.ts`, which fails when `dist/` is not an
-  installable folder ([interfaces](../interfaces/index.md#the-build-check)).
+  installable folder ([interfaces](../interfaces/command.md#the-build-check)).
 
 ## Unit tests
 
@@ -78,8 +78,10 @@ app's data, a wrong key refused.
 
 `createSandbox(appId, { workspaceLink? })` (`harness/sandbox.ts`) makes one throwaway folder under the
 real tmp path holding everything a run may touch: `home/` (copies of `.claude`, `.codex`, `.zshrc` from
-`harness/fixtures/home`), `workspace/` (a copy of `harness/fixtures/workspace`: two projects and the
-folder agent `claude-libra`), `ud/` (Pomade's user data: `run/pomade.sock`, `app-keys/<appId>`), and
+`harness/fixtures/home`), `workspace/` (a copy of `harness/fixtures/workspace`: two projects, the
+folder agent `claude-libra`, the agent template `Agents/Claude Agent Template` and the shared
+skills in `Agents/_shared/skills`; symlinks are copied as they are, so the template's skill links
+point inside the copy), `ud/` (Pomade's user data: `run/pomade.sock`, `app-keys/<appId>`), and
 three seeded transcripts (`SEEDED_TRANSCRIPTS`: one per kind of store). `backendEnv()` is the **whole**
 environment a backend gets — `HOME`, a minimal `PATH`, `POMADE_*` — and nothing of the caller's, so a
 test can never read the real stores or the real `Apps/`.
@@ -122,11 +124,15 @@ set with `test.use`:
 |---|---|---|
 | `seed` | `null` | `{ into(sandbox) }` writes into the sandbox before the backend starts (transcripts, records) |
 | `workspaceLink` | `false` | the workspace is named through a symlink |
-| `pomadeSeed` | `{}` | what the fake Pomade has at start besides the fixture projects: `agentTabs`, `sessions`, `files` |
+| `pomadeSeed` | `{}` | what the fake Pomade has at start: `agentTabs`, `sessions`, `files`, and — in place of the fixture projects `alpha` and `beta` — `projects` (each with the agents it offers), `groups`, `activeProject`, and the `roster` that `agentTabs.launch` accepts |
 
 A spec that does not use `backend` runs with none, which is how "backend not answering" is tested.
 `e2e/transcripts.ts` writes Claude Code transcript lines into a sandbox (`prompt`, `answer`,
-`claudeSession`, `projectFolder`, `seedIntoProject`). Specs assert on `data-testid`s, roles and the
+`claudeSession`, `projectFolder`, `seedIntoProject`). `e2e/roster-fixtures.ts` is a roster to look
+at: `seedRoster(sandbox)` writes agent folders and profiles (a very long id and role among them)
+and each agent's work sessions (`SESSION_PLAN`, `agentSession`) before the backend starts, and
+`ROSTER_PROJECTS` is the projects, with long names and the agents each offers, that the fake
+Pomade starts with; `planned(agent, windows)` is the counts a spec expects from the plan. Specs assert on `data-testid`s, roles and the
 fake host's records; waits that depend on the backend pass `backend.output()` as their message. Screenshots for
 review (`look.spec.ts` and others) go to `e2e/artifacts/` (gitignored); computed-style assertions
 (the panel's and the tab's backgrounds) pin what screenshots cannot.
@@ -135,7 +141,7 @@ review (`look.spec.ts` and others) go to `e2e/artifacts/` (gitignored); computed
 seeded in `pomadeSeed` and, for most cases, the real backend: `show --json` in an agent tab equals
 `sessions.get`'s `Session`; `--session` outside any terminal; text output; and every exit status
 (tab with no session, plain terminal, unknown id, no tab, usage, backend absent, Pomade closed, no
-app identity, a key Pomade did not issue). Interfaces: [interfaces](../interfaces/index.md#the-pomade-agents-command).
+app identity, a key Pomade did not issue). Interfaces: [interfaces](../interfaces/command.md#the-pomade-agents-command).
 
 Core's specs: `no-host` (outside Pomade; a Pomade with a newer Host API), `panel` (the strip icon's panel,
 no tabs opened, no badge), `tabs` (open, focus, one tab per project, the switch navigating by itself),
@@ -188,4 +194,4 @@ Agent tabs there run `STAND_IN_AGENT`, a zsh script mapped onto the fixture fold
 prompt, takes `--resume <id>`, and on the prompt `/show` runs `pomade-agents show --json` into `<store>/show.json`
 and says `AGENT_SHOWED <exit status>`. The specs kill any backend pid still alive in `afterAll`.
 
-Tickets: T-002, T-027, T-029, T-031, T-032.
+Tickets: T-002, T-020, T-027, T-029, T-031, T-032.

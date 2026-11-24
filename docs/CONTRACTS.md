@@ -28,7 +28,7 @@ folder without a `SKILL.md` whose frontmatter `name` is the folder's and whose `
 | `hostApi` | `0` |
 | `capabilities` | `project.read` (projects, their stable ids, names and folders, their visible agents) · `agentTabs.read` (each agent tab's session, folder, title and live state) · `agentTabs.write` (an agent tab's title, the unnamed mark) — the backend's project attribution, live state, tab titles and the project ↔ agent connection; the Sessions tab's and Live now's project names · `tabs.open` — Live now focuses agent tabs (`agentTabs.focus`) and opens a Runner run's attached terminal (`tabs.openAttached`); the backend's `sessions.open` does the same and resumes sessions (`agentTabs.resume`) · `files.read` — the Settings page's **Add folder…** asks Pomade's folder picker (`files.pickFolder`) · `project.write` — a new agent is connected to the projects chosen for it (`project.setAgents`, `roster.create`), and the agent page's Projects tab connects and disconnects an agent (`project.setAgents`, from the frame) |
 | `strip` | one icon, `agents` — action `panel` |
-| `events` | publishes `sessions.changed`, `roster.changed`, `liveNow.changed` and `roster.creating` (for its own UI frames) and `session.turnFinished` (declared, never published), `session.closed`, `session.statusChanged` ("Published events" below); subscribes to `pomade-agents:sessions.changed`, `pomade-agents:roster.changed`, `pomade-agents:liveNow.changed` and `pomade-agents:roster.creating` (its own, for its UI frames), `project.created`, `project.renamed` and `project.removed` (the backend, and the UI frames for project names), `project.updated` (the Roster's and the agent page's frames, for the agents each project offers and its group) and, for the backend, `pomade.ready`, `agentTab.changed`, `agentTab.exited` and Runner's `pomade-runner:run.started`, `pomade-runner:run.finished` ("Subscribed events" below); publishes `skills.changed` and subscribes to `pomade-agents:skills.changed` (its own, for the Settings page and the Skills tab; "Skills" below) |
+| `events` | publishes `sessions.changed`, `roster.changed`, `liveNow.changed` and `roster.creating` (for its own UI frames) and `session.turnFinished` (declared, never published), `session.closed`, `session.statusChanged` ("Published events" below); subscribes to `pomade-agents:sessions.changed`, `pomade-agents:roster.changed`, `pomade-agents:liveNow.changed` and `pomade-agents:roster.creating` (its own, for its UI frames), `project.created`, `project.renamed` and `project.removed` (the backend, and the UI frames for project names), `project.updated` (every UI frame's project list, and the Roster's and the agent page's frames for the agents each project offers and its group) and, for the backend, `pomade.ready`, `agentTab.changed`, `agentTab.exited` and Runner's `pomade-runner:run.started`, `pomade-runner:run.finished` ("Subscribed events" below); publishes `skills.changed` and subscribes to `pomade-agents:skills.changed` (its own, for the Settings page and the Skills tab; "Skills" below) |
 | `backend` | `backend/main.mjs`, mode `with-pomade` |
 | `api` | the methods of "Published API" below — `sessions.forRepo`, `sessions.liveIn` and `roster.list` among them, which Pomade reads (HOST-API §4, "Platform reads of app APIs") |
 | `commands` | one, `pomade-agents` — entry `cli/pomade-agents.mjs` ("Command" below) |
@@ -201,7 +201,7 @@ One UI bundle; `welcome.surface` and the frame's route pick the view (`src/ui/co
 
 Served by the backend through Pomade's broker (`api.serve`); callers use `apps.call`. The UI calls
 it the same way. Method names and shapes are in `src/shared/api.ts`, `src/shared/sessions.ts`,
-`src/shared/roster.ts` and `src/shared/work-sessions.ts`; the sessions contract's and `RosterAgent` are `pomade-kit/protocol`'s.
+`src/shared/roster.ts`, `src/shared/skills.ts`, `src/shared/live-now.ts` and `src/shared/work-sessions.ts`; the sessions contract's and `RosterAgent` are `pomade-kit/protocol`'s.
 
 | Method | Params | Answer |
 |---|---|---|
@@ -793,7 +793,7 @@ the `roster.creating` notice; the shapes in `src/shared/roster.ts`, the name rul
     every zsh runs with exactly that environment. A workspace path holding `'`, `"`, `$`, `` ` ``
     or `\` cannot go into the alias line: the `alias` step fails.
   - Params: `clone` absent, or a roster id of at most 256 characters; `name` a text of at most 256 characters; `role` one line of at most 200; `tags` at
-    most 20 one-line tags of at most 40 (trimmed, each once); `projects` project ids; `createId`
+    most 20 one-line tags of at most 40 (trimmed, each once); `projects` at most 200 project ids; `createId`
     the caller's id, at most 128 characters. Else `invalid-params`.
 
   ```ts
@@ -872,7 +872,7 @@ type RemoveOrphanResult = { agent: string };
 - **`roster.undoRelink`** takes a re-link back from its `undo`: the agent's profile, then the
   folder's, written back byte for byte (new, or over a file of other text), the roster read again —
   both files and `roster.agents` as before the re-link. Errors:
-  `not-ready`; `not-found` (no agent with a usable profile); `invalid-params` (the agent no longer
+  `not-ready`; `invalid-params` (the agent has no usable profile or no longer
   names the folder — taken back already, or changed since; a text over `PROFILE_TEXT_MAX` (65 536)
   or not a usable profile of its id, in which case the re-link stands); `io-error`.
 - **`roster.removeOrphan`** deletes the orphan's `agents/<id>/agent.yaml` and that folder when

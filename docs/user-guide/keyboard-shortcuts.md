@@ -62,8 +62,8 @@ The row menu, **Move to project**, and the filter menus.
 
 | Shortcut | Source |
 |---|---|
-| Esc, `/`, F2, Enter, Cmd+A, Space, ↑ ↓, Shift+↑↓ | `src/ui/sessions/SessionsTab.tsx:293`, `:300`, `:306`, `:314`, `:321`, `:327`, `:335`, `:338` |
-| Click, Cmd+click, Shift+click, double-click | `src/ui/sessions/SessionsTab.tsx:250` (`onTabClick`), `:260` (`events.onClick`, `events.onCheck`) |
+| Esc, `/`, F2, Enter, Cmd+A, Space, ↑ ↓, Shift+↑↓ | `src/ui/sessions/SessionsTab.tsx:301`, `:308`, `:314`, `:322`, `:329`, `:335`, `:344` |
+| Click, Cmd+click, Shift+click, double-click | `src/ui/sessions/SessionsTab.tsx:258` (`onTabClick`), `:269` (`events.onClick`), `:284` (`events.onCheck`) |
 | Search field's Esc and ↓ | `src/ui/sessions/Toolbar.tsx:40`, `:44` |
 | Name and note fields | `src/ui/sessions/DetailPanel.tsx:147`, `:234` |
-| Menus | `src/ui/core/Menu.tsx:82` |
+| Menus | `src/ui/core/Menu.tsx:103` |

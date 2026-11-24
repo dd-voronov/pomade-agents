@@ -108,7 +108,7 @@ Open / Resume, the rename retitle and the Live now click use. The other directio
 `{ sessionId }` for an agent tab Pomade lists (`sessionId` `null` before its first prompt) and `null` for any
 other id; `sessions.ofTab` turns that into `{ agentTab, session }` and the `pomade-agents` command's default
 target uses it ([CONTRACTS "Session of a tab"](../../CONTRACTS.md#session-of-a-tab),
-[interfaces](../interfaces/index.md#session-of-a-tab)).
+[interfaces](../interfaces/api.md#session-of-a-tab)).
 
 ## Names are tab names
 

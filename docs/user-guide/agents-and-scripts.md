@@ -1,7 +1,7 @@
 ---
 doc: docs/user-guide/agents-and-scripts.md
 audience: users
-holds: how an agent or a script reads session data — the `pomade-agents show` command, the `pomade-agents-sessions` skill and how to give it to an agent
+holds: how an agent or a script reads session data — the `pomade-agents show` command, the work-session field, the record files, the `pomade-agents-sessions` skill and how to give it to an agent
 kind: reference
 ---
 
@@ -25,9 +25,12 @@ pomade-agents --help
 
 - **An agent asking about itself** runs `pomade-agents show --json` in its own tab and gets its own
   session. It has none until its first prompt starts one (exit 6 before then).
-- **Without `--json`** it prints the name, then lines for status and note, live state, agent, project,
-  folder, times, messages, tokens, estimated cost and the transcript path. Times are UTC. The layout is
-  for people and may change; scripts read `--json`.
+- **Without `--json`** it prints the name, then lines for status and note, whether it is a work session
+  (`work session  yes — it counts`, or `no — left out of every count and sum`), live state, agent,
+  project, folder, times, messages, tokens, estimated cost and the transcript path. Times are UTC. The
+  layout is for people and may change; scripts read `--json`.
+- **`--json`** prints the session as the app has it, including `"work": true` or `false`: a script that
+  counts or sums sessions takes the ones with `"work": true`.
 - **Outside a Pomade terminal** name the session with `--session <id>`; the command still needs Pomade
   running.
 - **There is no command that sets a status.** The status is yours, set in the Sessions tab.
