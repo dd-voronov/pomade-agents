@@ -143,6 +143,9 @@ export type Session = {
   /** Why the record file cannot be read; the app leaves it alone until it reads again. */
   recordProblem: string | null;
   attribution: Attribution;
+  /** The start folder relative to the folder of the first project it shows in, both with symlinks
+   *  resolved: `""` at that folder; `null` when it shows in no project, or that project does not hold it. */
+  folderInProject: string | null;
   /** What it is doing now, from the agent tab bound to it; `closed` when none runs it. */
   live: SessionLiveState;
   /** When the backend saw it enter `live` (ISO 8601); `null`: Closed, and not seen live since the backend started. */
@@ -371,6 +374,7 @@ export function isSession(value: unknown): value is Session {
     (v.record === null || isSessionRecord(v.record)) &&
     isStringOrNull(v.recordProblem) &&
     isAttribution(v.attribution) &&
+    isStringOrNull(v.folderInProject) &&
     (SESSION_LIVE_STATES as readonly unknown[]).includes(v.live) &&
     isStringOrNull(v.liveSince)
   );

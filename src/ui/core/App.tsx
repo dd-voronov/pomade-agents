@@ -17,7 +17,7 @@ function Hosted({ host }: { host: HostClient }): ReactElement {
   const view = viewFor(host.welcome.surface, route);
   if (view === "live-now") return <LiveNowPanel host={host} />;
   return (
-    <TabView host={host} view={view}>
+    <TabView view={view} navigate={navigate}>
       {view === "roster" ? <RosterTab /> : <SessionsTab host={host} route={route} navigate={navigate} />}
     </TabView>
   );

@@ -35,7 +35,8 @@ import type {
 } from "../../shared/sessions.ts";
 import { RecordError, type RecordStore } from "../records/record-store.ts";
 import type { SummariesAnswer } from "../stores/session-store.ts";
-import { attribute, type ProjectPlace } from "./attribution.ts";
+import type { RealPath } from "../core/real-paths.ts";
+import { attribute, folderInProject, type ProjectPlace } from "./attribution.ts";
 import type { LiveState } from "./live-state.ts";
 import { isRecordId, latestSummary, newRecord, refreshRecord, sameRecord, type RecordContext } from "./rules.ts";
 
@@ -56,6 +57,8 @@ export interface SessionDataOptions {
   noRecords: string;
   /** What runs now: each session's live state. */
   live: Pick<LiveState, "ofSession" | "onChange">;
+  /** Folders with symlinks resolved: start folders are compared with project folders that way. */
+  realPath: RealPath;
   now: () => Date;
   log: (line: string) => void;
 }
@@ -107,7 +110,7 @@ interface Entry {
 }
 
 export function startSessionData(options: SessionDataOptions): SessionData {
-  const { summaries: source, records, noRecords, live, now, log } = options;
+  const { summaries: source, records, noRecords, live, realPath, now, log } = options;
   const epoch = randomUUID();
   let revision = 0;
   let stopped = false;
@@ -122,6 +125,9 @@ export function startSessionData(options: SessionDataOptions): SessionData {
   /** Runner marks not in the session's record yet: session id → job name. */
   const runnerJobs = new Map<string, string>();
   let adopting = false;
+  /** Start folders with symlinks resolved; one not resolved yet is absent. */
+  const realCwds = new Map<string, string>();
+  const resolving = new Map<string, Promise<void>>();
 
   const entries = new Map<string, Entry>();
   const removed = new Map<string, number>();
@@ -159,7 +165,30 @@ export function startSessionData(options: SessionDataOptions): SessionData {
   const latest = (id: string): SessionSummary | null =>
     latestSummary([...(transcriptsOf.get(id) ?? [])].flatMap((path) => byTranscript.get(path) ?? []));
 
-  const contextOf = (summary: SessionSummary): RecordContext => ({ summary, boundIn: boundIn.get(summary.id) ?? null, projects, runnerJob: runnerJobs.get(summary.id) ?? null });
+  /** Resolve a start folder once; the sessions started in it are joined again when it differs from what was assumed. */
+  const resolveCwd = (cwd: string): Promise<void> => {
+    let pending = resolving.get(cwd);
+    if (pending === undefined) {
+      pending = realPath(cwd).then((real) => {
+        realCwds.set(cwd, real);
+        for (const summary of byTranscript.values()) if (summary.cwd === cwd) mark(summary.id);
+      });
+      resolving.set(cwd, pending);
+    }
+    return pending;
+  };
+
+  /** The summary's start folder with symlinks resolved; `undefined` while it is being resolved. */
+  const realCwdOf = (summary: SessionSummary): string | null | undefined => {
+    if (summary.cwd === null) return null;
+    const real = realCwds.get(summary.cwd);
+    if (real === undefined) void resolveCwd(summary.cwd);
+    return real;
+  };
+
+  // Until its start folder is resolved a session is placed by the folder as recorded — right unless a
+  // symlink leads into it — and its record is not written.
+  const contextOf = (summary: SessionSummary): RecordContext => ({ summary, realCwd: realCwdOf(summary) ?? summary.cwd, boundIn: boundIn.get(summary.id) ?? null, projects, runnerJob: runnerJobs.get(summary.id) ?? null });
 
   /** Sessions with a write of the app's own in flight; `true`: asked again meanwhile. */
   const writing = new Map<string, boolean>();
@@ -218,14 +247,18 @@ export function startSessionData(options: SessionDataOptions): SessionData {
     const record = held?.value ?? null;
     if (record !== null && record.startedByRunner?.job === runnerJobs.get(id)) runnerJobs.delete(id);
     let problem = held?.problem ?? null;
+    const realCwd = realCwdOf(summary);
+    const resolved = realCwd !== undefined;
     if (records !== null && held === undefined) {
       const firstRun = adoptedAt();
       if (!isRecordId(id)) problem = "its session id cannot name a file";
-      else if (firstRun !== null && !adopting) writeOnce(id, () => create(newRecord(contextOf(summary), firstRun)));
-    } else if (record !== null && !sameRecord(refreshRecord(record, contextOf(summary)), record)) {
+      else if (firstRun !== null && !adopting && resolved) writeOnce(id, () => create(newRecord(contextOf(summary), firstRun)));
+    } else if (record !== null && resolved && !sameRecord(refreshRecord(record, contextOf(summary)), record)) {
       refresh(id);
     }
-    put(id, { id, summary, record, recordProblem: problem, attribution: attribute({ cwd: summary.cwd, record, projects }), ...live.ofSession(id) });
+    const cwd = realCwd ?? summary.cwd;
+    const attribution = attribute({ cwd, record, projects });
+    put(id, { id, summary, record, recordProblem: problem, attribution, folderInProject: folderInProject(cwd, attribution.projects[0], projects), ...live.ofSession(id) });
   };
 
   const flush = (): void => {
@@ -291,6 +324,7 @@ export function startSessionData(options: SessionDataOptions): SessionData {
         const summary = latest(id);
         return summary !== null && isRecordId(id) && records.get(id) === undefined ? [summary] : [];
       });
+      await Promise.all(found.flatMap((summary) => (summary.cwd === null ? [] : [resolveCwd(summary.cwd)])));
       for (let i = 0; i < found.length; i += ADOPT_BATCH) {
         await Promise.all(found.slice(i, i + ADOPT_BATCH).map((summary) => create(newRecord(contextOf(summary), null))));
       }

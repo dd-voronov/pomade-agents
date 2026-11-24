@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { Session, SessionSummary, SessionsChanged } from "../../shared/sessions.ts";
 import { testSummary } from "../../shared/test-sessions.ts";
+import { createRealPaths } from "../core/real-paths.ts";
 import { SESSIONS_FOLDER, SETTINGS_FILE, openRecordStore, type RecordStore } from "../records/record-store.ts";
 import type { SummariesAnswer } from "../stores/session-store.ts";
 import type { ProjectPlace } from "./attribution.ts";
@@ -69,7 +70,7 @@ describe("the session data", () => {
   async function start(source: SummarySource, withRecords = true): Promise<SessionData> {
     records = withRecords ? await openRecordStore({ dataDir, now: () => clock, log: (l) => lines.push(l) }) : null;
     live = createLiveState(() => clock);
-    data = startSessionData({ summaries: source, records, noRecords: "No workspace is open", live, now: () => clock, log: (l) => lines.push(l) });
+    data = startSessionData({ summaries: source, records, noRecords: "No workspace is open", live, realPath: createRealPaths(), now: () => clock, log: (l) => lines.push(l) });
     return data;
   }
 
@@ -254,6 +255,20 @@ describe("the session data", () => {
     await expect.poll(() => session("s")?.record?.projectRoot, SOON).toBe("Projects/gamma");
     expect(session("s")?.attribution).toEqual({ projects: ["beta"], by: "remembered", sharedFolder: false });
     expect(await readFile(fileOf("s"), "utf8")).toContain("projectRoot: Projects/gamma");
+  });
+
+  it("places a session started through a symlinked folder in the project the folder is in, keeping the folder as recorded", async () => {
+    await mkdir(join(ws, "Projects", "beta", "src"), { recursive: true });
+    await symlink(join(ws, "Projects", "beta"), join(dir, "beta-link"));
+    await mkdir(dataDir, { recursive: true });
+    await writeFile(join(dataDir, SETTINGS_FILE), `adoptedAt: ${FIRST_RUN}\n`);
+    const source = fakeSource();
+    source.put(summary("s", { cwd: join(dir, "beta-link", "src") }));
+    const d = await start(source);
+    d.setProjects(PROJECTS());
+    await expect.poll(() => session("s")?.record?.project, SOON).toBe("beta");
+    expect(session("s")).toMatchObject({ attribution: { projects: ["beta"], by: "folder" }, folderInProject: "src" });
+    expect(session("s")?.record?.cwd).toBe(join(dir, "beta-link", "src"));
   });
 
   it("leaves an unreadable record alone, refuses changes to it, and takes it back once fixed", async () => {

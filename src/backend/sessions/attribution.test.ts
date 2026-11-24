@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { attribute, isInside, projectsHolding, type AttributionInput, type ProjectPlace } from "./attribution.ts";
+import { attribute, folderInProject, isInside, projectsHolding, type AttributionInput, type ProjectPlace } from "./attribution.ts";
 
 const W = "/ws";
 const place = (id: string, root: string): ProjectPlace => ({ id, root, folder: root === "" ? W : `${W}/${root}` });
@@ -73,5 +73,15 @@ describe("project attribution", () => {
     expect(isInside("/ws/a", "/ws/ab")).toBe(false);
     expect(isInside("/", "/ws")).toBe(true);
     expect(projectsHolding("/ws/x", PROJECTS)).toEqual([]);
+  });
+
+  it("gives the start folder relative to a project's folder, by whole path segments", () => {
+    expect(folderInProject(`${W}/Projects/Pomade`, "pomade", PROJECTS)).toBe("");
+    expect(folderInProject(`${W}/Projects/Pomade/src/ui`, "pomade", PROJECTS)).toBe("src/ui");
+    expect(folderInProject(`${W}/Projects/Pomade-old`, "pomade", PROJECTS)).toBeNull();
+    expect(folderInProject(`${W}/Projects/Pomade`, "gone", PROJECTS)).toBeNull();
+    expect(folderInProject(`${W}/Projects/Pomade`, undefined, PROJECTS)).toBeNull();
+    expect(folderInProject(null, "pomade", PROJECTS)).toBeNull();
+    expect(folderInProject(`${W}/x`, "root", [{ id: "root", root: "", folder: "/" }])).toBe("ws/x");
   });
 });

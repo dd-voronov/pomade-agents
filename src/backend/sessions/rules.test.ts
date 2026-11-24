@@ -14,6 +14,7 @@ const PROJECTS: ProjectPlace[] = [
 
 const context = (patch: Partial<RecordContext> = {}, summary: Parameters<typeof testSummary>[0] = {}): RecordContext => ({
   summary: testSummary({ id: "s1", cwd: "/ws/Projects/beta/src", transcript: "/t/s1.jsonl", ...summary }),
+  realCwd: null,
   boundIn: null,
   projects: PROJECTS,
   runnerJob: null,
@@ -121,6 +122,11 @@ describe("keeping a record current", () => {
 
   it("keeps the start folder it knows when the transcript has none yet", () => {
     expect(refreshRecord(record, context({}, { cwd: null })).cwd).toBe("/ws/Projects/beta/src");
+  });
+
+  it("places a session by its start folder with symlinks resolved, keeping the folder as recorded", () => {
+    const through = refreshRecord(record, context({ realCwd: "/ws/Projects/alpha/src" }, { cwd: "/link/alpha/src" }));
+    expect(through).toMatchObject({ cwd: "/link/alpha/src", project: "alpha", projectRoot: "Projects/alpha" });
   });
 });
 

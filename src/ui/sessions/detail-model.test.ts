@@ -82,31 +82,38 @@ describe("started in", () => {
     expect(relativeTo("/w/p", "/w")).toBeNull();
   });
 
-  it("is the folder relative to the session's project, with the branch", () => {
-    expect(startedIn(inProject("/ws/Projects/alpha/docs", ["alpha"], "main"), PROJECTS, ["/ws"])).toEqual({ folder: "docs/", root: null, branch: "main" });
-    expect(startedIn(inProject("/ws/Projects/alpha"), PROJECTS, ["/ws/"])).toEqual({ folder: "./", root: "project root", branch: null });
+  /** A session started in `cwd`, `folderInProject` as the backend placed it. */
+  const placed = (cwd: string | null, folderInProject: string | null, branch: string | null = null): Session =>
+    testSession({ summary: testSummary({ cwd, branch }), attribution: { projects: folderInProject === null ? [] : ["alpha"], by: "folder", sharedFolder: false }, folderInProject });
+
+  it("is the folder relative to the session's project, as the backend resolves it, with the branch", () => {
+    expect(startedIn(placed("/ws/Projects/alpha/docs", "docs", "main"), ["/ws"])).toEqual({ folder: "docs/", root: null, branch: "main" });
+    expect(startedIn(placed("/ws/Projects/alpha", ""), ["/ws/"])).toEqual({ folder: "./", root: "project root", branch: null });
+  });
+
+  it("is relative to the project also when the folder or the project's root is reached through a symlink", () => {
+    expect(startedIn(placed("/ws/Projects/alpha-link/docs", "docs"), ["/ws"])).toEqual({ folder: "docs/", root: null, branch: null });
+    expect(startedIn(placed("/elsewhere/alpha", ""), ["/ws"])).toEqual({ folder: "./", root: "project root", branch: null });
   });
 
   it("is relative to the workspace for the Workspace bucket, or when the project's folder does not hold it", () => {
-    expect(startedIn(inProject("/ws/notes", []), PROJECTS, ["/ws"])).toEqual({ folder: "notes/", root: null, branch: null });
-    expect(startedIn(inProject("/ws", []), PROJECTS, ["/ws"])).toEqual({ folder: "./", root: "workspace root", branch: null });
-    expect(startedIn(inProject("/ws/Projects/beta/src", ["alpha"]), PROJECTS, ["/ws"])).toEqual({ folder: "Projects/beta/src/", root: null, branch: null });
+    expect(startedIn(placed("/ws/notes", null), ["/ws"])).toEqual({ folder: "notes/", root: null, branch: null });
+    expect(startedIn(placed("/ws", null), ["/ws"])).toEqual({ folder: "./", root: "workspace root", branch: null });
+    expect(startedIn(inProject("/ws/Projects/beta/src", ["alpha"]), ["/ws"])).toEqual({ folder: "Projects/beta/src/", root: null, branch: null });
   });
 
-  it("is relative to the project also through a symlinked workspace, whichever way the transcript records the folder", () => {
-    const roots = ["/private/ws", "/ws"];
-    expect(startedIn(inProject("/private/ws/Projects/alpha/docs"), PROJECTS, roots)).toEqual({ folder: "docs/", root: null, branch: null });
-    expect(startedIn(inProject("/ws/Projects/alpha"), PROJECTS, roots)).toEqual({ folder: "./", root: "project root", branch: null });
-    expect(startedIn(inProject("/private/ws/notes", []), PROJECTS, roots)).toEqual({ folder: "notes/", root: null, branch: null });
+  it("is relative to the workspace through a symlinked workspace, whichever way the transcript records the folder", () => {
+    expect(startedIn(placed("/private/ws/notes", null), ["/private/ws", "/ws"])).toEqual({ folder: "notes/", root: null, branch: null });
+    expect(startedIn(placed("/ws/notes", null), ["/private/ws", "/ws"])).toEqual({ folder: "notes/", root: null, branch: null });
   });
 
   it("is the folder as recorded outside the workspace, or before the workspace is known", () => {
-    expect(startedIn(inProject("/elsewhere/x", []), PROJECTS, ["/ws"])).toEqual({ folder: "/elsewhere/x", root: null, branch: null });
-    expect(startedIn(inProject("/ws/Projects/alpha/docs"), PROJECTS, [])).toEqual({ folder: "/ws/Projects/alpha/docs", root: null, branch: null });
+    expect(startedIn(placed("/elsewhere/x", null), ["/ws"])).toEqual({ folder: "/elsewhere/x", root: null, branch: null });
+    expect(startedIn(placed("/ws/Projects/alpha/docs", null), [])).toEqual({ folder: "/ws/Projects/alpha/docs", root: null, branch: null });
   });
 
   it("is nothing when the transcript records no folder", () => {
-    expect(startedIn(inProject(null), PROJECTS, ["/ws"])).toBeNull();
+    expect(startedIn(inProject(null), ["/ws"])).toBeNull();
   });
 });
 

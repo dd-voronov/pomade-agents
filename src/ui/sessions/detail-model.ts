@@ -3,7 +3,7 @@
 // start folder relative to the project, the message blocks, the note's save rule and how a failed
 // change reads. Values read as in the table (`table-model.ts`).
 
-import type { ErrorCode, ProjectRef } from "pomade-kit/protocol";
+import type { ErrorCode } from "pomade-kit/protocol";
 import { HostError } from "pomade-kit/sdk";
 
 import type { Session, SessionProvider, TimedText } from "../../shared/sessions.ts";
@@ -77,21 +77,17 @@ function relativeToAny(roots: readonly string[], path: string): string | null {
   return null;
 }
 
-/** The start folder relative to the session's (first) project, else to the workspace, else as
- *  recorded; `null` when the transcript records none. `workspaceRoots` are the workspace's root
- *  with symlinks resolved and as Pomade names it (`app.info`'s `workspaceReal`, `workspace`): a
- *  transcript records the folder either way. Empty while the workspace is not known. */
-export function startedIn(session: Session, projects: ReadonlyMap<string, ProjectRef>, workspaceRoots: readonly string[]): StartedIn | null {
+/** The start folder relative to the session's (first) project — as the backend resolves it
+ *  (`folderInProject`), symlinks and all — else to the workspace, else as recorded; `null` when the
+ *  transcript records none. `workspaceRoots` are the workspace's root with symlinks resolved and as
+ *  Pomade names it (`app.info`'s `workspaceReal`, `workspace`): a transcript records the folder
+ *  either way. Empty while the workspace is not known. */
+export function startedIn(session: Session, workspaceRoots: readonly string[]): StartedIn | null {
   const { cwd, branch } = session.summary;
   if (cwd === null) return null;
   const as = (relative: string, root: "project root" | "workspace root"): StartedIn =>
     relative === "" ? { folder: "./", root, branch } : { folder: `${relative}/`, root: null, branch };
-  const project = projects.get(session.attribution.projects[0] ?? "");
-  if (project !== undefined) {
-    const projectRoots = workspaceRoots.map((root) => (project.root === "" ? root : `${root.replace(/\/+$/, "")}/${project.root}`));
-    const inProject = relativeToAny(projectRoots, cwd);
-    if (inProject !== null) return as(inProject, "project root");
-  }
+  if (session.folderInProject !== null) return as(session.folderInProject, "project root");
   const inWorkspace = relativeToAny(workspaceRoots, cwd);
   if (inWorkspace !== null) return as(inWorkspace, "workspace root");
   return { folder: cwd, root: null, branch };

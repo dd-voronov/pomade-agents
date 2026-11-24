@@ -34,6 +34,7 @@ export function testSession(patch: Partial<Session> = {}): Session {
     record: { id, provider: "claude-code", agent: "claude", status: "active" },
     recordProblem: null,
     attribution: { projects: [], by: "workspace", sharedFolder: false },
+    folderInProject: null,
     live: "closed",
     liveSince: null,
     ...patch,

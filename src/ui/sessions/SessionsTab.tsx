@@ -152,7 +152,6 @@ export function SessionsTab({ host, route, navigate }: { host: HostClient; route
           session={selected}
           now={now}
           names={names}
-          projects={projects}
           workspaceRoots={workspaceRoots}
           byId={copy.byId}
           inTab={(id) => {

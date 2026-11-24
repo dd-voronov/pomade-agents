@@ -21,7 +21,7 @@ export interface ProjectPlace {
 }
 
 export interface AttributionInput {
-  /** The start folder: absolute, as the transcript records it. */
+  /** The start folder: absolute, symlinks resolved — as project folders are compared. */
   cwd: string | null;
   record: Pick<SessionRecord, "project" | "projectOverride" | "launchedFrom"> | null;
   /** Pomade's projects in sidebar order; `null` while not known (Pomade not reached yet). */
@@ -35,6 +35,14 @@ export function projectsHolding(cwd: string, projects: readonly ProjectPlace[]):
   const holding = projects.filter((p) => isInside(p.folder, cwd));
   const deepest = Math.max(...holding.map((p) => p.folder.length));
   return holding.filter((p) => p.folder.length === deepest);
+}
+
+/** `cwd` relative to the folder of project `projectId`: `""` at its root; `null` when that project
+ *  is not known or does not hold `cwd`. Both folders absolute with symlinks resolved. */
+export function folderInProject(cwd: string | null, projectId: string | undefined, projects: readonly ProjectPlace[] | null): string | null {
+  const place = projects?.find((p) => p.id === projectId);
+  if (cwd === null || place === undefined || !isInside(place.folder, cwd)) return null;
+  return cwd === place.folder ? "" : cwd.slice(place.folder.endsWith(sep) ? place.folder.length : place.folder.length + 1);
 }
 
 export function attribute({ cwd, record, projects }: AttributionInput): Attribution {

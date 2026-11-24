@@ -4,7 +4,7 @@
 // under the note.
 
 import { useRef, useState, type KeyboardEvent, type ReactElement, type ReactNode } from "react";
-import { SESSION_STATUSES, type ProjectRef, type SessionStatus } from "pomade-kit/protocol";
+import { SESSION_STATUSES, type SessionStatus } from "pomade-kit/protocol";
 
 import { CloseIcon, FolderIcon, ForkIcon, InfoIcon, TimerIcon, WarningIcon } from "../core/icons.tsx";
 import { SESSION_NOTE_MAX, type Session } from "../../shared/sessions.ts";
@@ -32,7 +32,6 @@ export interface DetailPanelProps {
   now: Date;
   /** Project names by id. */
   names: ReadonlyMap<string, string>;
-  projects: ReadonlyMap<string, ProjectRef>;
   /** The workspace's root with symlinks resolved and as Pomade names it; empty while not known. */
   workspaceRoots: readonly string[];
   /** Every session the UI holds, by id: a fork's parent may be outside the scope. */
@@ -182,9 +181,9 @@ function StatusButtons({ session, change }: Pick<DetailPanelProps, "session" | "
   );
 }
 
-function Facts({ session, now, names, projects, workspaceRoots }: Pick<DetailPanelProps, "session" | "now" | "names" | "projects" | "workspaceRoots">): ReactElement {
+function Facts({ session, now, names, workspaceRoots }: Pick<DetailPanelProps, "session" | "now" | "names" | "workspaceRoots">): ReactElement {
   const { summary } = session;
-  const folder = startedIn(session, projects, workspaceRoots);
+  const folder = startedIn(session, workspaceRoots);
   const status = statusOf(session);
   return (
     <dl className={styles.facts} data-testid="facts">

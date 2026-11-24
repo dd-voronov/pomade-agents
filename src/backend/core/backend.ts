@@ -84,8 +84,8 @@ export async function startBackend(options: BackendOptions): Promise<Backend> {
   await roster.refresh();
   const live = createLiveState(options.now);
   const tabs = followTabs(live);
-  const sessions = startSessionData({ summaries: store, records, noRecords, live, now: options.now, log });
   const realPath = createRealPaths();
+  const sessions = startSessionData({ summaries: store, records, noRecords, live, realPath, now: options.now, log });
 
   // The UI frames subscribe to the app's own `sessions.changed`; the backend publishes it to them
   // through whichever Pomade connection is up.

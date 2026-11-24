@@ -51,9 +51,11 @@ One UI bundle; `welcome.surface` and the frame's route pick the view (`src/ui/co
 - **A tab's scope** is the project it was opened in, `welcome.project`; the tab keeps it and ignores
   `project.changed`. The Workspace project's tab (`"__workspace__"`) shows every session, with a Project
   column. Project names and roots come from `project.list`, asked again on `project.created`,
-  `project.renamed` and `project.removed`; the detail panel's "started in" is the start folder relative to the project's
-  root under the workspace `app.info` names — with symlinks resolved (`workspaceReal`), else as
-  Pomade names it (`workspace`) — else relative to the workspace, else as recorded.
+  `project.renamed` and `project.removed`; the detail panel's "started in" is the start folder relative to the folder of
+  the session's first project, as the backend resolves it (`Session.folderInProject`: symlinks in
+  the start folder and in the project's root resolved), else relative to the workspace `app.info`
+  names — with symlinks resolved (`workspaceReal`) or as Pomade names it (`workspace`) — else as
+  recorded.
 - **Status and note** are set from the detail panel through `sessions.setStatus` ("Sessions"
   below), one call at a time; the frame takes the changed sessions from its answer, so the row
   moves at once, and a refused change leaves the rows as they were. The panel says what was not
@@ -61,7 +63,9 @@ One UI bundle; `welcome.surface` and the frame's route pick the view (`src/ui/co
   `io-error` "The record file could not be written.", `not-ready`, `not-found`, `app-absent`,
   `app-not-responding`, else "Something went wrong."); the backend's message is its hover text.
 - The app has one tab per project — Pomade's icon-less app tab. `tabs.openApp({ route })` opens it
-  or navigates it; the frame follows `route.changed`.
+  or navigates it (the panel's Sessions and Roster); the frame follows `route.changed`. The tab's
+  Sessions | Roster switch is the tab navigating by itself (`navigate`, `tabs.setRoute`), as the
+  selection is (`src/ui/core/TabView.tsx`).
 
 ## Published API
 
@@ -143,6 +147,8 @@ type Session = {
   record: SessionRecord | null;       // null: no workspace, first run still indexing, or the file cannot be used
   recordProblem: string | null;       // why the record file cannot be used
   attribution: Attribution;
+  folderInProject: string | null;     // the start folder relative to the folder of attribution.projects[0], both
+                                      // with symlinks resolved: "" at its root; null: no project, or it does not hold it
   live: SessionLiveState;             // the kit's: working · needs-you · idle · closed
   liveSince: string | null;           // when the backend saw it enter `live`; null: Closed, not seen live this run
 };
@@ -175,8 +181,11 @@ no project = the Workspace) → the project of the first Pomade tab seen bound t
 (`launched`) → the deepest project folder holding the start folder, every project on it when
 several share it (`folder`, `sharedFolder`) → the project the record names, when no project folder
 holds the start folder any more — the project was renamed or moved (`remembered`) → the Workspace.
-A project that no longer exists never holds a session; a Move to it is dropped. Project folders
-are compared absolute with symlinks resolved. A tab in the Workspace scope records
+A project that no longer exists never holds a session; a Move to it is dropped. The start folder
+and the project folders are compared absolute with symlinks resolved (the workspace's and the
+project root's alike); each start folder is resolved once per backend run — until it is, the
+session is placed by the folder as recorded and its record is not written — and one that does not
+exist stands as it is. The record keeps the start folder as recorded (`cwd`). A tab in the Workspace scope records
 `launchedFrom: "__workspace__"`: the session belongs to the Workspace, in no project.
 
 **Changes.** `sessions.setStatus` sets one status on every id (all are checked first: an unknown id
@@ -222,7 +231,10 @@ kit's `checkRepoSessions` / `checkLiveIn` unchanged. Pomade asks them as the cal
 
 - **Folders** — the caller's `folder` (absolute, else `invalid-params`) and every recorded folder
   are compared absolute with symlinks resolved; each folder is resolved once and kept 30 s
-  (`src/backend/core/real-paths.ts`); one that does not exist stands as it is. "At or below" is
+  (`src/backend/core/real-paths.ts`); one that does not exist stands as it is. Every read that
+  matches folders compares this form: `forRepo`, `liveIn` and `find` here, and the attribution
+  that gives `RepoSession.project` ("Sessions" above), so a session matches its repo and its
+  project however its folder was reached. "At or below" is
   the folder itself or a path inside it — never a sibling sharing its name's start.
 - **`forRepo`** — the sessions whose start folder (resolved) is `folder` or inside it, and with
   `branch` (a non-empty string) whose recorded branch is exactly that one; newest `lastActiveAt`

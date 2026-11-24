@@ -14,6 +14,8 @@ import { attribute, type ProjectPlace } from "./attribution.ts";
 export interface RecordContext {
   /** The session's latest transcript. */
   summary: SessionSummary;
+  /** The summary's start folder with symlinks resolved; `null` when it records none. */
+  realCwd: string | null;
   /** The project of the first Pomade tab seen bound to the session (`"__workspace__"` for the Workspace scope); `null`: never seen bound. */
   boundIn: string | null;
   /** Pomade's projects in sidebar order; `null` while not known. */
@@ -51,7 +53,7 @@ export function newRecord(context: RecordContext, adoptedAt: string | null): Ses
 /** The record with the fields the app keeps current: the transcript and start folder, the first
  *  binding to a tab, the Runner job that started it, and the effective project with its root as
  *  Pomade names it now. Everything else — name, status, note, a Move to project — stays as it is. */
-export function refreshRecord(record: SessionRecord, { summary, boundIn, projects, runnerJob }: RecordContext): SessionRecord {
+export function refreshRecord(record: SessionRecord, { summary, realCwd, boundIn, projects, runnerJob }: RecordContext): SessionRecord {
   const next: SessionRecord = { ...record, transcript: summary.transcript };
   if (summary.cwd !== null) next.cwd = summary.cwd;
   if (runnerJob !== null) next.startedByRunner = { job: runnerJob };
@@ -62,7 +64,7 @@ export function refreshRecord(record: SessionRecord, { summary, boundIn, project
   if (projects === null) return next;
   // A Move to a project that no longer exists is void: the session goes back to its automatic project.
   if (next.projectOverride && next.project !== undefined && !projects.some((p) => p.id === next.project)) delete next.projectOverride;
-  const [first] = attribute({ cwd: next.cwd ?? null, record: next, projects }).projects;
+  const [first] = attribute({ cwd: realCwd ?? next.cwd ?? null, record: next, projects }).projects;
   const place = projects.find((p) => p.id === first);
   if (place) {
     next.project = place.id;
