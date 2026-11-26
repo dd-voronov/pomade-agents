@@ -41,7 +41,7 @@ const UI_FILES = ["src/ui/**/*.{ts,tsx}", "harness/shell/shell.ts"];
 const UI_TESTS = ["src/ui/**/*.test.ts"];
 
 export default tseslint.config(
-  { ignores: ["dist/**", "prototypes/**", "test-results/**", "playwright-report/**", "e2e/artifacts/**", "**/*.d.ts"] },
+  { ignores: ["dist/**", "private/**", "test-results/**", "playwright-report/**", "e2e/artifacts/**", "**/*.d.ts"] },
   tseslint.configs.base,
   { name: "pomade-agents/config", files: ["eslint.config.mjs"], rules: baseHygieneRules },
   {
