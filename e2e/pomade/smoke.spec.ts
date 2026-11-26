@@ -155,7 +155,7 @@ test.describe("dev-linked into Pomade", () => {
     }
   });
 
-  test("quitting Pomade stops the backend; the stores were never written, and Apps/ holds only the app's settings, session records and agent profiles", async () => {
+  test("quitting Pomade stops the backend; the stores were never written, and Apps/<app id>/ holds only the app's settings, session records and agent profiles", async () => {
     await app?.close();
     app = null;
     await expect.poll(() => alive(backendPid), { timeout: 10_000 }).toBe(false);
@@ -163,10 +163,11 @@ test.describe("dev-linked into Pomade", () => {
     const fixtures = await fixtureSnapshots();
     const home = await sandbox.snapshot(sandbox.home);
     for (const [path, hash] of Object.entries(fixtures.home)) expect(home[path], path).toBe(hash);
-    const apps = Object.keys(await sandbox.snapshot(join(sandbox.workspace, "Apps")));
-    expect(apps.filter((path) => path.startsWith(`${manifest.id}/sessions/`) && path.endsWith(".yaml"))).toHaveLength(Object.keys(SEEDED_TRANSCRIPTS).length);
-    expect(apps.filter((path) => !path.startsWith(`${manifest.id}/sessions/`)).sort()).toEqual(
-      [...FIXTURE_AGENTS.map((id) => `${manifest.id}/agents/${id}/agent.yaml`), `${manifest.id}/settings.yaml`].sort(),
+    // Only the app's own folder: Pomade keeps its own files under `Apps/` too (`Apps/Pomade/…`).
+    const own = Object.keys(await sandbox.snapshot(join(sandbox.workspace, "Apps", manifest.id)));
+    expect(own.filter((path) => path.startsWith("sessions/") && path.endsWith(".yaml"))).toHaveLength(Object.keys(SEEDED_TRANSCRIPTS).length);
+    expect(own.filter((path) => !path.startsWith("sessions/")).sort()).toEqual(
+      [...FIXTURE_AGENTS.map((id) => `agents/${id}/agent.yaml`), "settings.yaml"].sort(),
     );
   });
 });
