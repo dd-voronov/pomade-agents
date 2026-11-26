@@ -1,4 +1,4 @@
-/* Model & modes (layout: prototypes/roster): the model's two fields, then one row per mode with
+/* Model & modes: the model's two fields, then one row per mode with
    its switch, words and launch line. The launch line is one line, cut with "…" (its tooltip and
    Copy hold all of it): nothing pushes the page wide. */
 

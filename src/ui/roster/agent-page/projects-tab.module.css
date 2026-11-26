@@ -1,4 +1,4 @@
-/* The Projects tab (layout: prototypes/roster): one block of rows — Project · Sessions (90 d) ·
+/* The Projects tab: one block of rows — Project · Sessions (90 d) ·
    Last session · the action — under a header, a Connected band and a Not connected band. A row is
    28 px, its columns fixed, so hovering and switching never move anything: Disconnect is there
    from the start, transparent until the row is hovered or focused. Below 600 px the project's

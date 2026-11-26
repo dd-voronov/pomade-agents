@@ -1,4 +1,4 @@
-/* The agent's page: a header over a tab bar over the tab's body (layout: prototypes/roster). The
+/* The agent's page: a header over a tab bar over the tab's body. The
    header's controls stay inside it at every width: the name gives way first, then the chips, then
    the sub line; the buttons never shrink and never leave the row. */
 

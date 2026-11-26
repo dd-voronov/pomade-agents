@@ -7,8 +7,8 @@ kind: reference
 
 # pomade-agents — modules
 
-A module is a real area of the app with a home in the code. Tickets name one in `module:`
-(`../Pomade/docs/process/backlog.md`); process items use `meta`. The app's design, across modules, is
+A module is a real area of the app with a home in the code. Tickets name one in `module:`;
+process items use `meta`. The app's design, across modules, is
 in [DESIGN](../DESIGN.md).
 
 | Module | Covers | Where in code |

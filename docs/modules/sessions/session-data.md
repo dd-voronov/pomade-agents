@@ -83,7 +83,7 @@ Spec: `relink-sessions.spec.ts`. Tickets: T-036.
 
 ## Attribution
 
-`attribution.ts`, [glossary](../../GLOSSARY.md) "Project attribution". In order: `projectOverride`
+`attribution.ts`. In order: `projectOverride`
 (+ `project`; without `project`, the Workspace bucket) → `launchedFrom` → the deepest project root
 holding the start folder (all projects on that root when several share it: `sharedFolder`) → the
 `project` remembered in the record, when no root holds the folder any more (ids are stable across

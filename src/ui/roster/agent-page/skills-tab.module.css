@@ -1,4 +1,4 @@
-/* The Skills tab (layout: prototypes/roster): a lead line over one block of groups; each group a
+/* The Skills tab: a lead line over one block of groups; each group a
    28 px head (the folder path, the count of links on, a mark for a folder not listed) over 28 px
    rows — switch, name, description, "also in". A row's columns are fixed, so switching changes
    colour only and never moves a row. Below 560 px the description gives way. */
