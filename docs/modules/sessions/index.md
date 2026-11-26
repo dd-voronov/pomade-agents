@@ -13,7 +13,7 @@ names = tab names, live state, and the one rule for which sessions count. Code: 
 `src/shared/live-now.ts` and `src/shared/work-sessions.ts`; the Sessions routes in `src/ui/core/routes.ts`;
 end-to-end specs in `e2e/`. Reads the `stores` module's session summaries; the published API and events
 are in [CONTRACTS](../../CONTRACTS.md) ("Sessions", "Live now", "Agent counts", "Published events"); the
-design is [DESIGN](../../DESIGN.md) §2.4–2.9. For users: [user guide](../../user-guide/index.md).
+design is [ARCHITECTURE](../../ARCHITECTURE.md) §2.4–2.9. For users: [user guide](../../user-guide/index.md).
 
 **Work sessions.** Every count and sum the app shows is over work sessions: a session is one unless its
 status is Done–skip/Failed. The backend sets `Session.work` from that one rule

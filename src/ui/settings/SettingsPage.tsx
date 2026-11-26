@@ -1,4 +1,4 @@
-// The app's Settings page (route `settings`, DESIGN §3.8): the skill folders the skills catalog
+// The app's Settings page (route `settings`, ARCHITECTURE §3.8): the skill folders the skills catalog
 // reads, each with its skill count and the links that point into it; **Add folder…** through
 // Pomade's folder picker; **Remove**, which first warns — naming the agents — when links depend on
 // the folder, and keeps the links. Every change offers Undo.

@@ -1,4 +1,4 @@
-// The Roster's windows and its reading of `sessions.agentCounts` (DESIGN §3.3–3.4): "this week" is
+// The Roster's windows and its reading of `sessions.agentCounts` (ARCHITECTURE §3.3–3.4): "this week" is
 // the local calendar week from Monday 00:00; the per-project window is the last 90 days, from the
 // start of the local day 90 days back. Both stay the same all day, so a frame that renews `now`
 // asks again only when a day turns.

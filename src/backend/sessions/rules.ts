@@ -1,4 +1,4 @@
-// What a session record holds, decided from what the app knows (DESIGN §2.4, §2.6, §4): the record
+// What a session record holds, decided from what the app knows (ARCHITECTURE §2.4, §2.6, §4): the record
 // a session gets when the app first sees it, and the fields the app keeps current in it afterwards.
 //
 // First sight: on the first run (the adoption) every session is Done; later, a session started

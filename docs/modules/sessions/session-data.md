@@ -139,7 +139,7 @@ way is applied, and one that already shows what it should is left alone. Specs: 
 
 ## Work-session rule
 
-`isWorkSession` (`src/shared/work-sessions.ts`), the only place ([DESIGN](../../DESIGN.md) §2.9,
+`isWorkSession` (`src/shared/work-sessions.ts`), the only place ([ARCHITECTURE](../../ARCHITECTURE.md) §2.9,
 [CONTRACTS "Sessions"](../../CONTRACTS.md#sessions) "Work session"): a session is a work session unless
 its record's status is `done-skip`; one without a record counts. `session-data.ts` sets `Session.work`
 whenever it joins a session, so a status change changes it like any field and the revision moves.

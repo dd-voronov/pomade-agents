@@ -1,4 +1,4 @@
-// An agent's Projects tab through the built app and backend in the fake Pomade (DESIGN §3.4, T-034):
+// An agent's Projects tab through the built app and backend in the fake Pomade (ARCHITECTURE §3.4, T-034):
 // one table, Project · Sessions (90 d) · Last session; Connected under the sidebar's groups, the most
 // sessions first inside a group, a project offering every agent locked; Not connected with the
 // projects the agent worked in first, the never-used ones behind Show all projects; Connect and

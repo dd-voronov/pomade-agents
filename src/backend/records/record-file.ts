@@ -1,4 +1,4 @@
-// The app's files in `<workspace>/Apps/pomade-agents/` as text (DESIGN §3.2, §4): a session
+// The app's files in `<workspace>/Apps/pomade-agents/` as text (ARCHITECTURE §3.2, §4): a session
 // record, `sessions/<id>.yaml`; an agent profile, `agents/<id>/agent.yaml`; and the app settings,
 // `settings.yaml`.
 //
@@ -61,7 +61,7 @@ export function parseRecord(id: string, text: string): Parsed<SessionRecord> {
   return isSessionRecord(values) ? { ok: true, value: values } : { ok: false, problem: "it is not a session record" };
 }
 
-/** A new record file: the keys in DESIGN §4's order. */
+/** A new record file: the keys in ARCHITECTURE §4's order. */
 export function renderRecord(record: SessionRecord): string {
   const ordered: Record<string, unknown> = {};
   for (const key of SESSION_RECORD_KEYS) if (record[key] !== undefined) ordered[key] = record[key];
@@ -123,7 +123,7 @@ export function parseProfile(id: string, text: string): Parsed<AgentProfile> {
   return isAgentProfile(values) ? { ok: true, value: values } : { ok: false, problem: "it is not an agent profile" };
 }
 
-/** A new profile file: the keys in DESIGN §3.2's order. */
+/** A new profile file: the keys in ARCHITECTURE §3.2's order. */
 export function renderProfile(profile: AgentProfile): string {
   const ordered: Record<string, unknown> = {};
   for (const key of AGENT_PROFILE_KEYS) if (profile[key] !== undefined) ordered[key] = profile[key];

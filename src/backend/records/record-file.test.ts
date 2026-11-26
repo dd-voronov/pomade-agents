@@ -21,7 +21,7 @@ const RECORD: SessionRecord = {
 };
 
 describe("a session record file", () => {
-  it("is written in DESIGN §4's key order and reads back as it was written", () => {
+  it("is written in ARCHITECTURE §4's key order and reads back as it was written", () => {
     const text = renderRecord(RECORD);
     expect(text.split("\n")[0]).toBe(`id: ${ID}`);
     expect(text).toContain('name: "G4: agents grill"');
@@ -133,7 +133,7 @@ describe("an agent profile file", () => {
     modes: { normal: { enabled: true }, "full-autonomy": { enabled: true } },
   };
 
-  it("is written in DESIGN §3.2's key order and reads back as it was written", () => {
+  it("is written in ARCHITECTURE §3.2's key order and reads back as it was written", () => {
     const text = renderProfile(PROFILE);
     expect(text.split("\n").map((l) => l.split(":")[0]).filter((k): k is string => k !== undefined && k !== "" && !k.startsWith(" "))).toEqual([
       "id",

@@ -1,5 +1,5 @@
 // The New agent page, route `roster/new` — `roster/new?clone=<id>` starts it as a clone of that
-// agent (DESIGN §3.6): the form with "Create will"
+// agent (ARCHITECTURE §3.6): the form with "Create will"
 // beside it, then the Create in place — its steps ticking — and where it ends: done, with the new
 // agent's tab open and its setup prompt to copy; the alias to fix with Check again; or nothing kept.
 

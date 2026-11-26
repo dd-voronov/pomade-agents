@@ -1,5 +1,5 @@
 // An agent's buttons with their menus, the same on a card, a list row and the agent's page
-// (DESIGN §3.3, §3.4): **Start session ▾** — the mode when more than Normal is enabled, then the
+// (ARCHITECTURE §3.3, §3.4): **Start session ▾** — the mode when more than Normal is enabled, then the
 // connected projects, the others, the Workspace; the ⋯ menu's entries — on the Roster also the
 // agent's page and its sessions — Clone…, Hide / Show in the "+" menu, Open CLAUDE.md, Open
 // agent.yaml; and an orphan's **Re-link ▾** (the unclaimed agent folders, read each time it opens) and

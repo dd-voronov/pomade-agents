@@ -6,7 +6,7 @@ import { HostError } from "pomade-kit/sdk";
 import { CLAUDE_MODEL_CHOICES } from "../../../shared/model-choices.ts";
 import { MODE_IDS, type AgentProvider, type ModeId, type RosterEntry } from "../../../shared/roster.ts";
 
-/** Each mode's name and what it does, per provider (DESIGN §3.5). */
+/** Each mode's name and what it does, per provider (ARCHITECTURE §3.5). */
 export const MODE_TEXT: Record<ModeId, { label: string } & Record<AgentProvider, string>> = {
   normal: { label: "Normal", claude: "the agent’s own settings, no flags", codex: "default approvals" },
   "full-autonomy": { label: "Full autonomy", claude: "skips every permission prompt", codex: "bypasses approvals and the sandbox" },

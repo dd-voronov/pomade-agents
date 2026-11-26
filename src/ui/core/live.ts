@@ -1,4 +1,4 @@
-// A live state in words (DESIGN §2.4, glossary "Live state"), as every surface says it.
+// A live state in words (ARCHITECTURE §2.4, glossary "Live state"), as every surface says it.
 
 import type { SessionLiveState } from "pomade-kit/protocol";
 

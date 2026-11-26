@@ -1,4 +1,4 @@
-// The delay behind event C (DESIGN §6): a status change settles `windowMs` after the session's
+// The delay behind event C (ARCHITECTURE §6): a status change settles `windowMs` after the session's
 // last change, so the Sessions tab's Undo can take it back before anyone hears of it. One pending
 // change per session: a change inside the window restarts it and keeps the first `from`; one that
 // brings the status back to that `from` drops it — nothing changed. `flush` settles every pending

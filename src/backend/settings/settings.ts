@@ -1,4 +1,4 @@
-// The app's own settings the backend follows (DESIGN §3.8, §4): the list of skill folders in
+// The app's own settings the backend follows (ARCHITECTURE §3.8, §4): the list of skill folders in
 // `settings.yaml`, read from the record store's copy of the file — which follows the file on disk —
 // and written through it, one settings write at a time.
 //

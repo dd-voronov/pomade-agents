@@ -1,4 +1,4 @@
-// Open / Resume through the built backend and the fake Pomade (DESIGN §2.1): a session with no tab
+// Open / Resume through the built backend and the fake Pomade (ARCHITECTURE §2.1): a session with no tab
 // resumes in a new agent tab in its project and start folder (`agentTabs.resume`) and a Done one
 // becomes Active; a session bound to an open tab focuses that tab, never a second one — from the
 // detail panel's primary button, a row's hover button, the row menu's first entry, Enter and a

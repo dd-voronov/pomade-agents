@@ -1,4 +1,4 @@
-// Model & modes (DESIGN §3.4, §3.5): the agent's default model and
+// Model & modes (ARCHITECTURE §3.4, §3.5): the agent's default model and
 // effort, written to Claude Code's `settings.json` (only those keys; Codex read-only), then its
 // modes — Normal always on, a switch for Full autonomy in `agent.yaml` — each enabled one with its
 // launch line, read-only, and Copy.

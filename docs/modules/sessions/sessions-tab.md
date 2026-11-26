@@ -14,7 +14,7 @@ rule lives in a pure `*-model.ts` file beside it; components only draw. The data
 `useOpenSession`, each an `apps.call` to the app's own backend ([CONTRACTS "Sessions"](../../CONTRACTS.md#sessions)).
 Backend side: [session-data](session-data.md). The tab's route grammar (`sessions`, `sessions/<id>`,
 `sessions?agent=<id>&project=<id>`) is in [CONTRACTS "Surfaces and routes"](../../CONTRACTS.md#surfaces-and-routes);
-the layout intent is [DESIGN](../../DESIGN.md) §2.7, the counting rule §2.9.
+the layout intent is [ARCHITECTURE](../../ARCHITECTURE.md) §2.7, the counting rule §2.9.
 
 ## Data in the UI
 
@@ -35,7 +35,7 @@ as it was. `copy === null` shows "Reading the session stores…"; an empty scope
 - **Header** — "Sessions", the scope name ("Workspace · all projects" in the Workspace's tab), and
   `N work sessions · ~$X est.` (`formatHeaderSum`; "1 work session"; the sum is left out when no
   session has a cost). The count and the sum are over the scope's **work sessions** (`Session.work`,
-  [DESIGN](../../DESIGN.md) §2.9; `workSessions`, `workCost` in `table-model.ts`): every status but
+  [ARCHITECTURE](../../ARCHITECTURE.md) §2.9; `workSessions`, `workCost` in `table-model.ts`): every status but
   Done–skip/Failed, a session without a record yet included, a hidden session never. They ignore the
   search and the filters; the tooltip says "Work sessions: every session but Done–skip/Failed". The
   `data-count` of `sessions-count` is the count.
@@ -196,7 +196,7 @@ the tab lists it), shared folder, outside Pomade; the same facts show as chips a
 | `sessions-copy.ts` | the UI's copy of the answers |
 | `row-menu.tsx` | row menu and Move to project menu entries |
 
-Keyboard shortcuts: [keyboard-shortcuts](../../user-guide/keyboard-shortcuts.md). Layout intent: [DESIGN](../../DESIGN.md) §2.7.
+Keyboard shortcuts: [keyboard-shortcuts](../../user-guide/keyboard-shortcuts.md). Layout intent: [ARCHITECTURE](../../ARCHITECTURE.md) §2.7.
 
 ## Tests
 

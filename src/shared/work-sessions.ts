@@ -1,4 +1,4 @@
-// Work sessions (DESIGN §2.9, docs/CONTRACTS.md "Agent counts"): the one rule that decides which
+// Work sessions (ARCHITECTURE §2.9, docs/CONTRACTS.md "Agent counts"): the one rule that decides which
 // sessions count, and the read the Roster's frames show from it — per agent, its last activity,
 // its work sessions and ~$ within a week the caller names, and per project its work sessions within
 // a window the caller names and its last session's time.
@@ -66,7 +66,7 @@ export type AgentCountsAnswer = {
   /** Every agent with a work session, by roster id. An agent missing here has none: zero, no time. */
   agents: AgentCounts[];
   /** Every agent with at least one session of any status, Skip/Failed included, by roster id: one
-   *  missing here has never run a session (Needs login, DESIGN §3.6). */
+   *  missing here has never run a session (Needs login, ARCHITECTURE §3.6). */
   withSessions: string[];
 };
 

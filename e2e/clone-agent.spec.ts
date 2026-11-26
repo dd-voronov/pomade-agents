@@ -1,4 +1,4 @@
-// Cloning a folder agent and the new agent's first run (DESIGN §3.6, E-006), against the fake
+// Cloning a folder agent and the new agent's first run (ARCHITECTURE §3.6, E-006), against the fake
 // Pomade with the sandbox's HOME, rc file and workspace: Clone… on `claude-libra`'s page opens the
 // New agent page with it as the source — its role, tags and projects pre-filled, the name empty —
 // and Create copies only its CLAUDE.md, settings.json, skill links and plugins link (no sessions,

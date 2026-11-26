@@ -1,4 +1,4 @@
-// The Sessions table (DESIGN §2.7 "Table — nothing selected"): one scrolling list with a sticky
+// The Sessions table (ARCHITECTURE §2.7 "Table — nothing selected"): one scrolling list with a sticky
 // column header — its checkbox checks every row shown — and the four collapsible status groups,
 // whose headers take dropped rows. It measures its own width and shows the columns that fit. Which
 // groups are collapsed or expanded is the tab's, so it stays while the sessions change and across

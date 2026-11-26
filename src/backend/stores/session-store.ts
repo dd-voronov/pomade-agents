@@ -1,5 +1,5 @@
 // Every agent session on this Mac, kept current: the stores' transcripts parsed into summaries
-// (DESIGN §2.2–2.3), each new or grown transcript re-parsed from where it stopped.
+// (ARCHITECTURE §2.2–2.3), each new or grown transcript re-parsed from where it stopped.
 //
 // Watching: one recursive `fs.watch` per store root. On macOS that is one FSEvents stream per root
 // — no descriptor per file or folder, so hundreds of transcripts carry no EMFILE risk, and events

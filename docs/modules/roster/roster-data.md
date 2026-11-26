@@ -8,7 +8,7 @@ kind: reference
 # Roster data
 
 What the backend knows of each agent and how it keeps and serves it. Shapes and semantics:
-[CONTRACTS "Roster"](../../CONTRACTS.md#roster); design: [DESIGN](../../DESIGN.md) §3.1, §3.2, §3.5.
+[CONTRACTS "Roster"](../../CONTRACTS.md#roster); design: [ARCHITECTURE](../../ARCHITECTURE.md) §3.1, §3.2, §3.5.
 Code: `src/backend/roster/` (`roster.ts`, `first-sight.ts`, `profile-edit.ts`, `launch-spec.ts`,
 `connections.ts`, `provider-config.ts`), shapes in `src/shared/roster.ts`, handlers in
 `src/backend/interfaces/api.ts` ([interfaces](../interfaces/index.md)). The frames' side:

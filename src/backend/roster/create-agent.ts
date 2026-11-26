@@ -1,4 +1,4 @@
-// Creating a folder agent from the template or as a clone of one (DESIGN §3.6): the name check and
+// Creating a folder agent from the template or as a clone of one (ARCHITECTURE §3.6): the name check and
 // the Create, as steps that report as they start and end (`CREATE_STEP_IDS`).
 //
 // - **The name** is checked in order: its own rules (`nameRuleProblem`), then the disk (the folder
@@ -8,7 +8,7 @@
 // - **The agent itself** — folder, shared skill links, `agent.yaml` — appears whole or not at all.
 //   The template — or a clone source's allowed entries (`CLONED_ENTRIES`, `copyCloned`) — is copied
 //   to a staging folder beside the others whose name holds "template", so the agent scan skips it
-//   (DESIGN §3.1); the links go in there; `agent.yaml` is written; then
+//   (ARCHITECTURE §3.1); the links go in there; `agent.yaml` is written; then
 //   the staging folder is renamed into place. A failure on the way removes the staging folder and
 //   the `agent.yaml` this Create wrote, and the Create ends `failed`: the roster never sees a
 //   folder without its profile, nor a profile it would read as an orphan for longer than the

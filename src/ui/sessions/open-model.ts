@@ -1,4 +1,4 @@
-// Open / Resume as the Sessions tab shows it (DESIGN §2.1, §2.7), as pure functions: what the
+// Open / Resume as the Sessions tab shows it (ARCHITECTURE §2.1, §2.7), as pure functions: what the
 // action does for a session and its label, the hint under the panel's button, and what the toast
 // says once `sessions.open` answered or refused.
 

@@ -1,5 +1,5 @@
 // An agent's default model and effort, read from its provider's own config — their single truth
-// (DESIGN §3.2): Claude Code's `<configDir>/settings.json` (`model`, `effortLevel`), Codex's
+// (ARCHITECTURE §3.2): Claude Code's `<configDir>/settings.json` (`model`, `effortLevel`), Codex's
 // `<configDir>/config.toml` (`model`, `model_reasoning_effort`, top-level keys). Only read here.
 
 import { readFile } from "node:fs/promises";

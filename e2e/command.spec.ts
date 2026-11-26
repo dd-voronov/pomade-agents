@@ -1,6 +1,6 @@
 // The built `pomade-agents` command run as Pomade's shim runs it — a child process with the
 // environment a shim and a Pomade terminal give it, finding the socket through `POMADE_HOME` —
-// against the fake Pomade and the real backend (DESIGN §7, CONTRACTS "Command"): `show` answers the
+// against the fake Pomade and the real backend (ARCHITECTURE §7, CONTRACTS "Command"): `show` answers the
 // session of the agent tab it runs in, or the one `--session` names, and every failure is one line
 // on stderr with its own exit status.
 

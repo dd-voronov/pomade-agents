@@ -1,4 +1,4 @@
-// `sessions.find` (DESIGN §5): the sessions started in one folder within a time window — how
+// `sessions.find` (ARCHITECTURE §5): the sessions started in one folder within a time window — how
 // Runner finds the session a launch produced when it could not set its id (Codex). The folder is
 // compared exactly, both absolute with symlinks resolved; times as instants, both ends included.
 

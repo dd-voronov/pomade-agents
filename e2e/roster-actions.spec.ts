@@ -1,4 +1,4 @@
-// The Roster's actions (DESIGN §3.3, T-021), on a card and a list row, over the real backend and the
+// The Roster's actions (ARCHITECTURE §3.3, T-021), on a card and a list row, over the real backend and the
 // fake Pomade: Start session ▾ (the mode, then connected projects, the others, the Workspace) launches
 // the agent there; Sessions opens the Workspace's Sessions tab on the agent; the ⋯ menu hides an agent
 // from the "+" menu (with Undo) and opens its files; the role line and the tags are edited on the card

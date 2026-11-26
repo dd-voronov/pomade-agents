@@ -1,4 +1,4 @@
-// The two answers git asks this app (DESIGN §5 "The sessions contract", `pomade-kit/protocol`
+// The two answers git asks this app (ARCHITECTURE §5 "The sessions contract", `pomade-kit/protocol`
 // agent-sessions): which sessions worked in a repository or worktree (`sessions.forRepo`) and what
 // runs in a folder now (`sessions.liveIn`). Every folder is compared absolute with symlinks
 // resolved, the caller's and the recorded ones alike.

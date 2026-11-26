@@ -1,4 +1,4 @@
-// What the detail panel and the list's two-line rows show, as pure functions of a session (DESIGN
+// What the detail panel and the list's two-line rows show, as pure functions of a session (ARCHITECTURE
 // §2.7 "List with the detail panel"): the panel's name and live line, its marker notes, the
 // start folder relative to the project, the message blocks, the note's save rule and how a failed
 // change reads. Values read as in the table (`table-model.ts`).

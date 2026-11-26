@@ -1,4 +1,4 @@
-// One agent as a row of the list (DESIGN §3.3): name with its state chips over the role line,
+// One agent as a row of the list (ARCHITECTURE §3.3): name with its state chips over the role line,
 // provider and model, Connected to, Last active, This week, and Start session ▾ with the ⋯ menu —
 // the card's own buttons and menus; an orphan's Re-link ▾ and Remove, which asks in place first.
 // An agent that Needs login keeps its chip at every width and offers the setup prompt on the second

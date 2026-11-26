@@ -1,4 +1,4 @@
-// Events B and C (DESIGN §6, docs/CONTRACTS.md "Published events"), built from the session as the
+// Events B and C (ARCHITECTURE §6, docs/CONTRACTS.md "Published events"), built from the session as the
 // app knows it when the event goes out.
 //
 // - **C `session.statusChanged`** — every status change `changeStatus` makes goes through the

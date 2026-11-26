@@ -1,4 +1,4 @@
-// The session reads and events Runner uses (DESIGN §5, §6), through the fake Pomade's broker and
+// The session reads and events Runner uses (ARCHITECTURE §5, §6), through the fake Pomade's broker and
 // bus as another app: `sessions.get`, `sessions.lastMessage` (a session's last agent answer) and
 // `sessions.find` (the sessions started in a folder within a time window); event C
 // `session.statusChanged` 5 s after a status change — none for one taken back inside the window,

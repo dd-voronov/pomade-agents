@@ -1,4 +1,4 @@
-// What the Roster's frame shows of each agent (DESIGN §3.3): the answer of `roster.agents`, the
+// What the Roster's frame shows of each agent (ARCHITECTURE §3.3): the answer of `roster.agents`, the
 // agent's counts and its connected projects, put together as the cards and rows read them, in the
 // order the Roster lists them.
 

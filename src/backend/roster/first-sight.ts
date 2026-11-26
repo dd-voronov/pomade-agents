@@ -1,5 +1,5 @@
 // What the app knows of an agent before it has a profile — the values its first `agent.yaml` is
-// written with (DESIGN §3.2): the folder scan (DESIGN §3.1), Pomade's `.pomade/agents.json`
+// written with (ARCHITECTURE §3.2): the folder scan (ARCHITECTURE §3.1), Pomade's `.pomade/agents.json`
 // (command overrides, hidden agents) and the role line from the first sentence under `## Role` in
 // the agent's `CLAUDE.md`. The same values stand in for an agent whose profile cannot be used, or
 // that has none because no workspace is open.

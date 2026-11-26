@@ -1,4 +1,4 @@
-// The agent page's Model & modes tab through the built app and backend in the fake Pomade (DESIGN
+// The agent page's Model & modes tab through the built app and backend in the fake Pomade (ARCHITECTURE
 // §3.4, §3.5): the effort and the default model are written to the agent's `settings.json` with
 // every other byte kept, and the header follows without a reload; a `settings.json` that is not
 // JSON is never written over; Codex is read-only; switching Full autonomy off writes `agent.yaml`

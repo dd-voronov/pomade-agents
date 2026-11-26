@@ -1,4 +1,4 @@
-// The roster (DESIGN §3.1, §3.2): every agent and its profile, kept current as agent folders,
+// The roster (ARCHITECTURE §3.1, §3.2): every agent and its profile, kept current as agent folders,
 // profiles, Pomade's overrides and the providers' configs change.
 //
 // - **Agents** are the built-ins `claude` and `codex` and the folder agents (`folderAgentNames`),
@@ -438,7 +438,7 @@ export function startRoster(options: RosterOptions): Roster {
     },
 
     async setModel(id, change) {
-      // Without a workspace the built-ins are shown read-only, their model included (DESIGN §3.3).
+      // Without a workspace the built-ins are shown read-only, their model included (ARCHITECTURE §3.3).
       if (profiles === null) throw new HostError("not-ready", noProfiles);
       const { profile } = livingAgent(id);
       const configDir = resolve(profile.configDir);

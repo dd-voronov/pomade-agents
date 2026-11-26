@@ -1,4 +1,4 @@
-// What an agent's provider config says, read for its page (DESIGN §3.4): permissions, MCP servers
+// What an agent's provider config says, read for its page (ARCHITECTURE §3.4): permissions, MCP servers
 // and plugins from Claude Code's `settings.json` and `.claude.json`, or Codex's `config.toml`; and
 // the project memory a Claude Code agent keeps under `<configDir>/projects/<folder>/memory/`.
 // Read only — the files are the provider's.

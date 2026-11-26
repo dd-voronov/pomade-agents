@@ -1,4 +1,4 @@
-// The list beside the detail panel (DESIGN §2.7 "List with the detail panel"): the four status
+// The list beside the detail panel (ARCHITECTURE §2.7 "List with the detail panel"): the four status
 // tabs with their counts, which take rows dropped on them, then the open tab's sessions as two-line rows — a long Done or
 // Done–skip/Failed tab cut to its latest rows with "Show all N", unless the selected session is
 // further down — or its one-line empty text. While a search or filter is on, no tab is open: the

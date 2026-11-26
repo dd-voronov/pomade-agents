@@ -1,4 +1,4 @@
-// The `pomade-agents` command (DESIGN §7, CONTRACTS "Command"): what it prints and how it exits for
+// The `pomade-agents` command (ARCHITECTURE §7, CONTRACTS "Command"): what it prints and how it exits for
 // the arguments it is given. It reads no file itself — every answer comes from the app's backend
 // through Pomade's broker, so the command, the UI and other apps see one truth. Sub-commands are a
 // table (`SUB_COMMANDS`); each parses its own options and fails with a `Failure`, which becomes one
@@ -11,7 +11,7 @@ import { sessionText } from "./session-text.ts";
 
 export const COMMAND = "pomade-agents";
 
-/** Where the session records are, under the workspace (DESIGN §4). */
+/** Where the session records are, under the workspace (ARCHITECTURE §4). */
 export const RECORDS_FOLDER = "Apps/pomade-agents/sessions";
 
 /** Exit statuses, one per way the command can fail; scripts branch on them. */

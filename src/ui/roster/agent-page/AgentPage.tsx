@@ -1,4 +1,4 @@
-// An agent's page (route `roster/<agent>/<tab>`, DESIGN §3.4): the header, the tab bar and the
+// An agent's page (route `roster/<agent>/<tab>`, ARCHITECTURE §3.4): the header, the tab bar and the
 // tab's body. The tab is the route, so a reload and a restart of Pomade open it again; ← Roster
 // returns to the Roster. The roster comes from the backend's `roster.agents`; a page for an agent
 // it does not hold says so.

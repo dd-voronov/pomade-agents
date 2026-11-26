@@ -1,4 +1,4 @@
-// The Roster tab (DESIGN §3.3, T-020): every agent as a card or a row, over the real backend and
+// The Roster tab (ARCHITECTURE §3.3, T-020): every agent as a card or a row, over the real backend and
 // the fake Pomade — the order and the marks, the numbers, Connected to, the view switch, how the
 // tab keeps current, no workspace, and that nothing hangs over an edge or scrolls sideways at any
 // width. `ROSTER_SHOTS=<folder>` also writes screenshots of both views at several widths.

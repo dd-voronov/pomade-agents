@@ -196,7 +196,7 @@ keeps the links; every change offers Undo.
   frame takes the catalog its answer carries. The agent page's Skills tab uses the same hook
   ([roster](../roster/index.md)).
 
-Interfaces: [CONTRACTS "Skills"](../../CONTRACTS.md#skills). Design: [DESIGN](../../DESIGN.md) §3.8.
+Interfaces: [CONTRACTS "Skills"](../../CONTRACTS.md#skills). Design: [ARCHITECTURE](../../ARCHITECTURE.md) §3.8.
 
 Tests that touch this page's parts: `routes.test.ts`, `skill-folders.test.ts`,
 `settings-copy.test.ts` (unit); the e2e specs `no-host`, `panel`, `tabs`, `look`, `backend`,

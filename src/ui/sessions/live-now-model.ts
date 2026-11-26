@@ -1,4 +1,4 @@
-// What the Live now panel shows of the backend's rows (DESIGN §2.8): one group per project — the
+// What the Live now panel shows of the backend's rows (ARCHITECTURE §2.8): one group per project — the
 // active project first with a "current" tag, then the projects in Projects panel order, the
 // Workspace last — and in each, Needs you → Working → Idle, then the most recent. Unattended runs
 // are rows like the tabs (always Working) and count in "N running"; they never need you.

@@ -1,4 +1,4 @@
-// The name of a new agent (DESIGN §3.6): one word that is its folder `Agents/<name>/`, its shell
+// The name of a new agent (ARCHITECTURE §3.6): one word that is its folder `Agents/<name>/`, its shell
 // alias and its name in the "+" menu. The rules here need nothing but the name, so the New agent
 // page applies them as the user types and the backend applies them again before it writes; the
 // folder and the shell are the backend's to check (`roster.checkName`).

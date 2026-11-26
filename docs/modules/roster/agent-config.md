@@ -80,7 +80,7 @@ A skill is on for an agent when `<configDir>/skills/<name>` is a symlink to a sk
 
 The **skills catalog** (`skills.catalog`, `skills-catalog.ts`) lists the skills of the listed skill folders
 and every Claude Code agent's `skills/` entries; it is read from disk on request. The folder list and the
-Settings page that edits it belong to the Settings page ([DESIGN](../../DESIGN.md) §3.8,
+Settings page that edits it belong to the Settings page ([ARCHITECTURE](../../ARCHITECTURE.md) §3.8,
 [CONTRACTS "Skills"](../../CONTRACTS.md#skills)); the agent page only reads the catalog and links.
 
 ## Invariants

@@ -1,4 +1,4 @@
-// An agent's Skills tab through the built app and backend in the fake Pomade (DESIGN §3.4): the
+// An agent's Skills tab through the built app and backend in the fake Pomade (ARCHITECTURE §3.4): the
 // agent's `skills/` entries grouped by skill folder — the listed folders in the Settings order, a
 // folder no longer listed (marked), then its own — with "also in"; a switch takes a link away and
 // makes it again, with Undo, and the row stays in place; a broken link is shown and can be taken

@@ -1,4 +1,4 @@
-// Each agent's counts over work sessions (`sessions.agentCounts`, DESIGN §2.9), kept current in the
+// Each agent's counts over work sessions (`sessions.agentCounts`, ARCHITECTURE §2.9), kept current in the
 // UI: asked through Pomade's broker within the windows the caller names, then asked again whenever
 // the backend's `sessions.changed` notice is past the answer's sessions — a status change, a move,
 // a new session — and whenever the windows change. While the backend does not answer, the UI asks

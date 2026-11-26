@@ -1,4 +1,4 @@
-// Which session is selected and what the two layouts show around it (DESIGN §2.7), as pure
+// Which session is selected and what the two layouts show around it (ARCHITECTURE §2.7), as pure
 // functions: the rows ↑ ↓ walk in the table and in the list, the step itself, the status tab the
 // list opens, the list's rows, and what the table opens up to show the row it returns to.
 

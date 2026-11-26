@@ -20,9 +20,9 @@ place), shared shapes in `src/shared/` (`roster.ts`, `skills.ts`, `agent-name.ts
 ([interfaces](../interfaces/index.md)). Specs: `e2e/roster*.spec.ts`, `e2e/agent-*.spec.ts`,
 `e2e/create-agent.spec.ts`, `e2e/clone-agent.spec.ts`, unit tests beside the code. Interfaces:
 [CONTRACTS "Roster", "Agent counts", "Skills"](../../CONTRACTS.md#roster); design:
-[DESIGN](../../DESIGN.md) §3. For users: [Roster](../../user-guide/roster.md),
+[ARCHITECTURE](../../ARCHITECTURE.md) §3. For users: [Roster](../../user-guide/roster.md),
 [Agent page](../../user-guide/agent-page.md), [New agent](../../user-guide/new-agent.md). The app's
-Settings page with the skill folders is the Settings page's own ([DESIGN](../../DESIGN.md) §3.8); this
+Settings page with the skill folders is the Settings page's own ([ARCHITECTURE](../../ARCHITECTURE.md) §3.8); this
 module links to it and reads its catalog.
 
 | Page | Summary |

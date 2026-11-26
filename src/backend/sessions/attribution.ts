@@ -1,4 +1,4 @@
-// Which project(s) a session shows in (DESIGN §2.6), in order: Move to project; the project of the
+// Which project(s) a session shows in (ARCHITECTURE §2.6), in order: Move to project; the project of the
 // Pomade tab that first ran it (`launchedFrom`; a tab in the Workspace scope places it in the
 // Workspace bucket, in no project); the deepest project root holding its start folder
 // — every project on that root when several share it; the project it was placed in before, when no

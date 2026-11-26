@@ -1,4 +1,4 @@
-// Naming a session and moving it to another project (DESIGN §2.5, §2.6, §2.7), as pure functions:
+// Naming a session and moving it to another project (ARCHITECTURE §2.5, §2.6, §2.7), as pure functions:
 // what a typed name saves, the projects Move to project offers and which one is checked, the
 // project Undo moves a session back to, and what the toasts say.
 

@@ -6,7 +6,7 @@ stats). A web UI Pomade hosts in a side panel and a tab, plus a Node backend tha
 Pomade runs. Both are built on `pomade-kit`.
 
 Part of the Pomade family — the platform and its rules live in the sibling repo `Pomade`
-(`docs/PLATFORM.md`, `docs/HOST-API.md`). Design: `docs/DESIGN.md`. Plan: `docs/PLAN.md`.
+(`docs/PLATFORM.md`, `docs/HOST-API.md`). Architecture: `docs/ARCHITECTURE.md`.
 The app's own interfaces: `docs/CONTRACTS.md`.
 
 ## Scripts

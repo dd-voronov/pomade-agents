@@ -1,4 +1,4 @@
-// The user's zsh, as a new agent needs it (DESIGN §3.6): its rc file, the alias line a folder agent
+// The user's zsh, as a new agent needs it (ARCHITECTURE §3.6): its rc file, the alias line a folder agent
 // gets there, and a fresh interactive shell asked what a name resolves to.
 //
 // Everything is taken from the environment it is handed — the backend's, which Pomade gives it

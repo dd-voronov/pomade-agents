@@ -1,4 +1,4 @@
-// What the New agent page shows (DESIGN §3.6), as plain data: the name's verdict as it is typed,
+// What the New agent page shows (ARCHITECTURE §3.6), as plain data: the name's verdict as it is typed,
 // the "Create will" list, the labels of the steps as they tick, where a Create leaves the page, and
 // what a clone takes from its source.
 // Text runs are `Part`s — plain text, or a name/path shown as code — so the page renders them

@@ -1,4 +1,4 @@
-// An agent's page through the built app and backend in the fake Pomade (DESIGN §3.4): the folder
+// An agent's page through the built app and backend in the fake Pomade (ARCHITECTURE §3.4): the folder
 // agent's page shows each tab from its folder's files and the tab survives a reload; role and tags
 // are edited in place into `agent.yaml` without moving anything around them; Open CLAUDE.md /
 // agent.yaml / settings.json / a memory file reach Pomade's editor; Open in Sessions opens the

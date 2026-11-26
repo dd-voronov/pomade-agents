@@ -1,4 +1,4 @@
-// Launch specs (DESIGN §3.5): the command line that starts one agent in one mode — new, with a
+// Launch specs (ARCHITECTURE §3.5): the command line that starts one agent in one mode — new, with a
 // session id of the caller's, or resuming a session — optionally with its first prompt.
 //
 // The provider forms, as each CLI takes them (`claude --help`, `codex --help`, `codex resume

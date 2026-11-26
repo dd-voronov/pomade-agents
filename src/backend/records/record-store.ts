@@ -1,4 +1,4 @@
-// The app's files on disk, `<workspace>/Apps/pomade-agents/` (DESIGN §3.2, §4) — the session
+// The app's files on disk, `<workspace>/Apps/pomade-agents/` (ARCHITECTURE §3.2, §4) — the session
 // records, the agent profiles and the app settings — mirrored in memory and kept in step with the
 // disk (PLATFORM rule 8: the file is the truth). Records and profiles are two sets of files kept by
 // one machinery: every guarantee below holds for both.

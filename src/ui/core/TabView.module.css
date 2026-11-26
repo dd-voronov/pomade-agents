@@ -63,7 +63,7 @@
   overflow: auto;
 }
 
-/* The app's Settings (DESIGN §3.8), at the bar's right end. */
+/* The app's Settings (ARCHITECTURE §3.8), at the bar's right end. */
 .gear {
   display: inline-flex;
   flex: none;

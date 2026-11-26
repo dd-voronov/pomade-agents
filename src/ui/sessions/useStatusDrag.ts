@@ -1,4 +1,4 @@
-// Dragging rows onto a status (DESIGN §2.7 "Changing a status"): a row — or, when it is checked,
+// Dragging rows onto a status (ARCHITECTURE §2.7 "Changing a status"): a row — or, when it is checked,
 // every checked row — dragged onto a group header (the table) or a status tab (the list) is set to
 // that status. Only the tab's own rows drop there; anything else dragged over is refused.
 

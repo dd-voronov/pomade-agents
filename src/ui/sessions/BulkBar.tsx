@@ -1,4 +1,4 @@
-// The bulk bar (DESIGN §2.7 "Selecting several"): while rows are checked it takes the toolbar's
+// The bulk bar (ARCHITECTURE §2.7 "Selecting several"): while rows are checked it takes the toolbar's
 // place — "N selected", Set status with the four statuses, Clear. Bulk sets no note. Another bulk
 // action is one more control before the spacer.
 

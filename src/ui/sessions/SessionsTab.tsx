@@ -1,7 +1,7 @@
 // The Sessions tab: the header (the scope, its work sessions' count and ~$ sum), the toolbar (search and
 // filters) or, while rows are checked, the bulk bar in its row, then — while no session is
 // selected — the table of the scope's sessions, or — once one is — the list with the detail panel
-// (DESIGN §2.7). A state page shows while the stores are read, when the scope has none, or in the
+// (ARCHITECTURE §2.7). A state page shows while the stores are read, when the scope has none, or in the
 // table when nothing matches the search and filters. The scope is the project the tab was opened in
 // (`welcome.project`); a tab keeps it. The selection is the tab's route (`useSelection`); the
 // search, the filters, the checked rows, the menus (a row's, Move to project, a filter's) and the

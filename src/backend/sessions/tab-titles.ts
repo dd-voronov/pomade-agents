@@ -1,4 +1,4 @@
-// A session's name is its agent tab's title, both ways (DESIGN §2.5; pomade:E-033 titles and the
+// A session's name is its agent tab's title, both ways (ARCHITECTURE §2.5; pomade:E-033 titles and the
 // unnamed mark). The backend keeps every agent tab as Pomade last told it, and:
 //
 // - **A rename** (`SessionData.rename`: the UI, the API, the command) retitles every tab bound to

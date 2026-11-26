@@ -1,4 +1,4 @@
-// The skills catalog (DESIGN §3.4, §3.8): the skills the listed skill folders hold, and every
+// The skills catalog (ARCHITECTURE §3.4, §3.8): the skills the listed skill folders hold, and every
 // Claude Code agent's `skills/` entries — which link where, which are the agent's own, and whether a
 // link's target lies in a listed folder.
 //

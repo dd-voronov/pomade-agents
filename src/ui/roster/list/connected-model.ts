@@ -1,4 +1,4 @@
-// The Roster's "Connected to" field (DESIGN §3.3): the projects whose "+" menu offers an agent,
+// The Roster's "Connected to" field (ARCHITECTURE §3.3): the projects whose "+" menu offers an agent,
 // ordered by the agent's work sessions in them over the last 90 days, and how many of them a field
 // of a given width names.
 

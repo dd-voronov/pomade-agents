@@ -1,4 +1,4 @@
-// What runs now, and each session's live state (DESIGN §2.4, glossary "Live state"): detected,
+// What runs now, and each session's live state (ARCHITECTURE §2.4, glossary "Live state"): detected,
 // never set. One entry per live thing, from its live source, under its key there (a tab's id, a
 // run's job and run); each source replaces or changes only its own entries. Agent tabs are a source (`agentTabs.list`, then every `agentTab.changed`;
 // pomade:E-033): a tab is live while its state is `working`, `needs-you` or `idle`, and `exited`

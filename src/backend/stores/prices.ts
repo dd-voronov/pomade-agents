@@ -1,6 +1,6 @@
 // The price table: per model id, dollars per million tokens and the context window. Hand-maintained;
 // it covers the models that occur in the stores. A model it lacks has no cost and no context
-// (DESIGN §2.3) — never a guess.
+// (ARCHITECTURE §2.3) — never a guess.
 //
 // Model ids resolve deliberately: an exact id, an alias the entry lists (a dated snapshot), or a
 // context variant the entry lists (`claude-opus-4-8[1m]`). Nothing else matches — no prefix or

@@ -1,4 +1,4 @@
-// The agent page's Projects tab as data (DESIGN §3.4): every project of the workspace as one row —
+// The agent page's Projects tab as data (ARCHITECTURE §3.4): every project of the workspace as one row —
 // its work sessions of the agent in the last 90 days, the agent's last session there — placed under
 // Connected (the project's "+" menu offers the agent) or Not connected. Pure: the tab reads the
 // projects, the agent's counts and each project's visible agents, and shows what this returns.

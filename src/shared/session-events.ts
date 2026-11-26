@@ -1,4 +1,4 @@
-// The events the app publishes about one session (DESIGN §6, docs/CONTRACTS.md "Published
+// The events the app publishes about one session (ARCHITECTURE §6, docs/CONTRACTS.md "Published
 // events"): their names on the bus and their payloads. A subscriber names them
 // `pomade-agents:<name>`. The shapes are type aliases, so they are JSON values as they are.
 

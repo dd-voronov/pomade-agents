@@ -8,7 +8,7 @@ kind: reference
 # The agent's page
 
 One agent in detail, at the route `roster/<agent>/<tab>` (`src/ui/roster/agent-page/`). Design:
-[DESIGN](../../DESIGN.md) §3.4, §3.5. Users: [Agent page](../../user-guide/agent-page.md). The backend files
+[ARCHITECTURE](../../ARCHITECTURE.md) §3.4, §3.5. Users: [Agent page](../../user-guide/agent-page.md). The backend files
 the tabs read and write: [agent-config](agent-config.md); the profile and the roster:
 [roster-data](roster-data.md).
 

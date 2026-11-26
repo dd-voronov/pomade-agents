@@ -1,4 +1,4 @@
-// The events the app subscribes to from Runner (DESIGN §6 "Subscribed", docs/CONTRACTS.md
+// The events the app subscribes to from Runner (ARCHITECTURE §6 "Subscribed", docs/CONTRACTS.md
 // "Subscribed events"): `pomade-runner:run.started` and `pomade-runner:run.finished`, live only.
 // The app follows only agent runs (`kind: "agent"`) that carry the agent-run fields; `readRunEvent`
 // sorts a payload that crossed the bus into one of those, another kind of run (script, service,

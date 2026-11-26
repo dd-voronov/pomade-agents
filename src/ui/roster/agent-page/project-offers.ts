@@ -1,4 +1,4 @@
-// Connecting an agent to a project and taking it away again (DESIGN §3.4, `pomade:E-030`): the
+// Connecting an agent to a project and taking it away again (ARCHITECTURE §3.4, `pomade:E-030`): the
 // project's visible agents — the list its "+" menu offers — is the one stored fact, written with
 // `project.setAgents` as a whole list. Each write reads the list first and edits that, so a change
 // made elsewhere in the meantime is kept; a project that offers every agent (`["*"]`) is never

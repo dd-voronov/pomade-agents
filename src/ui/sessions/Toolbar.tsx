@@ -1,4 +1,4 @@
-// The Sessions tab's toolbar (DESIGN §2.7 "Both layouts"): the search field, the filter buttons —
+// The Sessions tab's toolbar (ARCHITECTURE §2.7 "Both layouts"): the search field, the filter buttons —
 // Project (the Workspace's tab only), Agent, Folder — each opening its menu, and while a search or
 // filter is on, "Clear" and the match count. The bulk bar takes its row while rows are checked.
 //

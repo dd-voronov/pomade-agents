@@ -1,4 +1,4 @@
-// The app's Settings page and the skills catalog (DESIGN §3.4, §3.8): the gear at the right of the
+// The app's Settings page and the skills catalog (ARCHITECTURE §3.4, §3.8): the gear at the right of the
 // Sessions | Roster bar opens route `settings`; the skill folders show their skills and the links
 // that point into them; Add folder… takes the folder Pomade's picker answers and its skills join the
 // catalog an agent's Add skill reads; Remove warns naming the agents when links depend on the

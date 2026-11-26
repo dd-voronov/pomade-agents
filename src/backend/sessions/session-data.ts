@@ -1,4 +1,4 @@
-// The sessions the app answers for (DESIGN §2.4, §2.6, §4): each session the stores know joined
+// The sessions the app answers for (ARCHITECTURE §2.4, §2.6, §4): each session the stores know joined
 // with its record, the project(s) it shows in, its live state and its agent tab, kept current as the transcripts,
 // the records on disk, Pomade's projects and tabs and what runs now change.
 //

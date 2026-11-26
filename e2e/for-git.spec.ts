@@ -1,4 +1,4 @@
-// The sessions contract git asks (DESIGN §5, `pomade-kit/protocol` agent-sessions) through the
+// The sessions contract git asks (ARCHITECTURE §5, `pomade-kit/protocol` agent-sessions) through the
 // fake Pomade's broker, as the caller `pomade`: `sessions.forRepo` lists the sessions started in a
 // repository's folder and below, with `branch` only that branch's; `sessions.liveIn` is live while
 // an agent tab runs in the folder — before its first prompt too — and not once its agent exits or

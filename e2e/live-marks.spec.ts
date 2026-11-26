@@ -1,4 +1,4 @@
-// Live state on the Sessions tab (DESIGN §2.4, §2.7 "Marks") through the built backend and the fake
+// Live state on the Sessions tab (ARCHITECTURE §2.4, §2.7 "Marks") through the built backend and the fake
 // Pomade: a session bound to an agent tab shows a round mark — spinner for Working, red dot for
 // Needs you, grey dot for Idle, nothing once the agent exits — on its table row and its list row,
 // within ~1 s of each change, with "<state> since <time>" as the tooltip; the detail panel says the

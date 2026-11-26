@@ -1,4 +1,4 @@
-// Creating an agent from the template on the New agent page (DESIGN §3.6, E-006), against the fake
+// Creating an agent from the template on the New agent page (ARCHITECTURE §3.6, E-006), against the fake
 // Pomade with the sandbox's HOME, rc file and workspace: the name is checked as it is typed —
 // characters, the folder, then zsh — and `claude-pm` and `ls` are refused before anything is
 // written; Create ticks its steps, makes the folder with the shared skill links and `agent.yaml`,

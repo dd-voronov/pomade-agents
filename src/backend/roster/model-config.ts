@@ -1,4 +1,4 @@
-// An agent's default model and effort in its provider config (DESIGN §3.2, §3.4): read for both
+// An agent's default model and effort in its provider config (ARCHITECTURE §3.2, §3.4): read for both
 // providers, written for Claude Code only — `settings.json`'s `model` and `effortLevel`, every
 // other byte of the file kept (`json-keys.ts`).
 //

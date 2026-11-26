@@ -1,4 +1,4 @@
-// The Live now panel's data (DESIGN §2.8, docs/CONTRACTS.md "Live now") as the UI and the backend
+// The Live now panel's data (ARCHITECTURE §2.8, docs/CONTRACTS.md "Live now") as the UI and the backend
 // both know it: what runs now — one row per live agent tab, with what the panel shows of its
 // session, and one per Runner agent run while it runs; the method that answers it and the event
 // that says it changed.

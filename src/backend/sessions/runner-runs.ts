@@ -1,4 +1,4 @@
-// Runner's agent runs in the session data (DESIGN §2.4, §5, §6; docs/CONTRACTS.md "Subscribed
+// Runner's agent runs in the session data (ARCHITECTURE §2.4, §5, §6; docs/CONTRACTS.md "Subscribed
 // events"), from its `run.started` / `run.finished` — the app never calls Runner (PLATFORM rule 4).
 //
 // - **Run started** — the run is a live entry (`source: "run"`, Working, the job's name, its

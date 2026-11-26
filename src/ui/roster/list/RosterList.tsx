@@ -1,4 +1,4 @@
-// The Roster tab's list state (DESIGN §3.3): every agent as a card or a row — the built-ins first,
+// The Roster tab's list state (ARCHITECTURE §3.3): every agent as a card or a row — the built-ins first,
 // then by id, hidden ones in a collapsible section at the end — over what the roster, the
 // connections, the projects and the agents' counts say. A state page shows until all four have
 // answered. The cards' and rows' actions (`commands/`) say what they did in the tab's toast.

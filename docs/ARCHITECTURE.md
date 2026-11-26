@@ -1,11 +1,11 @@
 ---
-doc: docs/DESIGN.md
+doc: docs/ARCHITECTURE.md
 audience: engineers, product
-holds: the app's living design — sessions, roster, data and files, published API, events, command, placement, what's not in v1
+holds: the map of the Agents app — what it is, its parts and stack, where things live in code, the docs map, sessions, the roster, the data model and files, the published API, events, the command, what it uses of the platform and the kit, what lives where, what is not in the app
 kind: reference
 ---
 
-# pomade-agents — Design
+# pomade-agents — Architecture
 
 `pomade-agents` ("Agents" in the UI) is the Pomade app for the user's agents. It owns two kinds of
 data, for the whole Pomade family:
@@ -16,12 +16,15 @@ data, for the whole Pomade family:
   name), the status the user sets, its live state, where it started, which agent and model ran it,
   its context fill and estimated cost, the first and last messages, and one-click resume.
 
-Other pieces read both only through this app's API (PLATFORM rule 4). This doc states the current
-design. The reasoning and the Owner's scenarios are in the G4 grill outcome
-(`../Pomade/docs/auxiliary/grills/2026-11-09-g4-agents.md`); the platform frame is in
+Other pieces read both only through this app's API (PLATFORM rule 4). The platform frame is in
 `../Pomade/docs/PLATFORM.md`.
 
+This page is the map. Interfaces are in [CONTRACTS](CONTRACTS.md); how each module behaves and is
+built is in `docs/modules/`; how to use the app is in `docs/user-guide/` (§1.6).
+
 ## 1. Shape
+
+### 1.1 Parts
 
 | Part | What |
 |---|---|
@@ -29,12 +32,22 @@ design. The reasoning and the Owner's scenarios are in the G4 grill outcome
 | **Backend** | **with-Pomade** (starts and stops with Pomade). It reads and watches the agents' session stores, keeps the parse cache, writes the session and roster files, edits agent folders and `settings.json`, and appends shell aliases to `~/.zshrc` |
 | **Commands** | `pomade-agents` (§7) |
 
-**Stack:** TypeScript + React + Vite for the UI, a TypeScript Node process for the backend, both
-on `pomade-kit`'s SDK. Pure logic (transcript parsing, attribution, cost math) is unit-tested with
-vitest. Behavior is covered by Playwright against the SDK's fake host, plus a dev-linked Pomade
-smoke spec.
+### 1.2 Stack
 
-**Manifest** (`manifest.json`):
+| Layer | Choice |
+|---|---|
+| UI | TypeScript + React + Vite |
+| Backend | a TypeScript Node process, built by Vite |
+| Command | a TypeScript Node program, built by Vite |
+| SDK | `pomade-kit`'s SDK (`github:dd-voronov/pomade-kit`, the tag pinned in `package.json`), under the UI, the backend and the command |
+| Unit tests | vitest, for pure logic (transcript parsing, attribution, cost math) |
+| Behavior tests | Playwright against the SDK's fake host, plus a dev-linked Pomade smoke spec |
+
+How the app is tested: [testing](modules/core/testing.md). The scripts and the gate: `README.md`.
+
+### 1.3 Manifest
+
+`public/manifest.json`:
 - id `pomade-agents`, backend `with-pomade`
 - one strip icon: Agents → fills the panel with Live now
 - command `pomade-agents`
@@ -42,11 +55,74 @@ smoke spec.
 - paths outside the workspace: `~/.claude/` (built-in Claude Code store, skills, settings),
   `~/.codex/` (sessions, config), `~/.zshrc` (aliases)
 
-**Surfaces:**
+Every key: [CONTRACTS](CONTRACTS.md) "Manifest".
+
+### 1.4 Surfaces
+
 - The **Agents icon** in Pomade's left strip opens the **Live now** panel (§2.8).
 - The panel's two buttons, **Sessions** and **Roster**, open or focus those wide tabs.
 - With the app installed, Pomade's clock icon opens the Sessions tab, and the "+" menu takes its
   agents from the roster (§3.7).
+
+### 1.5 Repo layout
+
+A module is a real area of the app with a home in the code; the module map is
+[modules](modules/index.md).
+
+| Folder | Holds | Module |
+|---|---|---|
+| `public/` | `manifest.json` — the single source of the app's id, version and API list —, the strip icon, the format skill (`skills/pomade-agents-sessions/`) | `core`, `interfaces` |
+| `src/shared/` | what the UI and the backend share: the API's method names and shapes | `interfaces` |
+| `src/ui/core/` | the app shell: handshake, routes and surfaces, the tab's view switch, empty and unavailable states, shared UI pieces | `core` |
+| `src/ui/sessions/` | the Live now panel and the Sessions view | `sessions` |
+| `src/ui/roster/` | the Roster view, the agent's page, the New agent page | `roster` |
+| `src/ui/settings/` | the app's Settings page | `core` |
+| `src/backend/core/` | the backend process: locations, run record, connection to Pomade | `core` |
+| `src/backend/stores/` | the agents' session stores: transcript parsers, the price table, the parse index, watching | `stores` |
+| `src/backend/records/` | the app's data files: session records and `settings.yaml` — read, written, watched | `sessions` |
+| `src/backend/sessions/` | sessions joined: summaries + records + projects; first-run adoption, record rules, project attribution | `sessions` |
+| `src/backend/roster/` | `agent.yaml`, roster import, modes and launch specs, creating agents and their aliases | `roster` |
+| `src/backend/settings/` | the app's settings and the skill folders | `core` |
+| `src/backend/interfaces/` | the API the backend serves through Pomade's broker, and what it follows of Pomade (projects, agent tabs) | `interfaces` |
+| `src/command/` | the `pomade-agents` command | `interfaces` |
+| `harness/` | development and test tooling: the sandbox, the fake Pomade (pomade-kit's fake host and its socket side) and its shell page, fixtures (synthetic transcripts in `fixtures/transcripts/`) | `core` |
+| `e2e/` | Playwright specs against the fake Pomade; `e2e/pomade/` — the smoke spec in a real Pomade | `core` |
+| `scripts/` | `dev`, `dev:fake` and the `pomade` command runner | `core` |
+
+`npm run build` builds the app folder `dist/`: the UI (`index.html`, `assets/`), `manifest.json`,
+the strip icon, and the backend bundled into one file, `backend/main.mjs`.
+
+### 1.6 Docs
+
+| Doc | Holds |
+|---|---|
+| [CONTRACTS](CONTRACTS.md) | the interfaces this app offers and the ones its parts share — manifest, surfaces and routes, published API, published events, backend, test harness |
+| [modules](modules/index.md) | the module map, and under it each module's pages (below) |
+| [user guide](user-guide/index.md) | how to use the app, task by task (below) |
+| `../Pomade/docs/PLATFORM.md` · `../Pomade/docs/HOST-API.md` | the platform and its rules · the protocol under the app's interfaces |
+
+**Modules:**
+
+| Module | Covers | Pages |
+|---|---|---|
+| [core](modules/core/index.md) | app shell: manifest, install, backend process, surfaces and routing, settings and app state, test harness | [app-shell](modules/core/app-shell.md) · [testing](modules/core/testing.md) |
+| [stores](modules/stores/index.md) | reading the agents' session stores — Claude Code (built-in + folder agents) and Codex transcripts: parsing, watching, parse index, messages, tokens, context %, cost, price table | one page |
+| [sessions](modules/sessions/index.md) | session records (names, statuses, notes, attribution, overrides), the Sessions tab, the Live now panel, names = tab names, live state | [sessions-tab](modules/sessions/sessions-tab.md) · [session-data](modules/sessions/session-data.md) · [live-now](modules/sessions/live-now.md) |
+| [roster](modules/roster/index.md) | `agent.yaml`, roster import, the Roster tab and cards, the agent detail page, modes and launch specs, creating agents and their aliases | [roster-data](modules/roster/roster-data.md) · [roster-tab](modules/roster/roster-tab.md) · [agent-page](modules/roster/agent-page.md) · [agent-config](modules/roster/agent-config.md) · [creating-agents](modules/roster/creating-agents.md) |
+| [interfaces](modules/interfaces/index.md) | the published API through Pomade's broker, events A/B/C, the `pomade-agents` command, the session-data format skill | [api](modules/interfaces/api.md) · [events](modules/interfaces/events.md) · [command](modules/interfaces/command.md) |
+
+**User guide:**
+
+| Page | What it covers |
+|---|---|
+| [sessions](user-guide/sessions.md) | the Sessions tab |
+| [live-now](user-guide/live-now.md) | the Live now panel behind the Agents icon |
+| [roster](user-guide/roster.md) | the Roster tab |
+| [agent-page](user-guide/agent-page.md) | an agent's page, tab by tab |
+| [new-agent](user-guide/new-agent.md) | creating an agent from the template or as a clone |
+| [settings](user-guide/settings.md) | the app's Settings page |
+| [agents-and-scripts](user-guide/agents-and-scripts.md) | the `pomade-agents show` command for an agent or a script, the record files, the `pomade-agents-sessions` skill |
+| [keyboard-shortcuts](user-guide/keyboard-shortcuts.md) | every key and pointer shortcut of the app |
 
 ## 2. Sessions
 
@@ -187,12 +263,12 @@ selected, the **list with the detail panel** once one is.
   clears the checks, then closes the detail panel.
 - **Empty states:** no sessions in this scope; nothing matches (with "Clear search and
   filters"); a line in each empty status.
-- **Sessions hidden from the tab** — today those that hold only a `/clear` — are left out of the
+- **Sessions hidden from the tab** — those that hold only a `/clear` — are left out of the
   rows, counts, sums, search and filters; the header says "N hidden", and clicking it shows them
   in their groups, dimmed, with a "hidden — no messages" chip, until clicked again. The header's
   count and sum never take them. Live now lists their agent tabs all the same.
 - Light theme only. One density.
-- Deep reading = Resume. There is no transcript viewer in v1.
+- Deep reading = Resume. There is no transcript viewer.
 
 **Table — nothing selected.** One scrolling table over the full width:
 
@@ -249,9 +325,6 @@ A **work session** is a session that counts. Every count and sum the app shows �
 roll-ups, an agent's sessions per project — is over work sessions, and one rule in one place in
 the code decides it: every session is a work session unless its status is Done–skip/Failed.
 The window a view counts over ("this week", "the last 90 days") is that view's own.
-
-Which other sessions are not work — started and ended at once, tests, sub-agents' — and how
-each is treated is [[P-017]].
 
 ## 3. Roster
 
@@ -316,8 +389,7 @@ modes:
 ### 3.3 Roster tab
 
 One entry per agent, in two views the user switches between with two icon buttons left of
-**New agent** — **cards** and a **list** — the choice remembered on this Mac. Layout:
-`prototypes/roster/`.
+**New agent** — **cards** and a **list** — the choice remembered on this Mac.
 
 - **Header:** the agent count; this week's work sessions (§2.9) and ~$ across agents; the view
   switch; **New agent**; the gear of the app's Settings (§3.8) sits at the right of the
@@ -396,11 +468,11 @@ project's own settings.
   combination, with the id the session will have and what to type to end the agent. Pomade's "+"
   menu and Runner both build their launches from it. Claude Code takes a new session's id
   (`--session-id`); Codex cannot, so a caller finds that session with `sessions.find`.
-- Custom modes are later ([[P-004]]).
+- Custom modes are not in the app (§10).
 
 ### 3.6 Creating an agent
 
-**Claude Code agents only in v1.** A page of its own, route `roster/new`.
+**Claude Code agents only.** A page of its own, route `roster/new`.
 
 1. **Form,** in this order:
    - **start from**: the blank template `Agents/Claude Agent Template`, or **clone** a folder
@@ -452,7 +524,11 @@ Sessions | Roster bar, kept in `settings.yaml` (§4).
   **Remove** warns when links depend on it and keeps them.
 - An agent's own `skills/` folder is always read.
 
-## 4. Data and files
+## 4. Data model and files
+
+What the app keeps — agent profiles, session names, statuses and notes, its settings — is in the
+workspace, under `<workspace>/Apps/pomade-agents/`. Its caches are machine-local, in Pomade's user
+data (`app-state/pomade-agents/`).
 
 | What | Where | Synced |
 |---|---|---|
@@ -565,9 +641,9 @@ constants (`SESSIONS_APP_ID`, `SESSIONS_FOR_REPO_METHOD`, `SESSIONS_LIVE_IN_METH
 **Published** (declared in the manifest, delivered by `pomade:E-031`; subscribers name them
 `pomade-agents:<event>`):
 
-| Event | When | v1 |
+| Event | When | Emitted |
 |---|---|---|
-| **A** `session.turnFinished` | an agent answered and waits | declared; not emitted ([[P-013]]). When it is, only while someone subscribes |
+| **A** `session.turnFinished` | an agent answered and waits | declared; not emitted (P-013). When it is, only while someone subscribes |
 | **B** `session.closed` | the session's process ended: `/exit`, tab closed, crash, a Runner run finished | yes |
 | **C** `session.statusChanged` | the user changed a status (bulk = one event per session), 5 s after the change | yes |
 
@@ -643,9 +719,16 @@ pomade-agents show     [--session <id>] [--json]
 | tab ↔ session bindings, titles both ways, live state, focus / launch / resume, "+" menu + clock icon | `pomade:E-033` |
 | opening a Runner run's attached terminal | `pomade:E-034` |
 | the tab's own route when it navigates by itself (`tabs.setRoute`: the selection) | `pomade:E-045` |
-| Host API client, fake host (`pomade-kit` v0.14.0) | `pomade-kit:E-001` |
+| Host API client, fake host (`pomade-kit`, §1.2) | `pomade-kit:E-001` |
+
+The capabilities the manifest asks for, and what each is used for: [CONTRACTS](CONTRACTS.md)
+"Manifest".
 
 ## 9. Placement
+
+`pomade-agents` is an app (PLATFORM rule 1). Its UI runs in a Pomade tab or side panel; a backend
+and commands exist only where the hosting model allows them (PLATFORM "How an app lives inside
+Pomade").
 
 | Capability | Where |
 |---|---|
@@ -658,10 +741,10 @@ pomade-agents show     [--session <id>] [--json]
 | Unattended runs | `pomade-runner` |
 | Branch ↔ session link in the Git panel | platform git, using §5 |
 
-## 10. Not in v1
+## 10. Not in the app
 
-Codex-based agents ([[P-003]]) · custom modes ([[P-004]]) · team-first "+" menu ([[P-005]]) ·
-planned sessions ([[P-006]]) · Stats tab ([[P-007]]) · Claude subscription meter ([[P-008]]) ·
-transcript tab ([[P-009]]) · Board cards → agents ([[P-010]]) · dashboard widgets ([[P-011]]) ·
-own harness / own agents ([[P-012]]) · emitting event A ([[P-013]]) · Runner runs in the Active
-group ([[P-014]], parked). Stats roll-ups: v1 scope still to be groomed ([[P-002]]).
+Codex-based agents (P-003) · custom modes (P-004) · team-first "+" menu (P-005) ·
+planned sessions (P-006) · Stats tab (P-007) · Claude subscription meter (P-008) ·
+transcript tab (P-009) · Board cards → agents (P-010) · dashboard widgets (P-011) ·
+own harness / own agents (P-012) · emitting event A (P-013) · Runner runs in the Active
+group (P-014).

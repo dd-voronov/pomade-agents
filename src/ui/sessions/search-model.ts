@@ -1,4 +1,4 @@
-// Search and filters of the Sessions tab (DESIGN §2.7 "Both layouts"), as pure functions: the
+// Search and filters of the Sessions tab (ARCHITECTURE §2.7 "Both layouts"), as pure functions: the
 // search's pattern, which of a session's texts it hits, the snippet line a row adds for a hit it
 // does not show, the parts a text splits into around its matches, each session's folder, and the
 // filters' options with their counts.

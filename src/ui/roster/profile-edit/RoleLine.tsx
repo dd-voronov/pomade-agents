@@ -1,4 +1,4 @@
-// An agent's role line, edited where it is shown (DESIGN §3.3, §3.4): a click, or Enter on the focused
+// An agent's role line, edited where it is shown (ARCHITECTURE §3.3, §3.4): a click, or Enter on the focused
 // line, turns it into a field; Enter or leaving the field saves, Esc drops the change. Hovering and
 // editing only paint — the line keeps its box (the field lies over the text, which stays in the
 // layout and takes the typed text), so nothing around it moves. A line cut to `lines` (a card's) is

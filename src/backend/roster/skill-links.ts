@@ -1,4 +1,4 @@
-// The Skills tab's writes (DESIGN §3.4): a skill is switched on by making a symlink in the agent's
+// The Skills tab's writes (ARCHITECTURE §3.4): a skill is switched on by making a symlink in the agent's
 // own `skills/` folder and off by taking that symlink away. The rules keep every write inside that
 // one folder:
 //

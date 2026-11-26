@@ -1,4 +1,4 @@
-// Projects: where the agent is offered and where it worked (DESIGN §3.4). One table — Project ·
+// Projects: where the agent is offered and where it worked (ARCHITECTURE §3.4). One table — Project ·
 // Sessions (90 d) · Last session — in two bands: Connected, the projects whose "+" menu offers the
 // agent (under the sidebar's groups), and Not connected, the others, those the agent has sessions in
 // first. Connect and Disconnect write the project's setting (`project.setAgents`) and offer Undo; a

@@ -1,4 +1,4 @@
-// The skill folders and the skills catalog as the UI and the backend both know them (DESIGN §3.4,
+// The skill folders and the skills catalog as the UI and the backend both know them (ARCHITECTURE §3.4,
 // §3.8; docs/CONTRACTS.md "Skills"): the workspace folders the catalog reads, kept in
 // `settings.yaml`; the skills they hold; and every Claude Code agent's `skills/` entries.
 //

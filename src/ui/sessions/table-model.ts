@@ -1,4 +1,4 @@
-// What the Sessions table shows, as pure functions of the sessions (DESIGN §2.7): which sessions
+// What the Sessions table shows, as pure functions of the sessions (ARCHITECTURE §2.7): which sessions
 // are in the tab's scope, their status groups in order, the ~$ sums, the latest-10 rule, the
 // columns that fit the width, and how each value reads.
 
@@ -75,7 +75,7 @@ export function costSum(sessions: readonly Session[]): number | null {
   return sum;
 }
 
-/** The work sessions of a set (`Session.work`, DESIGN §2.9): what every count and sum takes. */
+/** The work sessions of a set (`Session.work`, ARCHITECTURE §2.9): what every count and sum takes. */
 export function workSessions(sessions: readonly Session[]): Session[] {
   return sessions.filter((session) => session.work);
 }

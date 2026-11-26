@@ -1,4 +1,4 @@
-// Where the agents' transcript stores are (DESIGN §2.2) and which files in them are sessions.
+// Where the agents' transcript stores are (ARCHITECTURE §2.2) and which files in them are sessions.
 //
 // | Store | Root | Session file |
 // |---|---|---|
@@ -51,12 +51,12 @@ export function builtinRoots(home: string): StoreRoot[] {
   ];
 }
 
-/** True for a folder name the roster scan skips (DESIGN §3.1). */
+/** True for a folder name the roster scan skips (ARCHITECTURE §3.1). */
 export function isSkippedAgentFolder(name: string): boolean {
   return name === SHARED_FOLDER || name.toLowerCase().includes("template");
 }
 
-/** The folder agents (DESIGN §3.1): the name of every `<workspace>/Agents/<name>/` holding a
+/** The folder agents (ARCHITECTURE §3.1): the name of every `<workspace>/Agents/<name>/` holding a
  *  `CLAUDE.md`, except `_shared` and templates, sorted. The roster and the session stores both
  *  take their folder agents from here. */
 export async function folderAgentNames(workspace: string): Promise<string[]> {

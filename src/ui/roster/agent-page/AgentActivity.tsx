@@ -1,5 +1,5 @@
 // The agent's activity facts of the Overview, from the work-session counts (`sessions.agentCounts`,
-// DESIGN §2.9): when it was last active, and this week's work sessions and their ~$. "—" shows until
+// ARCHITECTURE §2.9): when it was last active, and this week's work sessions and their ~$. "—" shows until
 // the counts have been answered; an agent with no work session was never active and has no week.
 
 import type { ReactElement } from "react";

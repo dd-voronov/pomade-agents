@@ -1,4 +1,4 @@
-// The first run of a new agent (DESIGN §3.6), as pure functions: whether an agent still **Needs
+// The first run of a new agent (ARCHITECTURE §3.6), as pure functions: whether an agent still **Needs
 // login**, and the setup prompt the user pastes after `/login`.
 //
 // Needs login is read from session data alone: a Claude Code folder agent with no session of any

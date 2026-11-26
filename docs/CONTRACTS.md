@@ -256,7 +256,7 @@ interface AppInfo {
 
 ### Sessions
 
-A session joins four things (DESIGN §2.4, §2.6, §4), all shapes in `src/shared/sessions.ts`: what
+A session joins four things (ARCHITECTURE §2.4, §2.6, §4), all shapes in `src/shared/sessions.ts`: what
 its transcript says (the summary), the record the app keeps for it, where it shows, and what it is
 doing now (its live state).
 
@@ -355,8 +355,8 @@ type SessionsOpenResult = {
   The first message or answer makes it `null`, a change like any other. The field only marks the
   session: every read lists a hidden session as any other — `sessions.list`, `sessions.get`,
   `sessions.find`, `sessions.forRepo`, `sessions.liveIn`, Live now — and only the Sessions tab
-  leaves it out (DESIGN §2.7).
-- **Work session** (`isWorkSession` in `src/shared/work-sessions.ts`; DESIGN §2.9) — whether the
+  leaves it out (ARCHITECTURE §2.7).
+- **Work session** (`isWorkSession` in `src/shared/work-sessions.ts`; ARCHITECTURE §2.9) — whether the
   session counts: every session is one unless its record's status is `done-skip`; a session
   without a record counts. The backend sets `work` from it whenever it builds a session, so a
   status change changes `work` like any other field. Every count and sum the app shows is over
@@ -388,7 +388,7 @@ bucket, or `null` for the automatic project again; an unknown project is `not-fo
 record, `io-error` when its record file cannot be used. Every status change goes through
 `SessionData.changeStatus`.
 
-**Open / Resume — `sessions.open`** (`src/backend/sessions/open.ts`; DESIGN §2.1), through the
+**Open / Resume — `sessions.open`** (`src/backend/sessions/open.ts`; ARCHITECTURE §2.1), through the
 connection the API is served on:
 
 - `Session.tab` set → `agentTabs.focus` of that tab (`opened: "tab"`); no status change. A tab
@@ -415,7 +415,7 @@ Events are not replayed, so a frame asks once its subscription stands, and again
 while the backend does not answer; a restarted backend is another epoch and answers whole.
 
 **Tab titles** (`src/backend/sessions/tab-titles.ts`) — a session's name is its agent tab's title,
-both ways (DESIGN §2.5). The backend keeps every agent tab as Pomade last listed or changed it:
+both ways (ARCHITECTURE §2.5). The backend keeps every agent tab as Pomade last listed or changed it:
 
 - **A rename** (`SessionData.rename` — the UI, the API, the command) calls
   `agentTabs.setTitle(tabId, name)` for every tab bound to the session; `null` for an unnamed one
@@ -456,7 +456,7 @@ stops running is `closed` since that moment, and one never seen live this run is
 
 ### Live now
 
-The Live now panel's rows (DESIGN §2.8), shapes in `src/shared/live-now.ts`, built by
+The Live now panel's rows (ARCHITECTURE §2.8), shapes in `src/shared/live-now.ts`, built by
 `src/backend/sessions/live-now.ts` from the live state above.
 
 ```ts
@@ -509,7 +509,7 @@ type LiveNowAnswer = { epoch: string; revision: number; rows: LiveRow[] };  // e
 
 ### The sessions contract (git)
 
-`sessions.forRepo` and `sessions.liveIn` follow `pomade-kit/protocol` `agent-sessions` (DESIGN §5
+`sessions.forRepo` and `sessions.liveIn` follow `pomade-kit/protocol` `agent-sessions` (ARCHITECTURE §5
 "The sessions contract"): types and constants imported from the kit; every answer passes the
 kit's `checkRepoSessions` / `checkLiveIn` unchanged. Pomade asks them as the caller `pomade`, with a
 1.5 s limit (`src/backend/sessions/for-git.ts`).
@@ -536,7 +536,7 @@ kit's `checkRepoSessions` / `checkLiveIn` unchanged. Pomade asks them as the cal
 
 ### Reads for Runner
 
-`sessions.get`, `sessions.lastMessage` and `sessions.find` (DESIGN §5), shapes in
+`sessions.get`, `sessions.lastMessage` and `sessions.find` (ARCHITECTURE §5), shapes in
 `src/shared/sessions.ts`; `src/backend/sessions/for-runner.ts` answers `find`. The `Session`
 `get` answers carries `tab` — the agent tab bound to it, or `null` ("Sessions" above).
 
@@ -587,7 +587,7 @@ type SessionsFindResult = { sessions: FoundSession[] };  // earliest start first
 
 ### Roster
 
-The agents and their profiles (DESIGN §3.1, §3.2, §3.5), all shapes in `src/shared/roster.ts`;
+The agents and their profiles (ARCHITECTURE §3.1, §3.2, §3.5), all shapes in `src/shared/roster.ts`;
 `src/backend/roster/` keeps them.
 
 **Agents.** The built-ins `claude` and `codex`; one folder agent per `<workspace>/Agents/<name>/`
@@ -652,7 +652,7 @@ interface RosterAgent {           // pomade-kit/protocol
 - Answered from memory: Pomade's 1.5 s limit is never near. Pomade applies its own
   `.pomade/agents.json` overrides on top.
 
-**`roster.launchSpec`** — the command line for one launch (DESIGN §3.5):
+**`roster.launchSpec`** — the command line for one launch (ARCHITECTURE §3.5):
 
 ```ts
 type LaunchSpecParams = {
@@ -728,7 +728,7 @@ type RosterAgentsAnswer = {
 ```
 
 **`roster.connections`** — every agent's connected projects in one read, for the Roster tab's
-**Connected to** (DESIGN §3.3); read from Pomade on every call like `projectsFor`, never kept:
+**Connected to** (ARCHITECTURE §3.3); read from Pomade on every call like `projectsFor`, never kept:
 
 ```ts
 type RosterConnectionsAnswer = { connections: { agent: string; projects: string[] }[] };
@@ -755,7 +755,7 @@ would answer differently. The roster is small: a frame behind it asks `roster.ag
 A profile changed on disk is seen at once (the data folder's watch); agent folders,
 `.pomade/agents.json` and the providers' configs are read again every 2 s.
 
-**Creating an agent** (DESIGN §3.6) — `roster.checkName`, `roster.create`, `roster.checkAlias` and
+**Creating an agent** (ARCHITECTURE §3.6) — `roster.checkName`, `roster.create`, `roster.checkAlias` and
 the `roster.creating` notice; the shapes in `src/shared/roster.ts`, the name rules in
 `src/shared/agent-name.ts`, the work in `src/backend/roster/create-agent.ts` and
 `src/backend/roster/shell.ts`. Without a workspace (no profiles kept) all three are `not-ready`.
@@ -863,7 +863,7 @@ type RosterUpdateProfileResult = { profile: AgentProfile };   // as written
 - The change is in the file when the call answers; `roster.changed` follows from the data folder's
   watch.
 
-**Orphans: `roster.unclaimedFolders`, `roster.relink`, `roster.removeOrphan`** (DESIGN §3.2) —
+**Orphans: `roster.unclaimedFolders`, `roster.relink`, `roster.removeOrphan`** (ARCHITECTURE §3.2) —
 `src/backend/roster/roster.ts`:
 
 ```ts
@@ -939,7 +939,7 @@ type AgentMemory = { folders: { folder: string; files: { name: string; path: str
   the rest.
 
 **`roster.modelConfig`** / **`roster.setModel`** — an agent's default model and effort, for its
-page's Model & modes tab. The provider's config is their one truth (DESIGN §3.2):
+page's Model & modes tab. The provider's config is their one truth (ARCHITECTURE §3.2):
 
 ```ts
 type AgentModelConfig = {
@@ -994,7 +994,7 @@ An empty or non-string `tabId` is `invalid-params`.
 ### Agent counts
 
 `sessions.agentCounts` — each agent's counts over work sessions ("Sessions" above), for the
-Roster's frames (DESIGN §3.3, §3.4); shapes and the counting (`agentCounts`) in
+Roster's frames (ARCHITECTURE §3.3, §3.4); shapes and the counting (`agentCounts`) in
 `src/shared/work-sessions.ts`. The windows are the caller's: the rule knows none.
 
 ```ts
@@ -1040,7 +1040,7 @@ type ProjectCounts = {
 - Errors: `invalid-params` when either time is missing or not ISO 8601 with a zone.
 ### Skills
 
-The skill folders and the skills catalog (DESIGN §3.4, §3.8), all shapes in
+The skill folders and the skills catalog (ARCHITECTURE §3.4, §3.8), all shapes in
 `src/shared/skills.ts`; `src/backend/settings/` keeps the folder list, `src/backend/roster/skills-catalog.ts`
 reads the catalog, `src/backend/roster/skill-links.ts` makes and takes away links. The agent
 page's Skills tab and **Add skill** read `skills.catalog` and switch links with `skills.link` /
@@ -1137,7 +1137,7 @@ or removed by hand on disk is not announced: it shows on the next read.
 
 ## Command
 
-`pomade-agents` (manifest `commands`; DESIGN §7), source `src/command/` — `main.ts` (the entry:
+`pomade-agents` (manifest `commands`; ARCHITECTURE §7), source `src/command/` — `main.ts` (the entry:
 the kit's `connectSocket` as role `command`, `resolveWorkspace`), `cli.ts` (arguments, sub-commands,
 failures), `session-text.ts` (the text form); built by `vite.command.config.ts` into
 `dist/cli/pomade-agents.mjs`, one self-contained module. Pomade's shim runs it (HOST-API §2
@@ -1176,7 +1176,7 @@ pomade-agents --help · pomade-agents show --help
 - **Sub-commands** are a table in `cli.ts` (`SUB_COMMANDS`); each parses its own options and
   resolves its target with `targetOf` / `sessionOf`.
 - **The format skill** — `public/skills/pomade-agents-sessions/SKILL.md`, shipped at
-  `skills/pomade-agents-sessions/` in the build (manifest `skills`): the record files (DESIGN §4,
+  `skills/pomade-agents-sessions/` in the build (manifest `skills`): the record files (ARCHITECTURE §4,
   every key of `SESSION_RECORD_KEYS`), status semantics, work sessions and their rule, this command
   and its exit statuses, and a worked example (Done sessions with their names, from the files alone).
   `src/command/skill.test.ts` fails when its key, status or exit-status tables, or the work-session
@@ -1185,7 +1185,7 @@ pomade-agents --help · pomade-agents show --help
 
 ## Published events
 
-Events B and C (DESIGN §6) go out on Pomade's bus (HOST-API §4 `events`); a subscriber declares
+Events B and C (ARCHITECTURE §6) go out on Pomade's bus (HOST-API §4 `events`); a subscriber declares
 `pomade-agents:session.closed` and `pomade-agents:session.statusChanged` in its manifest's
 `events.subscribe`. Names and payloads are in `src/shared/session-events.ts`, which also has
 the guards `isSessionClosedEvent` and `isStatusChangedEvent`. `session.turnFinished` (A) is
@@ -1326,7 +1326,7 @@ type AgentRunFinished = AgentRunStarted & {
 - **App data** (`src/backend/records/`) — `<workspace>/Apps/pomade-agents/`; session records and
   agent profiles are two sets of files kept by one machinery (`FileSet`), with one set of
   guarantees:
-  - `sessions/<session-id>.yaml` — one record per session (DESIGN §4), written when the app first
+  - `sessions/<session-id>.yaml` — one record per session (ARCHITECTURE §4), written when the app first
     sees the session and on every change. YAML 1.2 core schema (times stay strings); a key with no
     value, and `false` for `projectOverride` / `outsidePomade`, read as absent. A rewrite changes
     only the keys whose values change — comments, extra keys, order and quoting stay. New records
@@ -1369,7 +1369,7 @@ type AgentRunFinished = AgentRunStarted & {
   `agentTab.exited` feeds event B. Runner's `run.started` / `run.finished` come in on the same
   connection ("Subscribed events" above). A rename refreshes `projectRoot` in the records of that project.
   A removed project leaves the list at once; its sessions fall to their next attribution step
-  (DESIGN §2.6): a project that no longer exists holds no session.
+  (ARCHITECTURE §2.6): a project that no longer exists holds no session.
 - **Roster** (`src/backend/roster/`) — the agents (`roster.ts`), their first-sight values
   (`first-sight.ts`: the scan, `.pomade/agents.json`, the role line), default model and effort
   (`provider-config.ts`), launch specs (`launch-spec.ts`), the connection (`connections.ts`), the

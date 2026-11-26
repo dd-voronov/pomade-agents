@@ -1,4 +1,4 @@
-// The project ↔ agent connection (DESIGN §3.3, pomade:E-030): Pomade stores it as each project's
+// The project ↔ agent connection (ARCHITECTURE §3.3, pomade:E-030): Pomade stores it as each project's
 // visible agents — the agents its "+" menu offers — and the app reads it on every call
 // (`project.getAgents`), so it never holds a copy that could go stale.
 //

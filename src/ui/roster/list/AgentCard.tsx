@@ -1,4 +1,4 @@
-// One agent as a card (DESIGN §3.3): name and state chips, provider and model, the role line, the
+// One agent as a card (ARCHITECTURE §3.3): name and state chips, provider and model, the role line, the
 // tags, Connected to, Last active, This week, and the actions. The role line (two lines) and the
 // tags (one row) are edited in place — the agent page's `RoleLine` and `TagList` — in a room of fixed
 // height, so hovering or editing them moves nothing; the actions stay inside the card at every width.

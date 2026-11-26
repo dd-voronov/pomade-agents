@@ -1,6 +1,6 @@
 // A change of an agent's role line, tags, modes and hidden mark (`roster.updateProfile`): what it may hold, and
 // the profile it makes. Only these keys are edited here; the profile's other keys are never touched.
-// Normal is always on (DESIGN §3.4): an edit can switch only the other modes off.
+// Normal is always on (ARCHITECTURE §3.4): an edit can switch only the other modes off.
 
 import { MODE_IDS, ROLE_MAX, TAG_MAX, TAGS_MAX, isRoleLine, isTagList, type AgentProfile, type ModeId } from "../../shared/roster.ts";
 

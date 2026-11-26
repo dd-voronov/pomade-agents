@@ -1,4 +1,4 @@
-// Runner's agent runs in the session data (DESIGN §2.4, §5, §6), published on the fake Pomade's bus
+// Runner's agent runs in the session data (ARCHITECTURE §2.4, §5, §6), published on the fake Pomade's bus
 // as `pomade-runner` does: a run started lists the run in `sessions.liveIn` with its job, marks its
 // session's record `startedByRunner` and makes the session Working; a run finished drops it and a
 // subscriber hears B with `run-finished`. A run without a session id is placed by its folder and

@@ -1,4 +1,4 @@
-// The skill folders in `settings.yaml` (DESIGN §3.8, §4): the `skillFolders` key read from the
+// The skill folders in `settings.yaml` (ARCHITECTURE §3.8, §4): the `skillFolders` key read from the
 // file's text and written back into it, and the rules a folder of the list follows.
 //
 // - **Absent key**: `DEFAULT_SKILL_FOLDERS`. An empty list is a list: no folders.

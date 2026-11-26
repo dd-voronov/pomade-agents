@@ -1,4 +1,4 @@
-// Checking several sessions and changing their status at once (DESIGN §2.7 "Selecting several",
+// Checking several sessions and changing their status at once (ARCHITECTURE §2.7 "Selecting several",
 // "Changing a status"), as pure functions: a toggle, a Shift range, Shift+↑↓, the header
 // checkbox's state, which sessions a row's menu or a drag acts on, what the toast says, and how an
 // Undo sets the earlier statuses back.

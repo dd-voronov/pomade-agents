@@ -1,7 +1,7 @@
 // Sessions as the UI and the backend both know them (docs/CONTRACTS.md "Sessions"): what the
-// backend learns from the providers' transcript stores (the summary, DESIGN §2.2–2.3), the session
-// record the app keeps for each one (DESIGN §4), the project(s) it shows in (DESIGN §2.6), its live
-// state (DESIGN §2.4), the methods that answer and change them and the event that says they changed.
+// backend learns from the providers' transcript stores (the summary, ARCHITECTURE §2.2–2.3), the session
+// record the app keeps for each one (ARCHITECTURE §4), the project(s) it shows in (ARCHITECTURE §2.6), its live
+// state (ARCHITECTURE §2.4), the methods that answer and change them and the event that says they changed.
 //
 // The shapes are type aliases, so they are JSON values to the broker as they are.
 
@@ -93,7 +93,7 @@ export type SessionSummary = {
   malformedLines: number;
 };
 
-/** The session record, `<workspace>/Apps/pomade-agents/sessions/<id>.yaml` (DESIGN §4): the keys
+/** The session record, `<workspace>/Apps/pomade-agents/sessions/<id>.yaml` (ARCHITECTURE §4): the keys
  *  the file holds, an absent key absent here too. */
 export type SessionRecord = {
   id: string;
@@ -126,7 +126,7 @@ export type SessionRecord = {
   updated?: string;
 };
 
-/** Which rule placed a session (DESIGN §2.6): Move to project; the project of the tab that first ran
+/** Which rule placed a session (ARCHITECTURE §2.6): Move to project; the project of the tab that first ran
  *  it; the deepest project root holding its start folder; the project it was placed in before, when
  *  no project root holds the folder any more (the project was renamed or moved); the Workspace. */
 export type AttributionRule = "override" | "launched" | "folder" | "remembered" | "workspace";
@@ -148,7 +148,7 @@ export type SessionTab = {
   projectId: string;
 };
 
-/** Why the Sessions tab leaves a session out (DESIGN §2.7): `empty` — its transcript holds no
+/** Why the Sessions tab leaves a session out (ARCHITECTURE §2.7): `empty` — its transcript holds no
  *  message of the user's and no answer, as a file that holds only a `/clear`. */
 export type HiddenReason = "empty";
 
@@ -174,7 +174,7 @@ export type Session = {
   tab: SessionTab | null;
   /** Why the Sessions tab hides it; `null`: shown. Every read lists it all the same. */
   hidden: HiddenReason | null;
-  /** True for a work session (DESIGN §2.9, `isWorkSession`): every count and sum is over these. */
+  /** True for a work session (ARCHITECTURE §2.9, `isWorkSession`): every count and sum is over these. */
   work: boolean;
 };
 
@@ -360,7 +360,7 @@ export function isSessionSummary(value: unknown): value is SessionSummary {
   );
 }
 
-/** The record keys, in the order a new record file lists them (DESIGN §4). */
+/** The record keys, in the order a new record file lists them (ARCHITECTURE §4). */
 export const SESSION_RECORD_KEYS = [
   "id",
   "provider",

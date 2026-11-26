@@ -1,4 +1,4 @@
-// What an agent's actions offer, the same on a card, a list row and the agent's page (DESIGN §3.3,
+// What an agent's actions offer, the same on a card, a list row and the agent's page (ARCHITECTURE §3.3,
 // §3.4): the modes and projects of Start session ▾, whether it can start one at all, and the words
 // the toasts say.
 

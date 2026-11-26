@@ -1,6 +1,6 @@
 // The roster as the UI and the backend both know it (docs/CONTRACTS.md "Roster"): the agent
-// profile the app keeps for each agent (`agent.yaml`, DESIGN §3.2), the roster Pomade and other
-// apps read (`roster.list`, Pomade's `RosterAgent`), launch specs (DESIGN §3.5), the project ↔
+// profile the app keeps for each agent (`agent.yaml`, ARCHITECTURE §3.2), the roster Pomade and other
+// apps read (`roster.list`, Pomade's `RosterAgent`), launch specs (ARCHITECTURE §3.5), the project ↔
 // agent connection, and the app's own full read with its change notice.
 //
 // The shapes are type aliases, so they are JSON values to the broker as they are.
@@ -30,13 +30,13 @@ export const ROSTER_CHANGED_EVENT = "roster.changed";
 /** The projects each agent is connected to, for the app's own frames; answers `RosterConnectionsAnswer`. */
 export const ROSTER_CONNECTIONS_METHOD = "roster.connections";
 
-/** The modes every provider has (DESIGN §3.5), in the order the roster lists them. */
+/** The modes every provider has (ARCHITECTURE §3.5), in the order the roster lists them. */
 export const MODE_IDS = ["normal", "full-autonomy"] as const;
 export type ModeId = (typeof MODE_IDS)[number];
 
 export type AgentKind = "builtin" | "folder";
 
-/** One agent's `agent.yaml` as the app reads it (DESIGN §3.2). `tags` and `hidden` absent from the
+/** One agent's `agent.yaml` as the app reads it (ARCHITECTURE §3.2). `tags` and `hidden` absent from the
  *  file read as `[]` and `false`; a mode absent from `modes` is not enabled. */
 export type AgentProfile = {
   id: string;
@@ -202,7 +202,7 @@ export function isLaunchSpec(value: unknown): value is LaunchSpec {
   );
 }
 
-// ── Creating an agent (DESIGN §3.6) ─────────────────────────────────────────
+// ── Creating an agent (ARCHITECTURE §3.6) ─────────────────────────────────────────
 
 /** Whether a name can be had for a new agent; answers `NameVerdict`. */
 export const ROSTER_CHECK_NAME_METHOD = "roster.checkName";

@@ -1,4 +1,4 @@
-// The roster through the fake Pomade's broker, as Pomade and Runner call it (DESIGN §3, §5): in the
+// The roster through the fake Pomade's broker, as Pomade and Runner call it (ARCHITECTURE §3, §5): in the
 // sandbox workspace every agent gets its `agent.yaml` — the folder agent's role line from its
 // `CLAUDE.md`; `roster.list` passes Pomade's own check and leaves a hidden agent out; launch specs
 // carry the provider's mode argument and resume form, and their `line` runs in a real shell to

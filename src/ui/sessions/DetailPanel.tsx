@@ -1,4 +1,4 @@
-// The detail panel (DESIGN §2.7 "List with the detail panel"): one session's name — renamed in
+// The detail panel (ARCHITECTURE §2.7 "List with the detail panel"): one session's name — renamed in
 // place — its live state and since when (Closed: when it was last active), Open tab / Resume (with its hint), Rename and Move to project, its marker notes, its status as four buttons with the one-line note under them, the
 // facts, and its first message, last message and last agent answer. A refused change says so
 // under the note.

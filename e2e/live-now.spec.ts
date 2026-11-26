@@ -1,4 +1,4 @@
-// The Live now panel (DESIGN §2.8): every agent tab that runs an agent, across projects, grouped by
+// The Live now panel (ARCHITECTURE §2.8): every agent tab that runs an agent, across projects, grouped by
 // project with the active one first and tagged "current"; two-line rows ordered Needs you →
 // Working → Idle; a click focuses the tab and Pomade switches to its project. The Agents icon's
 // badge counts the Needs you rows — set by the backend, so it is right before the panel was ever

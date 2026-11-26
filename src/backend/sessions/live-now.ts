@@ -1,4 +1,4 @@
-// The Live now panel's rows and the Agents icon's badge (DESIGN §2.8; docs/CONTRACTS.md "Live
+// The Live now panel's rows and the Agents icon's badge (ARCHITECTURE §2.8; docs/CONTRACTS.md "Live
 // now"), from the live state the backend already keeps: one row per live agent tab, with its
 // session's name and first message and its agent (the session's, once known) with the roster's name, and one per Runner agent run while
 // it runs, with its job and its attached terminal (`runner-runs.ts`). The backend keeps the badge — the

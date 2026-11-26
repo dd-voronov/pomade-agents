@@ -1,4 +1,4 @@
-// Why the Sessions tab hides a session (DESIGN §2.7), decided from its summary — the one place the
+// Why the Sessions tab hides a session (ARCHITECTURE §2.7), decided from its summary — the one place the
 // rules live. A session that holds no message of the user's and no answer from the agent — a file
 // a `/clear` wrote and nothing after it — is `empty`. The first message or answer makes it shown.
 

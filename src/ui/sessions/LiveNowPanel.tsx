@@ -1,4 +1,4 @@
-// The Live now panel — what the Agents strip icon fills Pomade's side panel with (DESIGN §2.8):
+// The Live now panel — what the Agents strip icon fills Pomade's side panel with (ARCHITECTURE §2.8):
 // every agent running now across projects, grouped by project, the active one first. A tab row's
 // click focuses its agent tab (Pomade switches to its project); an unattended run's (⏱, its job's
 // name) opens its attached terminal tab in its project. A group header's click switches to its

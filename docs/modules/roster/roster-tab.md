@@ -11,7 +11,7 @@ The route `roster` renders `RosterList` (`src/ui/roster/list/`): every agent as 
 row**, with where it is connected, when it was last active, this week's work sessions and ~$, and its
 actions. `RosterTab.tsx` picks the state by route: `roster` is this page, `roster/new` the New agent page
 ([creating-agents](creating-agents.md)), `roster/<agent>/<tab>` an agent's page
-([agent-page](agent-page.md)). Design: [DESIGN](../../DESIGN.md) §3.3. Routes: [CONTRACTS "Surfaces and
+([agent-page](agent-page.md)). Design: [ARCHITECTURE](../../ARCHITECTURE.md) §3.3. Routes: [CONTRACTS "Surfaces and
 routes"](../../CONTRACTS.md#surfaces-and-routes). Users: [Roster](../../user-guide/roster.md).
 
 ## What it reads

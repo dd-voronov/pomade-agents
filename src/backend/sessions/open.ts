@@ -1,4 +1,4 @@
-// Open / Resume (DESIGN §2.1; `sessions.open`): the user is back in a session in one action.
+// Open / Resume (ARCHITECTURE §2.1; `sessions.open`): the user is back in a session in one action.
 //
 // - A session bound to an agent tab Pomade lists (`Session.tab`) → that tab is focused
 //   (`agentTabs.focus`); a tab that left the list meanwhile is resumed past.

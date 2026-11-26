@@ -1,4 +1,4 @@
-// The Skills tab's lists, from the skills catalog (DESIGN §3.4): the agent's `skills/` entries
+// The Skills tab's lists, from the skills catalog (ARCHITECTURE §3.4): the agent's `skills/` entries
 // grouped by skill folder — the listed folders in the Settings order, then a folder a link points
 // into that Settings no longer lists (marked), then the agent's own — and what **Add skill** offers.
 //

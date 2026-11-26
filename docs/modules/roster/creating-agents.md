@@ -10,7 +10,7 @@ kind: reference
 A new agent is a Claude Code **folder agent** — `Agents/<name>/` with its own `CLAUDE.md`, skills and
 settings, a profile, an alias in `~/.zshrc` — made from the blank template or cloned from an existing folder
 agent. Codex-based agents are not created (the Provider field's Codex button is off). Design:
-[DESIGN](../../DESIGN.md) §3.6. Contracts: [CONTRACTS "Roster"](../../CONTRACTS.md#roster) ("Creating an
+[ARCHITECTURE](../../ARCHITECTURE.md) §3.6. Contracts: [CONTRACTS "Roster"](../../CONTRACTS.md#roster) ("Creating an
 agent"). Users: [New agent](../../user-guide/new-agent.md). Code: `src/ui/roster/new-agent/`
 (`NewAgentPage.tsx`, `new-agent-model.ts`, `useNewAgent.ts`), `src/ui/roster/needs-login.ts`,
 `src/backend/roster/create-agent.ts`, `src/backend/roster/shell.ts`, `src/shared/agent-name.ts`, the shapes

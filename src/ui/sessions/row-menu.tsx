@@ -1,4 +1,4 @@
-// A session row's menu (DESIGN §2.7): Open / Resume, Rename and Move to project for the one session
+// A session row's menu (ARCHITECTURE §2.7): Open / Resume, Rename and Move to project for the one session
 // it was opened on, then Set status. Those three show only when the menu acts on that
 // session alone; Set status acts on every checked session when the row is one of several checked.
 // Also the Move to project menu itself, which the detail panel's button opens.

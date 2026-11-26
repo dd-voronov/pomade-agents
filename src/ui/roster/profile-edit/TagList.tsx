@@ -1,4 +1,4 @@
-// An agent's tags, edited where they are shown (DESIGN §3.3, §3.4): × on a tag removes it, "+ tag"
+// An agent's tags, edited where they are shown (ARCHITECTURE §3.3, §3.4): × on a tag removes it, "+ tag"
 // takes a field where Enter or a comma adds the tag, leaving the field adds what is typed, Esc drops
 // it. Every change saves the whole list at once. The × and the add button have their room in every
 // state, and the field is the add button's size, so hovering and adding never move a tag. Used by
