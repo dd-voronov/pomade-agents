@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Pomade app: the agent roster and session data",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">=22.18"
