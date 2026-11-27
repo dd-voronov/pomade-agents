@@ -29,6 +29,9 @@ The `pomade` command is found on `PATH` (Pomade's own terminals have it), else a
 
 The gate: `npm run lint && npm run typecheck && npm run build && npm run test:unit && npm run e2e`.
 
+`AGENTS_E2E_PORT_BASE` (default 4337) moves the e2e's two web servers to that port and the next, so
+two checkouts run their e2e at the same time.
+
 ## Layout
 
 | Folder | Holds |
